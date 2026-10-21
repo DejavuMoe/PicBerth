@@ -87,6 +87,15 @@ export function setQuery(patch: Record<string, string | undefined>) {
   apply();
 }
 
+/** Edit the current query with a callback (for repeated parameters) without adding a history entry. */
+export function updateQuery(edit: (p: URLSearchParams) => void) {
+  const p = new URLSearchParams(location.search);
+  edit(p);
+  const s = p.toString();
+  history.replaceState(null, '', location.pathname + (s ? `?${s}` : ''));
+  apply();
+}
+
 /** Only same-site app paths may be used as a post-login destination. */
 export function safeNext(next: string | null): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/';

@@ -36,6 +36,7 @@ export interface Image {
   broken: boolean;
   duplicate: boolean;
   source: ImageSource;
+  tags: string[];
   createdAt: string;
   trashedAt: string | null;
   links: Links;
@@ -46,17 +47,49 @@ export interface ImagePage {
   nextCursor: string | null;
 }
 
-export type ImageSort = 'new' | 'old' | 'large' | 'small';
+export type ImageSort = 'new' | 'old' | 'large' | 'small' | 'name';
 
 export interface ImageQuery {
   state?: ImageState;
   q?: string;
-  format?: ImageFormat;
+  /** Any-of. */
+  format?: ImageFormat[];
   visibility?: Visibility;
   gps?: boolean;
+  /** All-of. */
+  tag?: string[];
+  /** web, cli or 	oken:<id>; any-of. */
+  source?: string[];
+  /** RFC 3339: created_at >= since, created_at < until. */
+  since?: string;
+  until?: string;
   sort?: ImageSort;
   limit?: number;
   cursor?: string;
+}
+
+export interface ImagePatch {
+  visibility?: Visibility;
+  filename?: string;
+  tags?: string[];
+}
+
+export interface FacetSource {
+  key: string;
+  kind: ImageSource['kind'];
+  tokenId?: number;
+  tokenName?: string;
+  count: number;
+}
+
+export interface Facets {
+  total: number;
+  bytes: number;
+  formats: Record<ImageFormat, number>;
+  visibility: Record<Visibility, number>;
+  gps: number;
+  sources: FacetSource[];
+  tags: { tag: string; count: number }[];
 }
 
 export type BatchAction = 'trash' | 'restore' | 'purge' | 'visibility';

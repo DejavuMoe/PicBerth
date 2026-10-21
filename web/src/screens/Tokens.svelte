@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Button from '../components/Button.svelte';
-  import ConfirmDialog from '../components/ConfirmDialog.svelte';
-  import EmptyState from '../components/EmptyState.svelte';
-  import PageHeader from '../components/PageHeader.svelte';
+  import Icon from '../components/Icon.svelte';
+  import Modal from '../components/Modal.svelte';
   import { api, errorMessage } from '../lib/api';
   import { formatAbsolute, formatDate, formatRelative } from '../lib/format';
+  import { phone } from '../lib/media.svelte';
   import { toast } from '../lib/toast.svelte';
   import type { Scope, Token } from '../lib/types';
   import TokenDialog from './TokenDialog.svelte';
@@ -17,7 +16,6 @@
   let errorText = $state('');
   let creating = $state(false);
   let revoking = $state<Token | null>(null);
-  let revokeOpen = $state(false);
 
   async function load() {
     try {
@@ -30,209 +28,158 @@
   }
   onMount(() => void load());
 
-  function askRevoke(t: Token) {
-    revoking = t;
-    revokeOpen = true;
-  }
   async function revoke() {
     const t = revoking;
+    revoking = null;
     if (!t) return;
     try {
       await api.revokeToken(t.id);
-      toast(`已吊销「${t.name}」`);
+      toast('令牌已吊销');
       await load();
     } catch (e) {
       toast(errorMessage(e));
     }
   }
 
-  function expiryOf(t: Token): { text: string; expired: boolean } {
-    if (!t.expiresAt) return { text: '永不过期', expired: false };
-    const expired = new Date(t.expiresAt).getTime() < Date.now();
-    return { text: formatDate(t.expiresAt), expired };
-  }
   // Prefixes are stored without the ellipsis; it marks "the rest is secret".
   const shownPrefix = (p: string) => (p.endsWith('…') ? p : `${p}…`);
+  const expired = (t: Token) => !!t.expiresAt && new Date(t.expiresAt).getTime() < Date.now();
 </script>
 
-<div class="page tokens">
-  <PageHeader title="令牌" meta="给 PicGo、ShareX 和脚本使用的上传凭证" mono={false}>
-    {#snippet actions()}
-      <Button variant="primary" icon="plus" onclick={() => (creating = true)}>新建令牌</Button>
-    {/snippet}
-  </PageHeader>
+{#snippet scopeBadges(scopes: Scope[])}
+  <span class="adm-badges">
+    {#each scopes as s (s)}
+      <span class="badge" class:badge-warning={s === 'manage'}>{SCOPE_LABEL[s] ?? s}</span>
+    {/each}
+  </span>
+{/snippet}
+
+{#snippet expiry(t: Token)}
+  {#if t.revokedAt}
+    <span class="badge">已吊销</span>
+  {:else if !t.expiresAt}
+    <span>永不过期</span>
+  {:else if expired(t)}
+    <span class="badge badge-danger">已过期</span>
+  {:else}
+    <span class="num" title={formatAbsolute(t.expiresAt)}>{formatDate(t.expiresAt)}</span>
+  {/if}
+{/snippet}
+
+{#snippet lastUsed(t: Token)}
+  {#if t.lastUsedAt}
+    <span title={formatAbsolute(t.lastUsedAt)}>{formatRelative(t.lastUsedAt)}</span>
+  {:else}
+    <span class="subtle">从未使用</span>
+  {/if}
+{/snippet}
+
+{#snippet newButton()}
+  <button type="button" class="btn btn-primary" onclick={() => (creating = true)}>
+    <Icon name="plus" />
+    新建令牌
+  </button>
+{/snippet}
+
+<div class="page" style="--page-w: 1040px">
+  <div class="page-head">
+    <div>
+      <h1>令牌</h1>
+      <p>用于 PicGo、ShareX 和脚本上传</p>
+    </div>
+    {#if phase === 'ready' && tokens.length > 0}<div class="page-actions">{@render newButton()}</div>{/if}
+  </div>
 
   {#if phase === 'loading'}
-    <p class="muted">加载中…</p>
+    <p class="subtle">加载中…</p>
   {:else if phase === 'error'}
-    <EmptyState message={`加载失败：${errorText}`}>
-      <Button onclick={() => void load()}>重试</Button>
-    </EmptyState>
+    <div class="alert danger" role="alert">
+      <Icon name="alert" />
+      <div class="grow">加载失败：{errorText}</div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick={() => void load()}>重试</button>
+    </div>
   {:else if tokens.length === 0}
-    <EmptyState title="还没有令牌" message="新建一个令牌，就能用 PicGo、ShareX 或脚本上传照片。">
-      <Button variant="primary" icon="plus" onclick={() => (creating = true)}>新建令牌</Button>
-    </EmptyState>
-  {:else}
-    <ul class="rows" aria-label="令牌列表">
+    <div class="empty">
+      <strong>还没有令牌</strong>
+      <p>新建令牌后，可以在 PicGo、ShareX 或脚本中上传图片。</p>
+      <div class="actions">{@render newButton()}</div>
+    </div>
+  {:else if phone.matches}
+    <div class="adm-tcards">
       {#each tokens as t (t.id)}
-        {@const exp = expiryOf(t)}
-        {@const revokedRow = !!t.revokedAt}
-        <li class="row" class:revoked={revokedRow}>
-          <div class="id">
-            <p class="name-line">
-              <span class="name">{t.name}</span>
-              {#if revokedRow}<span class="stamp">已吊销</span>{/if}
-            </p>
-            <p class="prefix mono">{shownPrefix(t.prefix)}</p>
-          </div>
-
-          <div class="scopes">
-            {#each t.scopes as s (s)}
-              <span class="stamp" class:solid={s === 'manage' && !revokedRow}>{SCOPE_LABEL[s] ?? s}</span>
-            {/each}
-          </div>
-
-          <dl class="meta">
-            <div>
-              <dt>创建</dt>
-              <dd title={formatAbsolute(t.createdAt)}>{formatRelative(t.createdAt)}</dd>
+        <div class="card adm-tcard" class:adm-revoked={!!t.revokedAt}>
+          <div class="adm-tcard-top">
+            <div class="cell-name">
+              <span class="name truncate">{t.name}</span>
+              <span class="sub mono">{shownPrefix(t.prefix)}</span>
             </div>
-            <div>
-              <dt>最近使用</dt>
-              <dd title={t.lastUsedAt ? formatAbsolute(t.lastUsedAt) : undefined}>
-                {t.lastUsedAt ? formatRelative(t.lastUsedAt) : '从未使用'}
-              </dd>
-            </div>
-            <div>
-              <dt>过期</dt>
-              <dd class="exp" title={t.expiresAt ? formatAbsolute(t.expiresAt) : undefined}>
-                {#if exp.expired && !revokedRow}<span class="stamp danger">已过期</span>{/if}
-                {exp.text}
-              </dd>
-            </div>
-          </dl>
-
-          <div class="act">
-            {#if !revokedRow}
-              <Button variant="danger" size="sm" aria-label="吊销「{t.name}」" onclick={() => askRevoke(t)}>吊销</Button>
+            {#if t.revokedAt}
+              <span class="badge">已吊销</span>
+            {:else}
+              <button type="button" class="btn btn-danger btn-sm" aria-label={`吊销「${t.name}」`} onclick={() => (revoking = t)}>吊销</button>
             {/if}
           </div>
-        </li>
+          {@render scopeBadges(t.scopes)}
+          <div class="adm-kv">
+            <span>最近使用</span>
+            <span>{@render lastUsed(t)}</span>
+          </div>
+          {#if !t.revokedAt}
+            <div class="adm-kv">
+              <span>过期</span>
+              <span>{@render expiry(t)}</span>
+            </div>
+          {/if}
+        </div>
       {/each}
-    </ul>
+    </div>
+  {:else}
+    <div class="table-wrap">
+      <table class="table adm-table">
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>权限</th>
+            <th>最近使用</th>
+            <th>过期</th>
+            <th class="c-actions"><span class="sr-only">操作</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each tokens as t (t.id)}
+            <tr class:adm-revoked={!!t.revokedAt}>
+              <td>
+                <div class="cell-name">
+                  <span class="name truncate">{t.name}</span>
+                  <span class="sub mono">{shownPrefix(t.prefix)}</span>
+                </div>
+              </td>
+              <td>{@render scopeBadges(t.scopes)}</td>
+              <td>{@render lastUsed(t)}</td>
+              <td>{@render expiry(t)}</td>
+              <td class="c-actions">
+                {#if !t.revokedAt}
+                  <button type="button" class="btn btn-danger btn-sm" aria-label={`吊销「${t.name}」`} onclick={() => (revoking = t)}>吊销</button>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
   {/if}
 </div>
 
-<TokenDialog bind:open={creating} onfinished={() => void load()} />
+{#if creating}
+  <TokenDialog onclose={() => (creating = false)} onfinished={() => void load()} />
+{/if}
 
-<ConfirmDialog
-  bind:open={revokeOpen}
-  title={revoking ? `吊销「${revoking.name}」？` : '吊销令牌？'}
-  message="吊销后，使用此令牌的客户端会立即失效，且无法恢复。"
-  confirmLabel="吊销"
-  danger
-  onconfirm={revoke}
-/>
-
-<style>
-  .rows {
-    border-top: 1px solid var(--ink);
-  }
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) 156px minmax(0, 1.1fr) 64px;
-    grid-template-areas: 'id scopes meta act';
-    align-items: center;
-    column-gap: var(--s5);
-    padding: 17px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .id {
-    grid-area: id;
-    min-width: 0;
-  }
-  .name-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s1) var(--s2);
-  }
-  .name {
-    font-size: 15px;
-    font-weight: 650;
-    line-height: 1.35;
-  }
-  .prefix {
-    margin-top: 3px;
-    color: var(--ink-3);
-    font-size: var(--t-12);
-  }
-  .scopes {
-    grid-area: scopes;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s1);
-  }
-  .meta {
-    grid-area: meta;
-    display: grid;
-    grid-template-columns: 4.5em minmax(0, 1fr);
-    column-gap: var(--s2);
-    row-gap: 2px;
-    color: var(--ink-3);
-    font-size: var(--t-13);
-    line-height: 1.5;
-  }
-  .meta div {
-    display: contents;
-  }
-  .meta dd {
-    min-width: 0;
-  }
-  .exp {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s1) var(--s2);
-  }
-  .act {
-    grid-area: act;
-    justify-self: end;
-  }
-
-  .revoked {
-    color: var(--ink-3);
-  }
-  .revoked .name {
-    text-decoration: line-through;
-    text-decoration-thickness: 1px;
-  }
-  .revoked .scopes .stamp {
-    color: var(--ink-3);
-  }
-
-  @media (max-width: 760px) {
-    .row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        'id act'
-        'scopes scopes'
-        'meta meta';
-      align-items: start;
-      row-gap: var(--s2);
-      padding: var(--s3) 0 14px;
-    }
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2px var(--s4);
-    }
-    .meta div {
-      display: flex;
-      gap: var(--s1);
-    }
-    .scopes:empty {
-      display: none;
-    }
-  }
-</style>
+{#if revoking}
+  <Modal title={`吊销令牌「${revoking.name}」？`} width="440px" onclose={() => (revoking = null)}>
+    <p>使用此令牌的工具将无法继续上传。</p>
+    {#snippet footer()}
+      <button type="button" class="btn btn-secondary" data-autofocus onclick={() => (revoking = null)}>取消</button>
+      <button type="button" class="btn btn-danger-solid" onclick={revoke}>吊销</button>
+    {/snippet}
+  </Modal>
+{/if}

@@ -1,10 +1,9 @@
 // Upload queue: concurrency 3, one XHR per file (for real progress), client pre-checks,
 // window-wide drop / paste, link format preference.
 
-import { SvelteSet } from 'svelte/reactivity';
 import { ApiError, errorDetail, errorMessage, handleUnauthorized, isRetryable, networkError, noteVersion, problemFrom } from './api';
 import { formatBytes, formatLimit, formatNames } from './format';
-import { isTypingTarget, modalOpen } from './modal';
+import { dropBlocked, isTypingTarget } from './modal';
 import { session } from './session.svelte';
 import type { Image, ImageFormat, LinkFormat, Visibility } from './types';
 
@@ -64,8 +63,8 @@ function loadFormat(): LinkFormat {
   return 'url';
 }
 
-/** Images archived during this page session (the sheet marks them NEW). */
-export const freshIds = new SvelteSet<string>();
+/** The upload dialog; opened whenever files are queued. */
+export const uploadDialog = $state({ open: false });
 
 type UploadedListener = (image: Image) => void;
 const uploadedListeners = new Set<UploadedListener>();
@@ -175,6 +174,7 @@ export function addFiles(files: File[]) {
   const rejected = batch.filter((i) => i.status === 'error').length;
   if (rejected > 0) announce(`${rejected} 个文件未通过检查，未上传`);
   uploads.items.unshift(...batch);
+  uploadDialog.open = true;
   pump();
 }
 
@@ -246,7 +246,6 @@ function start(item: UploadItem) {
         item.image = image;
         item.status = 'done';
         announce(`已上传 ${item.name}`);
-        if (!image.duplicate) freshIds.add(image.id);
         // Outside this try: a listener's failure is not an upload failure.
         queueMicrotask(() => {
           for (const l of uploadedListeners) l(image);
@@ -309,11 +308,11 @@ export function removeItem(id: number) {
   pump();
 }
 
-/** Remove finished and failed rows; keeps anything still waiting or in flight. */
+/** Remove finished rows; keeps failures and anything still waiting or in flight. */
 export function clearFinished() {
   for (let i = uploads.items.length - 1; i >= 0; i--) {
     const item = uploads.items[i];
-    if (item && (item.status === 'done' || item.status === 'error')) {
+    if (item && item.status === 'done') {
       release(item);
       uploads.items.splice(i, 1);
     }
@@ -341,8 +340,8 @@ function pastedName(file: File): File {
   return new File([file], `pasted-${stamp}.${ext}`, { type: file.type, lastModified: file.lastModified });
 }
 
-/** Install on authenticated routes. `onAdded` runs after files were queued (e.g. navigate to /). */
-export function installGlobalInput(onAdded: () => void): () => void {
+/** Install on authenticated routes. */
+export function installGlobalInput(): () => void {
   let heartbeat: ReturnType<typeof setTimeout> | undefined;
 
   const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
@@ -353,7 +352,7 @@ export function installGlobalInput(onAdded: () => void): () => void {
   };
 
   const onDragEnter = (e: DragEvent) => {
-    if (!hasFiles(e) || modalOpen()) return;
+    if (!hasFiles(e) || dropBlocked()) return;
     e.preventDefault();
     uploads.drag.active = true;
     const items = e.dataTransfer?.items;
@@ -362,8 +361,8 @@ export function installGlobalInput(onAdded: () => void): () => void {
   const onDragOver = (e: DragEvent) => {
     if (!hasFiles(e)) return;
     e.preventDefault(); // required to allow a drop
-    if (e.dataTransfer) e.dataTransfer.dropEffect = modalOpen() ? 'none' : 'copy';
-    if (modalOpen()) return;
+    if (e.dataTransfer) e.dataTransfer.dropEffect = dropBlocked() ? 'none' : 'copy';
+    if (dropBlocked()) return;
     uploads.drag.active = true;
     // Some browsers never fire a final dragleave when the pointer exits the window.
     clearTimeout(heartbeat);
@@ -376,19 +375,17 @@ export function installGlobalInput(onAdded: () => void): () => void {
     if (!hasFiles(e)) return;
     e.preventDefault(); // never let the browser navigate to a dropped file
     stopDrag();
-    if (modalOpen()) return;
+    if (dropBlocked()) return;
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (files.length === 0) return;
     addFiles(files);
-    onAdded();
   };
   const onPaste = (e: ClipboardEvent) => {
-    if (isTypingTarget(e.target) || modalOpen()) return;
+    if (isTypingTarget(e.target) || dropBlocked()) return;
     const files = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/'));
     if (files.length === 0) return;
     e.preventDefault();
     addFiles(files.map(pastedName));
-    onAdded();
   };
   const onBeforeUnload = (e: BeforeUnloadEvent) => {
     if (!busy()) return;

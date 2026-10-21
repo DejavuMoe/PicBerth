@@ -1,7 +1,5 @@
 <script lang="ts">
-  import AuthPanel from '../components/AuthPanel.svelte';
-  import Button from '../components/Button.svelte';
-  import TextField from '../components/TextField.svelte';
+  import AuthCard from '../components/AuthCard.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -34,28 +32,18 @@
   }
 </script>
 
-<AuthPanel title="登录" subtitle="登录后管理你的底片">
-  <form onsubmit={submit} class="form" novalidate>
-    <TextField label="用户名" bind:value={username} autocomplete="username" autocapitalize="none" spellcheck={false} autofocus required />
-    <TextField label="密码" type="password" bind:value={password} autocomplete="current-password" required />
-    {#if error}<p class="error" role="alert">{error}</p>{/if}
-    <div class="actions">
-      <Button type="submit" variant="primary" block disabled={busy || !username || !password}>登录</Button>
+<AuthCard title="登录">
+  <form onsubmit={submit} novalidate>
+    <div class="field">
+      <label for="login-user">用户名</label>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input id="login-user" class="input" bind:value={username} autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required />
     </div>
+    <div class="field">
+      <label for="login-pass">密码</label>
+      <input id="login-pass" class="input" type="password" bind:value={password} autocomplete="current-password" required />
+    </div>
+    {#if error}<p class="error-text" role="alert">{error}</p>{/if}
+    <button type="submit" class="btn btn-primary btn-block" disabled={busy || !username || !password}>登录</button>
   </form>
-</AuthPanel>
-
-<style>
-  .form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s4);
-  }
-  .actions {
-    margin-top: var(--s2);
-  }
-  .error {
-    color: var(--danger);
-    font-size: var(--t-13);
-  }
-</style>
+</AuthCard>

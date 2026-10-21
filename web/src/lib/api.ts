@@ -4,9 +4,12 @@ import type {
   BatchAction,
   BatchResult,
   CheckReport,
+  Facets,
   Image,
   ImagePage,
+  ImagePatch,
   ImageQuery,
+  ImageState,
   SessionInfo,
   Settings,
   Snapshot,
@@ -168,11 +171,16 @@ export function handleUnauthorized() {
 // Transport
 
 type Primitive = string | number | boolean | null | undefined;
+type QueryValue = Primitive | readonly string[];
 
-function qs(query?: Record<string, Primitive>): string {
+function qs(query?: Record<string, QueryValue>): string {
   if (!query) return '';
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
+    if (Array.isArray(v)) {
+      for (const x of v) p.append(k, String(x));
+      continue;
+    }
     if (v === undefined || v === null || v === '' || v === false) continue;
     p.set(k, String(v));
   }
@@ -181,7 +189,7 @@ function qs(query?: Record<string, Primitive>): string {
 }
 
 interface RequestOptions {
-  query?: Record<string, Primitive>;
+  query?: Record<string, QueryValue>;
   json?: unknown;
   signal?: AbortSignal;
   /** Do not treat a 401 as an expired session (login attempts). */
@@ -241,8 +249,11 @@ export const api = {
   listImages: (q: ImageQuery, signal?: AbortSignal) =>
     request<ImagePage>('GET', '/images', { query: { ...q }, signal }),
   getImage: (id: string) => request<Image>('GET', `/images/${encodeURIComponent(id)}`),
+  patchImage: (id: string, patch: ImagePatch) =>
+    request<Image>('PATCH', `/images/${encodeURIComponent(id)}`, { json: patch }),
   setVisibility: (id: string, visibility: Visibility) =>
     request<Image>('PATCH', `/images/${encodeURIComponent(id)}`, { json: { visibility } }),
+  facets: (state: ImageState) => request<Facets>('GET', '/images/facets', { query: { state } }),
   batch: async (action: BatchAction, ids: string[], visibility?: Visibility): Promise<BatchResult[]> => {
     const out: BatchResult[] = [];
     // The server accepts at most 500 ids per call.
