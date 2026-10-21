@@ -63,8 +63,24 @@
         ]
       },
       "production": {
-        "routeOrWindow": "/",
-        "files": [],
+        "routeOrWindow": "/library",
+        "files": [
+          "web/src/App.svelte",
+          "web/src/app.css",
+          "web/src/components/Shell.svelte",
+          "web/src/screens/Library.svelte",
+          "web/src/components/library",
+          "web/src/components/UploadDialog.svelte",
+          "web/src/screens/Tokens.svelte",
+          "web/src/screens/TokenDialog.svelte",
+          "web/src/screens/Settings.svelte",
+          "web/src/screens/Status.svelte",
+          "web/src/lib/library.svelte.ts",
+          "web/src/lib/facets.svelte.ts",
+          "web/src/lib/api.ts",
+          "internal/httpapi/handlers_images.go",
+          "internal/core/tags.go"
+        ],
         "interfaces": [
           "GET /api/v1/images",
           "PATCH /api/v1/images/{id}",
@@ -75,9 +91,13 @@
           "/api/v1/status",
           "/api/v1/audit"
         ],
-        "tests": []
+        "tests": [
+          "internal/core/tags_test.go",
+          "internal/httpapi/tags_test.go",
+          "internal/meta/tags_test.go"
+        ]
       },
-      "status": "approved",
+      "status": "implemented",
       "approvedVariant": "Direction A (index.html default, ?d=a) with extension features on. Directions B and C remain in the file only as rejected alternatives."
     }
   ]
