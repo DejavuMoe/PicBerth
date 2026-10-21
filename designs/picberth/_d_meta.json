@@ -29,8 +29,21 @@
           }
         }
       ]
+    },
+    "登录与初始化": {
+      "versions": [
+        {
+          "path": "auth.html",
+          "createdAt": "2026-10-21T15:20:41.681Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ]
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-21T12:49:04.184Z"
+  "updatedAt": "2026-10-21T15:20:41.682Z"
 }

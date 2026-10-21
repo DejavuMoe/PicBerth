@@ -99,6 +99,55 @@
       },
       "status": "implemented",
       "approvedVariant": "Direction A (index.html default, ?d=a) with extension features on. Directions B and C remain in the file only as rejected alternatives."
+    },
+    {
+      "id": "auth",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "auth.html",
+        "assetPath": "auth.html",
+        "files": [
+          "auth.html",
+          "auth.jsx",
+          "styles.css",
+          "data.jsx",
+          "ui.jsx"
+        ],
+        "states": [
+          "setup-empty",
+          "setup-validation",
+          "setup-wrong-code",
+          "setup-busy",
+          "setup-already-done",
+          "login-empty",
+          "login-error",
+          "login-offline",
+          "login-busy",
+          "not-found",
+          "light-dark",
+          "mobile-390"
+        ],
+        "stableIds": [
+          "setup",
+          "login",
+          "not-found"
+        ]
+      },
+      "production": {
+        "routeOrWindow": "/login",
+        "files": [
+          "web/src/screens/Login.svelte",
+          "web/src/screens/Setup.svelte",
+          "web/src/screens/NotFound.svelte",
+          "web/src/components/AuthCard.svelte"
+        ],
+        "interfaces": [
+          "POST /api/v1/setup",
+          "POST /api/v1/session"
+        ],
+        "tests": []
+      },
+      "status": "needs-review"
     }
   ]
 }
