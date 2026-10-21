@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PicBerth 原型方案对比</title>
+    <style>
+      :root {
+        --bg: #f5f5f5;
+        --card: #fff;
+        --line: #e5e5e5;
+        --text: #171717;
+        --subtle: #6b6b6b;
+        --link: #0a62e0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 24px;
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--line);
+        background: var(--card);
+      }
+      header h1 {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      header .opts {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        color: var(--subtle);
+        font-size: 13px;
+      }
+      header button {
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--card);
+        font: inherit;
+        cursor: pointer;
+      }
+      header button[aria-pressed='true'] {
+        border-color: var(--link);
+        color: var(--link);
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 24px;
+      }
+      section {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+      }
+      section h2 {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 15px;
+      }
+      section h2 a {
+        color: var(--link);
+        font-size: 13px;
+        font-weight: 400;
+        text-decoration: none;
+      }
+      .frames {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        overflow-x: auto;
+      }
+      .frame {
+        flex: none;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .frame iframe {
+        display: block;
+        border: 0;
+        transform-origin: 0 0;
+      }
+      .cap {
+        margin-top: 6px;
+        color: var(--subtle);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PicBerth 原型 · 3 个方案</h1>
+      <div class="opts">
+        主题
+        <button type="button" data-theme="light" aria-pressed="true">浅色</button>
+        <button type="button" data-theme="dark" aria-pressed="false">深色</button>
+      </div>
+    </header>
+    <main id="list"></main>
+    <script>
+      const DIRS = [
+        ['a', 'A 侧栏控制台'],
+        ['b', 'B 三栏检视'],
+        ['c', 'C 上传优先'],
+      ];
+      const SIZES = [
+        ['桌面 1440 × 900', 1440, 900, 0.62],
+        ['手机 390 × 844', 390, 844, 0.62],
+      ];
+      let theme = 'light';
+      function render() {
+        const list = document.getElementById('list');
+        list.textContent = '';
+        for (const [d, name] of DIRS) {
+          const sec = document.createElement('section');
+          const h = document.createElement('h2');
+          h.textContent = name;
+          const a = document.createElement('a');
+          a.href = `index.html?d=${d}&theme=${theme}`;
+          a.target = '_blank';
+          a.textContent = '在新标签页打开';
+          h.append(a);
+          const row = document.createElement('div');
+          row.className = 'frames';
+          for (const [cap, w, hgt, s] of SIZES) {
+            const wrap = document.createElement('div');
+            const fr = document.createElement('div');
+            fr.className = 'frame';
+            fr.style.width = `${w * s}px`;
+            fr.style.height = `${hgt * s}px`;
+            const ifr = document.createElement('iframe');
+            ifr.src = `index.html?d=${d}&theme=${theme}&embed=1`;
+            ifr.width = w;
+            ifr.height = hgt;
+            ifr.loading = 'lazy';
+            ifr.title = `${name} ${cap}`;
+            ifr.style.transform = `scale(${s})`;
+            fr.append(ifr);
+            const c = document.createElement('div');
+            c.className = 'cap';
+            c.textContent = cap;
+            wrap.append(fr, c);
+            row.append(wrap);
+          }
+          sec.append(h, row);
+          list.append(sec);
+        }
+      }
+      document.querySelectorAll('[data-theme]').forEach((b) =>
+        b.addEventListener('click', () => {
+          theme = b.dataset.theme;
+          document.querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+          render();
+        }),
+      );
+      render();
+    </script>
+  </body>
+</html>

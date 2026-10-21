@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "production-code",
+      "type": "code",
+      "location": "internal/httpapi, web/src/lib, docs/api.md",
+      "roles": ["functional-truth"],
+      "trust": "repository-trusted",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": false,
+      "containsSensitiveData": false,
+      "sanitization": null,
+      "licenseOrPermission": "repository",
+      "localCopies": [],
+      "observations": [
+        "Image API supports state, q (filename/ID/SHA-256), format, visibility, gps, sort new/old/large/small and cursor pagination.",
+        "PATCH accepts only visibility; batch supports trash, restore, purge and visibility for up to 500 IDs.",
+        "Upload accepts an optional visibility part and returns duplicate=true for an existing image.",
+        "Error strings in web/src/lib/api.ts are reused for upload errors in the prototype."
+      ],
+      "inferences": [
+        "Tags, rename, date-range and source filters need new backend work and are shown only behind the extension toggle."
+      ],
+      "limitations": [
+        "The production SPA ships the rejected darkroom design; its layout and metaphor copy carry no authority."
+      ]
+    },
+    {
+      "id": "cloudflare-dashboard-palette",
+      "type": "webpage",
+      "location": "https://kumo-ui.com/colors/ ; https://www.designmd.co/d/dash-cloudflare-com",
+      "roles": ["visual-reference"],
+      "trust": "external-untrusted",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": true,
+      "containsSensitiveData": false,
+      "sanitization": null,
+      "licenseOrPermission": "public reference; colour values only, no code, components or brand marks copied",
+      "localCopies": [],
+      "observations": [
+        "Neutral grey surfaces (canvas, base, recessed, hairline) with a single blue action colour.",
+        "Dark mode uses near-black canvas and a brighter blue action colour around #056DFF."
+      ],
+      "inferences": [
+        "A restrained neutral palette with one blue accent matches the user's request for an R2-console look."
+      ],
+      "limitations": [
+        "Kumo components are not used or imported; Cloudflare orange and logos are excluded.",
+        "Token values were approximated; no stylesheet was copied."
+      ]
+    },
+    {
+      "id": "synthetic-fixtures",
+      "type": "image",
+      "location": "designs/picberth/assets/fixtures",
+      "roles": ["inspiration-only"],
+      "trust": "generated-untrusted",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": false,
+      "containsSensitiveData": false,
+      "sanitization": "generated locally; no real user images, tokens or paths",
+      "licenseOrPermission": "generated for this prototype",
+      "localCopies": ["assets/fixtures"],
+      "observations": [
+        "Sixteen generated images: screenshots, charts, diagrams, photos, a receipt scan, logo, avatar and banner."
+      ],
+      "inferences": [
+        "A mix of screenshots and photos exercises transparency, aspect ratios and long file names."
+      ],
+      "limitations": [
+        "File sizes and dimensions in the fixtures are simulated and do not match the bitmap files."
+      ]
+    }
+  ]
+}

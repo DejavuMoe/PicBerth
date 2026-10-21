@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "project": {
+    "name": "PicBerth",
+    "slug": "picberth",
+    "surfaceType": "operational"
+  },
+  "content": {
+    "defaultProfile": "operational-strict",
+    "inventory": "content-inventory.json",
+    "approvedCopySources": []
+  },
+  "designSources": "design-sources.json",
+  "surfaces": [
+    {
+      "id": "console",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "index.html",
+        "assetPath": "index.html",
+        "files": ["index.html", "styles.css", "data.jsx", "ui.jsx", "library.jsx", "admin.jsx", "app.jsx", "directions.html"],
+        "states": [
+          "direction-a-sidebar",
+          "direction-b-three-pane",
+          "direction-c-upload-first",
+          "library-table",
+          "library-grid",
+          "library-filtered",
+          "library-filtered-empty",
+          "library-empty",
+          "library-loading",
+          "library-error",
+          "selection-bulk-actions",
+          "image-detail",
+          "image-detail-trashed",
+          "upload-progress-error-duplicate",
+          "purge-confirm",
+          "trash",
+          "tokens",
+          "token-create-reveal",
+          "settings-unsaved",
+          "status",
+          "light-dark",
+          "desktop-1440",
+          "mobile-390",
+          "extension-features-on-off"
+        ],
+        "stableIds": ["library", "image-detail", "upload", "trash", "tokens", "settings", "status"]
+      },
+      "production": {
+        "routeOrWindow": "/",
+        "files": [],
+        "interfaces": ["GET /api/v1/images", "PATCH /api/v1/images/{id}", "POST /api/v1/images", "POST /api/v1/images/batch", "/api/v1/tokens", "/api/v1/settings", "/api/v1/status", "/api/v1/audit"],
+        "tests": []
+      },
+      "status": "needs-review"
+    }
+  ]
+}
