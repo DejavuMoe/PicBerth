@@ -1,5 +1,6 @@
 <script lang="ts">
   import AuthCard from '../components/AuthCard.svelte';
+  import Icon from '../components/Icon.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -112,7 +113,7 @@
       <input id="setup-confirm" class="input" type="password" bind:value={confirm} autocomplete="new-password" aria-invalid={submitted && errors.confirm ? 'true' : undefined} />
       {#if submitted && errors.confirm}<span class="error-text">{errors.confirm}</span>{/if}
     </div>
-    {#if formError}<p class="error-text" role="alert">{formError}</p>{/if}
-    <button type="submit" class="btn btn-primary btn-block" disabled={busy}>创建管理员</button>
+    {#if formError}<div class="alert danger" role="alert"><Icon name="alert" /><span>{formError}</span></div>{/if}
+    <button type="submit" class="btn btn-primary btn-block" disabled={busy}>{busy ? '正在创建…' : '创建管理员'}</button>
   </form>
 </AuthCard>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AuthCard from '../components/AuthCard.svelte';
+  import Icon from '../components/Icon.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -43,7 +44,7 @@
       <label for="login-pass">密码</label>
       <input id="login-pass" class="input" type="password" bind:value={password} autocomplete="current-password" required />
     </div>
-    {#if error}<p class="error-text" role="alert">{error}</p>{/if}
-    <button type="submit" class="btn btn-primary btn-block" disabled={busy || !username || !password}>登录</button>
+    {#if error}<div class="alert danger" role="alert"><Icon name="alert" /><span>{error}</span></div>{/if}
+    <button type="submit" class="btn btn-primary btn-block" disabled={busy || !username || !password}>{busy ? '正在登录…' : '登录'}</button>
   </form>
 </AuthCard>
