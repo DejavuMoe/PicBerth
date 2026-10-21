@@ -1,0 +1,36 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "PicBerth 控制台原型": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-10-21T12:27:29.586Z",
+          "status": "needs-review",
+          "subtitle": "A 侧栏 / B 三栏 / C 上传优先",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ]
+    },
+    "方案对比": {
+      "versions": [
+        {
+          "path": "directions.html",
+          "createdAt": "2026-10-21T12:27:29.953Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-10-21T12:27:29.586Z",
+  "updatedAt": "2026-10-21T12:27:29.954Z"
+}
