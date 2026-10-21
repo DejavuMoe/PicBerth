@@ -1,4 +1,5 @@
-// 亮台 (light) / 暗房 (dark). The explicit choice lives in localStorage; without one the system decides.
+// Light / dark. The explicit choice lives in localStorage; without one the system decides.
+// The resolved theme is always written to <html data-theme>.
 
 export type Theme = 'light' | 'dark';
 
@@ -16,11 +17,6 @@ function stored(): Theme | null {
 
 const state = $state({ choice: stored(), system: (media?.matches ? 'dark' : 'light') as Theme });
 
-media?.addEventListener('change', (e) => {
-  state.system = e.matches ? 'dark' : 'light';
-  syncMeta();
-});
-
 export const theme = {
   get current(): Theme {
     return state.choice ?? state.system;
@@ -28,18 +24,22 @@ export const theme = {
 };
 
 function syncMeta() {
-  const color = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
   for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     m.content = color || m.content;
   }
 }
 
-/** Apply the stored choice before the first paint (called from main.ts). */
+/** Apply the current theme to the document (called from main.ts before the first paint). */
 export function applyTheme() {
-  if (state.choice) document.documentElement.dataset.theme = state.choice;
-  else delete document.documentElement.dataset.theme;
+  document.documentElement.dataset.theme = theme.current;
   syncMeta();
 }
+
+media?.addEventListener('change', (e) => {
+  state.system = e.matches ? 'dark' : 'light';
+  applyTheme();
+});
 
 export function toggleTheme() {
   const next: Theme = theme.current === 'dark' ? 'light' : 'dark';

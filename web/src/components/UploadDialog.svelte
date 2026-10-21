@@ -1,0 +1,136 @@
+<script lang="ts">
+  import { formatBytes, formatLimit, formatNames } from '../lib/format';
+  import { copyLinks } from '../lib/library.svelte';
+  import { openPicker } from '../lib/picker';
+  import { toast } from '../lib/toast.svelte';
+  import type { Visibility } from '../lib/types';
+  import {
+    allowedFormats,
+    clearFinished,
+    currentVisibility,
+    LINK_FORMATS,
+    maxUploadBytes,
+    removeItem,
+    retry,
+    uploadDialog,
+    uploads,
+    type UploadItem,
+  } from '../lib/upload.svelte';
+  import CopyButton from './CopyButton.svelte';
+  import Icon from './Icon.svelte';
+  import Modal from './Modal.svelte';
+  import Seg from './Seg.svelte';
+  import Thumb from './Thumb.svelte';
+
+  const items = $derived(uploads.items);
+  const active = $derived(items.filter((u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing').length);
+  const done = $derived(items.filter((u) => u.status === 'done').length);
+  const failed = $derived(items.filter((u) => u.status === 'error').length);
+  const fmtLabel = $derived(LINK_FORMATS.find((f) => f.value === uploads.format)?.label ?? '');
+
+  const isActive = (u: UploadItem) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing';
+
+  function close() {
+    uploadDialog.open = false;
+  }
+  function cancel(u: UploadItem) {
+    removeItem(u.id);
+    toast('已取消上传');
+  }
+  function copyAll() {
+    void copyLinks(items.filter((u) => u.status === 'done' && u.image).map((u) => u.image!));
+  }
+</script>
+
+<Modal title="上传图片" width="560px" fullOnPhone blocksDrop={false} onclose={close}>
+  <button type="button" class="dropzone" onclick={openPicker}>
+    <Icon name="upload" size={26} />
+    <span class="dz-text">
+      <span class="dz-main">拖放或粘贴图片，或 <span class="dz-link">选择文件</span></span>
+      <span class="hint">{formatNames(allowedFormats()).join(' · ')}，单个不超过 {formatLimit(maxUploadBytes())}</span>
+    </span>
+  </button>
+
+  <div class="setting-row" style="margin-top: 12px">
+    <span class="label">上传后可见性</span>
+    <Seg
+      label="上传后可见性"
+      value={currentVisibility()}
+      onchange={(v: Visibility) => (uploads.visibilityChoice = v)}
+      options={[
+        { key: 'public', label: '公开' },
+        { key: 'private', label: '私有' },
+      ]}
+    />
+  </div>
+
+  {#if items.length > 0}
+    <div class="section-label" style="margin-top: 16px; margin-bottom: 0">
+      {active ? `正在上传 ${active} 个，已完成 ${done} 个` : `已完成 ${done} 个`}{failed ? `，失败 ${failed} 个` : ''}
+    </div>
+    <ul class="up-list">
+      {#each items as u (u.id)}
+        <li class="up-row">
+          {#if u.image}
+            <Thumb image={u.image} cover />
+          {:else}
+            <Thumb src={u.previewUrl ?? ''} alpha cover />
+          {/if}
+          <div class="up-info">
+            <span class="name truncate" title={u.name}>{u.name}</span>
+            {#if u.status === 'uploading'}
+              {@const pct = Math.round(u.progress * 100)}
+              <div class="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${u.name} 上传进度`}>
+                <span style:width="{pct}%"></span>
+              </div>
+              <span class="sub num">{pct}% · {formatBytes(Math.round(u.file.size * u.progress))} / {formatBytes(u.file.size)}</span>
+            {:else if u.status === 'queued'}
+              <span class="sub">等待上传</span>
+            {:else if u.status === 'processing'}
+              <div class="progress indeterminate"><span></span></div>
+              <span class="sub">处理中</span>
+            {:else if u.status === 'done'}
+              {#if u.image?.duplicate}
+                <span class="sub">已存在相同图片，返回原链接</span>
+              {:else}
+                <span class="sub">已上传 · {formatBytes(u.file.size)}{u.image?.visibility === 'private' ? ' · 私有' : ''}</span>
+              {/if}
+            {:else}
+              <span class="sub err" title={u.errorDetail || undefined}>{u.error}</span>
+            {/if}
+          </div>
+          <div class="up-act">
+            {#if isActive(u)}
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label={`取消上传 ${u.name}`} onclick={() => cancel(u)}>
+                <Icon name="x" />
+              </button>
+            {:else if u.status === 'done' && u.image}
+              <CopyButton iconOnly small text={u.image.links[uploads.format]} label={`复制 ${fmtLabel}`} />
+            {:else if u.status === 'error'}
+              {#if u.retryable}
+                <button type="button" class="btn btn-secondary btn-sm" onclick={() => retry(u.id)}>重试</button>
+              {:else}
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label={`移除 ${u.name}`} onclick={() => removeItem(u.id)}>
+                  <Icon name="x" />
+                </button>
+              {/if}
+            {/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  {#snippet footer()}
+    {#if done > 0}
+      <button type="button" class="btn btn-ghost" style="margin-right: auto" onclick={clearFinished}>清除已完成</button>
+    {/if}
+    {#if done > 1}
+      <button type="button" class="btn btn-secondary" onclick={copyAll}>
+        <Icon name="copy" />
+        复制全部链接
+      </button>
+    {/if}
+    <button type="button" class="btn btn-primary" onclick={close}>{active ? '在后台继续' : '完成'}</button>
+  {/snippet}
+</Modal>

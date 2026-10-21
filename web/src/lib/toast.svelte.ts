@@ -11,11 +11,13 @@ interface ToastOptions {
 }
 
 const MAX = 3;
-const DEFAULT_DURATION = 4000;
+const DEFAULT_DURATION = 3200;
+/** A toast with an action (撤销) stays longer. */
+const ACTION_DURATION = 6000;
 
 export const toasts = $state<Toast[]>([]);
 
-/** Shared flag: a fixed bottom bar (selection / unsaved changes) is on screen, toasts sit above it. */
+/** Shared flag: the fixed bulk-action bar is on screen, toasts sit above it. */
 export const bottomBar = $state({ active: false });
 
 let nextId = 1;
@@ -31,7 +33,7 @@ function arm(id: number) {
 
 export function toast(message: string, options: ToastOptions = {}): number {
   const id = nextId++;
-  durations.set(id, options.duration ?? DEFAULT_DURATION);
+  durations.set(id, options.duration ?? (options.action ? ACTION_DURATION : DEFAULT_DURATION));
   toasts.push({ id, message, action: options.action });
   while (toasts.length > MAX) {
     const oldest = toasts[0];

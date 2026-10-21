@@ -1,50 +1,43 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { copyText, type CopyResult } from '../lib/clipboard';
-  import Button from './Button.svelte';
-  import IconButton from './IconButton.svelte';
+  import { copyText, INSECURE_HINT } from '../lib/clipboard';
+  import { toast } from '../lib/toast.svelte';
+  import Icon from './Icon.svelte';
 
   interface Props {
-    value: string;
+    text: string;
     label?: string;
-    /** Text control to select when the clipboard API is unavailable. */
-    field?: HTMLInputElement | HTMLTextAreaElement | null;
+    small?: boolean;
+    variant?: 'secondary' | 'primary' | 'ghost';
     iconOnly?: boolean;
-    size?: 'md' | 'sm';
-    onresult?: (r: CopyResult) => void;
+    /** Text control to select when the clipboard is unavailable. */
+    field?: HTMLInputElement | null;
   }
-  let { value, label = '复制', field = null, iconOnly = false, size = 'md', onresult }: Props = $props();
+  let { text, label = '复制', small = false, variant = 'secondary', iconOnly = false, field = null }: Props = $props();
 
-  let copied = $state(false);
+  let done = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  async function run() {
-    const r = await copyText(value, field);
-    onresult?.(r);
-    if (r === 'copied') {
-      copied = true;
-      clearTimeout(timer);
-      timer = setTimeout(() => (copied = false), 1500);
-    }
+  async function run(e: MouseEvent) {
+    e.stopPropagation();
+    const r = await copyText(text, field);
+    if (r === 'failed') return toast('当前连接不安全，无法写入剪贴板');
+    if (r === 'selected') return toast(INSECURE_HINT);
+    done = true;
+    clearTimeout(timer);
+    timer = setTimeout(() => (done = false), 1400);
   }
-  onDestroy(() => clearTimeout(timer));
+  const name = $derived(done ? '已复制' : label);
 </script>
 
-{#if iconOnly}
-  <IconButton {size} icon={copied ? 'check' : 'copy'} label={copied ? '已复制' : label} onclick={run} />
-{:else}
-  <span class="wrap">
-    <Button {size} icon={copied ? 'check' : undefined} onclick={run}>{copied ? '已复制' : label}</Button>
-  </span>
-{/if}
-<span class="sr-only" role="status">{copied ? '已复制' : ''}</span>
-
-<style>
-  .wrap {
-    display: inline-flex;
-    min-width: 72px;
-  }
-  .wrap :global(.btn) {
-    flex: 1;
-  }
-</style>
+<button
+  type="button"
+  class="btn btn-{variant}"
+  class:btn-sm={small}
+  class:btn-icon={iconOnly}
+  onclick={run}
+  aria-label={iconOnly ? name : undefined}
+  title={iconOnly ? name : undefined}
+>
+  <Icon name={done ? 'check' : 'copy'} />
+  {#if !iconOnly}<span>{name}</span>{/if}
+</button>

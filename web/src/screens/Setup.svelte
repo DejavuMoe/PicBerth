@@ -1,7 +1,5 @@
 <script lang="ts">
-  import AuthPanel from '../components/AuthPanel.svelte';
-  import Button from '../components/Button.svelte';
-  import TextField from '../components/TextField.svelte';
+  import AuthCard from '../components/AuthCard.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -41,9 +39,6 @@
   }
 
   const codeComplete = $derived(code.replace(/-/g, '').length === CODE_LEN);
-  // 1: look the code up in the server log, 2: fill in the administrator account.
-  const step = $derived(codeComplete ? 2 : 1);
-  const steps = ['在服务器日志中找到初始化代码', '创建管理员账户', '开始冲洗照片'];
 
   const errors = $derived({
     code: !code.trim()
@@ -81,111 +76,43 @@
   }
 </script>
 
-<AuthPanel title="初始化" subtitle="第一次启动，需要创建管理员">
-  <ol class="steps" aria-label="初始化步骤">
-    {#each steps as text, i (i)}
-      <li class="step" class:current={step === i + 1} aria-current={step === i + 1 ? 'step' : undefined}>
-        <span class="num mono">{String(i + 1).padStart(2, '0')}</span>
-        <span>{text}</span>
-      </li>
-    {/each}
-  </ol>
-
-  <form onsubmit={submit} class="form" novalidate>
-    <div class="codefield">
-      <TextField
-        label="初始化代码"
-        bind:value={code}
+<AuthCard title="初始化">
+  <form onsubmit={submit} novalidate>
+    <div class="field">
+      <label for="setup-code">初始化代码</label>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        id="setup-code"
+        class="input code-input"
+        value={code}
         oninput={oncodeinput}
-        code
         autocomplete="off"
         autocapitalize="characters"
-        spellcheck={false}
+        spellcheck="false"
         placeholder="XXXX-XXXX-XXXX"
-        error={submitted ? errors.code : null}
+        aria-invalid={submitted && errors.code ? 'true' : undefined}
         autofocus
       />
+      <span class="hint">在服务器日志中找到初始化代码</span>
+      {#if submitted && errors.code}<span class="error-text">{errors.code}</span>{/if}
     </div>
-    <TextField
-      label="用户名"
-      bind:value={username}
-      autocomplete="username"
-      autocapitalize="none"
-      spellcheck={false}
-      error={submitted ? errors.username : null}
-    />
-    <TextField
-      label="密码"
-      type="password"
-      bind:value={password}
-      autocomplete="new-password"
-      hint="至少 10 个字符"
-      error={submitted ? errors.password : null}
-    />
-    <TextField
-      label="确认密码"
-      type="password"
-      bind:value={confirm}
-      autocomplete="new-password"
-      error={submitted ? errors.confirm : null}
-    />
-    {#if formError}<p class="error" role="alert">{formError}</p>{/if}
-    <div class="actions">
-      <Button type="submit" variant="primary" block disabled={busy}>创建管理员</Button>
+    <div class="field">
+      <label for="setup-user">用户名</label>
+      <input id="setup-user" class="input" bind:value={username} autocomplete="username" autocapitalize="none" spellcheck="false" aria-invalid={submitted && errors.username ? 'true' : undefined} />
+      {#if submitted && errors.username}<span class="error-text">{errors.username}</span>{/if}
     </div>
+    <div class="field">
+      <label for="setup-pass">密码</label>
+      <input id="setup-pass" class="input" type="password" bind:value={password} autocomplete="new-password" aria-invalid={submitted && errors.password ? 'true' : undefined} />
+      <span class="hint">至少 10 个字符</span>
+      {#if submitted && errors.password}<span class="error-text">{errors.password}</span>{/if}
+    </div>
+    <div class="field">
+      <label for="setup-confirm">确认密码</label>
+      <input id="setup-confirm" class="input" type="password" bind:value={confirm} autocomplete="new-password" aria-invalid={submitted && errors.confirm ? 'true' : undefined} />
+      {#if submitted && errors.confirm}<span class="error-text">{errors.confirm}</span>{/if}
+    </div>
+    {#if formError}<p class="error-text" role="alert">{formError}</p>{/if}
+    <button type="submit" class="btn btn-primary btn-block" disabled={busy}>创建管理员</button>
   </form>
-</AuthPanel>
-
-<style>
-  .steps {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s1);
-    margin-bottom: var(--s5);
-    padding-bottom: var(--s4);
-    border-bottom: 1px solid var(--line);
-  }
-  .step {
-    display: flex;
-    align-items: baseline;
-    gap: var(--s3);
-    color: var(--ink-3);
-    font-size: var(--t-13);
-    transition: color var(--dur) var(--ease);
-  }
-  .step.current {
-    color: var(--ink);
-    font-weight: 600;
-  }
-  .num {
-    flex: none;
-    width: 2ch;
-    font-size: var(--t-12);
-  }
-
-  .form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s4);
-  }
-  .actions {
-    margin-top: var(--s2);
-  }
-  .error {
-    color: var(--danger);
-    font-size: var(--t-13);
-  }
-
-  /* The code is the one thing to read off a server log: large, spaced mono. */
-  .codefield :global(.control) {
-    height: 56px;
-  }
-  .codefield :global(input.code) {
-    font-size: 20px;
-    font-weight: 500;
-    letter-spacing: 0.2em;
-  }
-  .codefield :global(input.code::placeholder) {
-    font-weight: 400;
-  }
-</style>
+</AuthCard>

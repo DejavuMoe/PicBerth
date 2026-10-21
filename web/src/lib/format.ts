@@ -1,4 +1,4 @@
-// Display formatting. Sizes are 1024-based; times use Intl only (no date library).
+// Display formatting. Sizes are 1024-based; times use plain arithmetic (no date library).
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
@@ -40,32 +40,26 @@ export function formatDate(iso: string | number | Date): string {
   return formatAbsolute(iso).slice(0, 10);
 }
 
-const rtf0 = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
-// Intl prints 3分钟前; the design wants a thin gap between the figure and the unit.
-const rtf = {
-  format: (v: number, unit: Intl.RelativeTimeFormatUnit) => rtf0.format(v, unit).replace(/(\d)(?=[\u4e00-\u9fff])/g, '$1 '),
-};
 const DAY = 86_400_000;
 
-/** "3 分钟前", "昨天"; beyond 7 days falls back to the absolute time. */
+export function startOfDay(t: number | Date): number {
+  const d = new Date(t);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** "8 分钟前", "昨天", "3 天前"; from 7 days on the date alone. */
 export function formatRelative(iso: string | number | Date, now = Date.now()): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return '—';
-  const diff = t - now;
-  const abs = Math.abs(diff);
-  if (abs >= 7 * DAY) return formatAbsolute(t);
-  if (abs < 45_000) return '刚刚';
-  if (abs < 3_600_000) return rtf.format(Math.round(diff / 60_000), 'minute');
-  if (abs < DAY) return rtf.format(Math.round(diff / 3_600_000), 'hour');
-  // Calendar-day difference so that "昨天" means yesterday, not "24 h ago".
-  const a = new Date(t);
-  const b = new Date(now);
-  const days = Math.round(
-    (Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) -
-      Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) /
-      DAY,
-  );
-  return rtf.format(days, 'day');
+  const diff = now - t;
+  if (diff < 0) return `${Math.max(1, Math.round(-diff / DAY))} 天后`;
+  if (diff < 60_000) return '刚刚';
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)} 分钟前`;
+  if (diff < DAY) return `${Math.round(diff / 3_600_000)} 小时前`;
+  const days = Math.round((startOfDay(now) - startOfDay(t)) / DAY);
+  if (days <= 1) return '昨天';
+  if (days < 7) return `${days} 天前`;
+  return formatDate(t);
 }
 
 export function formatDuration(totalSeconds: number): string {
@@ -77,22 +71,6 @@ export function formatDuration(totalSeconds: number): string {
   if (h > 0) return `${h} 小时 ${m} 分`;
   if (m > 0) return `${m} 分 ${s % 60} 秒`;
   return `${s} 秒`;
-}
-
-export function formatDims(width: number, height: number): string {
-  return `${width}×${height}`;
-}
-
-const MIME_LABEL: Record<string, string> = {
-  'image/jpeg': 'JPEG',
-  'image/png': 'PNG',
-  'image/gif': 'GIF',
-  'image/webp': 'WebP',
-  'image/avif': 'AVIF',
-};
-
-export function formatLabel(mime: string, ext = ''): string {
-  return MIME_LABEL[mime] ?? (ext ? ext.toUpperCase() : mime);
 }
 
 export const FORMAT_NAMES: Record<string, string> = {
