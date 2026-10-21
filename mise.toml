@@ -1,0 +1,43 @@
+# Toolchain for PicBerth. `mise install` sets up everything needed to build and test.
+# Floors come from security advisories (design baseline §9.6): Go >= 1.26.10 / 1.27.3.
+[tools]
+go = "1.27.3"
+node = "24.21.0"
+pnpm = "12.10.1"
+
+[env]
+CGO_ENABLED = "0"
+
+[tasks."web:install"]
+description = "Install frontend dependencies from the lockfile"
+dir = "web"
+run = "pnpm install --frozen-lockfile"
+
+[tasks."web:build"]
+description = "Build the SPA into internal/webui/dist"
+dir = "web"
+run = "pnpm build"
+
+[tasks."web:check"]
+description = "Type-check the SPA"
+dir = "web"
+run = "pnpm check"
+
+[tasks.build]
+description = "Build the single picberth binary (SPA embedded)"
+depends = ["web:build"]
+run = "go build -trimpath -ldflags \"-s -w\" -o dist/picberth ./cmd/picberth"
+run_windows = "go build -trimpath -ldflags \"-s -w\" -o dist/picberth.exe ./cmd/picberth"
+
+[tasks.test]
+description = "Run Go tests and SPA type checks"
+run = ["go vet ./...", "go test ./...", "mise run web:check"]
+
+[tasks.dev]
+description = "Run the Go server against ./.devdata (pair with `mise run web:dev`)"
+run = "go run ./cmd/picberth serve --data-dir .devdata --public-url http://127.0.0.1:5173 --log-level debug"
+
+[tasks."web:dev"]
+description = "Vite dev server on 127.0.0.1:5173, proxying /api and /i to the Go server"
+dir = "web"
+run = "pnpm dev"

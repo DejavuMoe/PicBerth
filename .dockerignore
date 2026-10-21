@@ -1,0 +1,9 @@
+.git
+dist
+.devdata
+web/node_modules
+internal/webui/dist
+# Documentation and deploy helpers are not needed to build the image
+**/*.md
+docs
+deploy

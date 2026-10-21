@@ -1,0 +1,40 @@
+services:
+  picberth:
+    build:
+      context: ..
+    image: picberth:local
+    ports:
+      # Docker writes its own iptables rules and bypasses ufw/firewalld. Publishing
+      # without the 127.0.0.1 prefix exposes the port publicly. Keep the prefix; the
+      # host reverse proxy (see deploy/Caddyfile or deploy/nginx.conf) is the public entry.
+      - "127.0.0.1:12433:12433"
+    environment:
+      PICBERTH_PUBLIC_URL: https://pics.example.com
+      # A reverse proxy on the host reaches the container through the bridge gateway,
+      # so trust exactly that address and nothing wider.
+      PICBERTH_TRUSTED_PROXIES: 172.30.112.1
+    networks:
+      - picberth
+    volumes:
+      # Named volume: recommended on Docker Desktop (macOS/Windows), where bind mounts are
+      # slow and have ownership quirks. Use Docker Engine >= 28.3.3: before 28.0.0 hosts on the
+      # same L2 segment could reach ports published on 127.0.0.1, and 28.3.3 fixes CVE-2025-54388
+      # (published ports reachable from the LAN after a firewalld reload).
+      - picberth-data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  picberth:
+    ipam:
+      config:
+        - subnet: 172.30.112.0/24
+          gateway: 172.30.112.1
+
+volumes:
+  picberth-data:

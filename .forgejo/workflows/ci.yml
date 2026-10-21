@@ -1,0 +1,30 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    # Adjust to your Forgejo runner's label. `docker` is the common label for container
+    # runners; use `ubuntu-latest` if your runner maps that label to a host image.
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v4
+
+      # Installs the toolchains pinned in mise.toml (Go, Node, pnpm).
+      - name: Set up mise
+        uses: https://github.com/jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install web dependencies
+        run: mise run web:install
+
+      - name: Test
+        run: mise run test
+
+      - name: Build
+        run: mise run build
+
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

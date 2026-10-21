@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd daemon for macOS. Install as root:
+    install -m 0644 com.picberth.server.plist /Library/LaunchDaemons/
+    launchctl bootstrap system /Library/LaunchDaemons/com.picberth.server.plist
+  The _picberth service user and /usr/local/var/picberth must exist beforehand.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.picberth.server</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/bin/picberth</string>
+		<string>serve</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PICBERTH_DATA_DIR</key>
+		<string>/usr/local/var/picberth</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>UserName</key>
+	<string>_picberth</string>
+	<key>StandardErrorPath</key>
+	<string>/usr/local/var/log/picberth.log</string>
+	<key>ExitTimeOut</key>
+	<integer>20</integer>
+</dict>
+</plist>

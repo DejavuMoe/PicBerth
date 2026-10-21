@@ -1,0 +1,535 @@
+/* PicBerth — 暗房 (the darkroom).
+   Tokens, fonts, reset, base elements and the film primitives shared by every screen.
+   Every colour in the app comes from the custom properties below (docs/ui.md §2). */
+
+/* Bundled latin subsets only; CJK text falls back to the system fonts listed in --font-ui. */
+@font-face {
+  font-family: 'Archivo Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url('../node_modules/@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Martian Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  font-stretch: 75% 112.5%;
+  src: url('../node_modules/@fontsource-variable/martian-mono/files/martian-mono-latin-wdth-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Animatable development value for uploads (progressive enhancement). */
+@property --dev {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+:root {
+  color-scheme: light;
+
+  --bg: #f2efe8;
+  --surface: #fbfaf6;
+  --surface-2: #e9e5db;
+  --line: #ddd7cb;
+  --line-strong: #bdb5a5;
+  --ink: #16130f;
+  --ink-2: #4a443b;
+  --ink-3: #736c60;
+  --accent: #cf3a24;
+  --accent-ink: #ffffff;
+  --accent-soft: #f6ded6;
+  --mark: var(--accent);
+  --ok: #2e7a47;
+  --warn: #9a5b00;
+  --warn-soft: #f4e7cc;
+  --danger: #c4331d;
+  --checker-a: #e4e0d6;
+  --checker-b: #f4f1ea;
+  --scrim: rgb(14 11 8 / 0.48);
+  --shadow: 0 18px 48px -12px rgb(10 8 6 / 0.35);
+
+  /* film: the same darkness in both themes */
+  --film: #14110e;
+  --film-2: #231e19;
+  --film-line: #2e2822;
+  --edge: #eba33f;
+  --edge-2: #a79c8b;
+  --print: #f4f1ea;
+  --safelight: rgb(214 40 22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0e0d0b;
+    --surface: #171512;
+    --surface-2: #211e1a;
+    --line: #2a2621;
+    --line-strong: #3d3730;
+    --ink: #eee8dc;
+    --ink-2: #b8af9f;
+    --ink-3: #8a8274;
+    --accent: #ff5b3d;
+    --accent-ink: #1a0a06;
+    --accent-soft: #3a1c15;
+    --ok: #6ccb8a;
+    --warn: #f0b44c;
+    --warn-soft: #33270f;
+    --danger: #ff6a4d;
+    --checker-a: #26221d;
+    --checker-b: #1d1a16;
+    --scrim: rgb(0 0 0 / 0.66);
+    --film: #2a2520;
+    --film-2: #36302a;
+    --film-line: #433b33;
+    --edge: #f0ae4e;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e0d0b;
+  --surface: #171512;
+  --surface-2: #211e1a;
+  --line: #2a2621;
+  --line-strong: #3d3730;
+  --ink: #eee8dc;
+  --ink-2: #b8af9f;
+  --ink-3: #8a8274;
+  --accent: #ff5b3d;
+  --accent-ink: #1a0a06;
+  --accent-soft: #3a1c15;
+  --ok: #6ccb8a;
+  --warn: #f0b44c;
+  --warn-soft: #33270f;
+  --danger: #ff6a4d;
+  --checker-a: #26221d;
+  --checker-b: #1d1a16;
+  --scrim: rgb(0 0 0 / 0.66);
+  --film: #2a2520;
+  --film-2: #36302a;
+  --film-line: #433b33;
+  --edge: #f0ae4e;
+}
+
+:root {
+  --font-cjk: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    'Source Han Sans SC', 'HarmonyOS Sans SC';
+  --font-ui: 'Archivo Variable', var(--font-cjk), system-ui, sans-serif;
+  --font-display: 'Archivo Variable', var(--font-cjk), system-ui, sans-serif;
+  --font-mono: 'Martian Mono Variable', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, var(--font-cjk),
+    monospace;
+
+  /* type scale */
+  --t-11: 11px;
+  --t-12: 12px;
+  --t-13: 13px;
+  --t-14: 14px;
+  --t-16: 16px;
+  --t-20: 20px;
+  --t-26: 28px;
+  --t-28: 28px;
+  --t-44: 44px;
+
+  /* spacing scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 72px;
+
+  /* radii: cut paper, not pills */
+  --r-ctl: 3px;
+  --r-panel: 2px;
+  --r-dialog: 4px;
+  --r-thumb: 2px;
+  --r-chip: 2px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 140ms;
+
+  --control-h: 36px;
+  --gutter: 32px;
+  --bar-h: 56px;
+  --tabbar-h: 0px;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --gutter: 16px;
+    --bar-h: 52px;
+    --tabbar-h: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+  }
+}
+
+/* reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+}
+html.scroll-locked {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+html.scroll-locked body {
+  padding-right: var(--locked-gutter, 0px);
+}
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-14);
+  line-height: 1.55;
+  font-weight: 420;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: anywhere;
+  transition: background-color 240ms var(--ease);
+}
+#app {
+  min-height: inherit;
+}
+h1,
+h2,
+h3 {
+  font-weight: 650;
+  line-height: 1.25;
+}
+h1 {
+  font-size: var(--t-20);
+}
+h2 {
+  font-size: var(--t-16);
+}
+h3 {
+  font-size: var(--t-13);
+}
+p {
+  text-wrap: pretty;
+}
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+button:disabled {
+  cursor: default;
+}
+a {
+  color: inherit;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+a:hover {
+  text-decoration-color: currentColor;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th {
+  font-weight: 550;
+  text-align: left;
+}
+dialog {
+  color: inherit;
+  max-width: none;
+  max-height: none;
+}
+dialog::backdrop {
+  background: var(--scrim);
+}
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+:where(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+:where(input, select, textarea)[aria-invalid='true']:focus-visible {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Utilities */
+
+.display {
+  font-family: var(--font-display);
+  font-stretch: 118%;
+  font-weight: 780;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-stretch: 100%;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.93em;
+  letter-spacing: -0.01em;
+}
+/* Edge print: the condensed mono printed along the film. */
+.edge {
+  font-family: var(--font-mono);
+  font-stretch: 87.5%;
+  font-size: var(--t-11);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--ink-3);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* page frame shared by every authenticated screen */
+.page {
+  width: 100%;
+  max-width: var(--page-w, 1040px);
+  margin: 0 auto;
+  padding: var(--s6) var(--gutter) calc(var(--s7) + var(--tabbar-h));
+}
+.page-narrow {
+  --page-w: 920px;
+}
+.page-wide {
+  --page-w: 1440px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  font-size: var(--t-16);
+  font-weight: 720;
+  letter-spacing: -0.005em;
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--ink);
+}
+
+/* checkerboard under transparent images */
+.checker {
+  background-color: var(--checker-b);
+  background-image: conic-gradient(
+    var(--checker-a) 25%,
+    transparent 0 50%,
+    var(--checker-a) 0 75%,
+    transparent 0
+  );
+  background-size: 14px 14px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Film primitives (docs/ui.md §5.1). A `.film` strip has a 26 px band above and below its frames:
+   sprocket holes punched in the page colour on the outer half, edge print on the inner half. */
+
+.film {
+  --band: 30px;
+  --hole-gap: 18px;
+  position: relative;
+  padding: var(--band) 8px;
+  background: var(--film);
+  color: var(--edge-2);
+}
+.film::before,
+.film::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  background: var(--bg);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='7'%3E%3Crect x='6' y='0' width='6' height='7' rx='1.5'/%3E%3C/svg%3E")
+    repeat-x 0 0 / var(--hole-gap) 7px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='7'%3E%3Crect x='6' y='0' width='6' height='7' rx='1.5'/%3E%3C/svg%3E")
+    repeat-x 0 0 / var(--hole-gap) 7px;
+  pointer-events: none;
+  transition: background-color 240ms var(--ease);
+}
+.film::before {
+  top: 4px;
+}
+.film::after {
+  bottom: 4px;
+}
+.film :focus-visible {
+  outline-color: var(--edge);
+}
+
+/* The grease-pencil stroke (selection marks, current nav item). */
+.grease {
+  fill: none;
+  stroke: var(--mark);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: grease-draw 260ms var(--ease) both;
+}
+@keyframes grease-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+/* Status lamps */
+.lamp {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);
+}
+.lamp.warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent);
+}
+.lamp.danger {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+}
+.lamp.off {
+  background: var(--line-strong);
+  box-shadow: none;
+}
+
+/* Stamps: small labelled marks for scopes, states and flags. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-chip);
+  color: var(--ink-2);
+  font-size: var(--t-12);
+  font-weight: 550;
+  line-height: 1;
+  white-space: nowrap;
+}
+.stamp.warn {
+  color: var(--warn);
+}
+.stamp.danger {
+  color: var(--danger);
+}
+.stamp.ok {
+  color: var(--ok);
+}
+.stamp.solid {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+/* Keyboard hint */
+kbd,
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+}

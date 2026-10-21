@@ -1,0 +1,41 @@
+# systemd unit for a native install. Create the system user first:
+#   useradd --system --home-dir /var/lib/picberth --shell /usr/sbin/nologin picberth
+# Install the binary at /usr/local/bin/picberth and optional config at /etc/picberth/picberth.env.
+
+[Unit]
+Description=PicBerth image host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=picberth
+Group=picberth
+StateDirectory=picberth
+StateDirectoryMode=0700
+Environment=PICBERTH_DATA_DIR=/var/lib/picberth
+# Leading "-" makes the file optional. systemd reads it as root before dropping privileges.
+EnvironmentFile=-/etc/picberth/picberth.env
+ExecStart=/usr/local/bin/picberth serve
+Restart=on-failure
+TimeoutStopSec=20
+UMask=0077
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/picberth
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

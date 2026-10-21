@@ -1,0 +1,13 @@
+# Native install (no Docker), Caddy on the same host as PicBerth.
+# In /etc/picberth/picberth.env set:
+#   PICBERTH_TRUSTED_PROXIES=127.0.0.1
+#   PICBERTH_PUBLIC_URL=https://pics.example.com
+# so PicBerth trusts only this local proxy's X-Forwarded-For.
+
+pics.example.com {
+	request_body {
+		# Must exceed PicBerth's hard upload limit of 100 MiB plus multipart overhead.
+		max_size 110MB
+	}
+	reverse_proxy 127.0.0.1:12433
+}
