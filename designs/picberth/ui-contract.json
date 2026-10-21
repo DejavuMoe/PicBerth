@@ -18,11 +18,18 @@
       "prototype": {
         "entry": "index.html",
         "assetPath": "index.html",
-        "files": ["index.html", "styles.css", "data.jsx", "ui.jsx", "library.jsx", "admin.jsx", "app.jsx", "directions.html"],
+        "files": [
+          "index.html",
+          "styles.css",
+          "data.jsx",
+          "ui.jsx",
+          "library.jsx",
+          "admin.jsx",
+          "app.jsx",
+          "directions.html"
+        ],
         "states": [
           "direction-a-sidebar",
-          "direction-b-three-pane",
-          "direction-c-upload-first",
           "library-table",
           "library-grid",
           "library-filtered",
@@ -45,15 +52,33 @@
           "mobile-390",
           "extension-features-on-off"
         ],
-        "stableIds": ["library", "image-detail", "upload", "trash", "tokens", "settings", "status"]
+        "stableIds": [
+          "library",
+          "image-detail",
+          "upload",
+          "trash",
+          "tokens",
+          "settings",
+          "status"
+        ]
       },
       "production": {
         "routeOrWindow": "/",
         "files": [],
-        "interfaces": ["GET /api/v1/images", "PATCH /api/v1/images/{id}", "POST /api/v1/images", "POST /api/v1/images/batch", "/api/v1/tokens", "/api/v1/settings", "/api/v1/status", "/api/v1/audit"],
+        "interfaces": [
+          "GET /api/v1/images",
+          "PATCH /api/v1/images/{id}",
+          "POST /api/v1/images",
+          "POST /api/v1/images/batch",
+          "/api/v1/tokens",
+          "/api/v1/settings",
+          "/api/v1/status",
+          "/api/v1/audit"
+        ],
         "tests": []
       },
-      "status": "needs-review"
+      "status": "approved",
+      "approvedVariant": "Direction A (index.html default, ?d=a) with extension features on. Directions B and C remain in the file only as rejected alternatives."
     }
   ]
 }
