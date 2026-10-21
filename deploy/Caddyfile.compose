@@ -1,0 +1,8 @@
+# Used by deploy/compose.caddy.yaml. Caddy obtains the certificate for this address automatically.
+pics.example.com {
+	request_body {
+		# Must exceed PicBerth's hard upload limit of 100 MiB plus multipart overhead.
+		max_size 110MB
+	}
+	reverse_proxy picberth:12433
+}

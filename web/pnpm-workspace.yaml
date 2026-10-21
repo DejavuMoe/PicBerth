@@ -1,0 +1,6 @@
+# Supply-chain hygiene (design baseline 8.8): only install versions that are at least 7 days old
+# and never run dependency lifecycle scripts unless explicitly reviewed (allowBuilds).
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+strictDepBuilds: true
+allowBuilds: {}

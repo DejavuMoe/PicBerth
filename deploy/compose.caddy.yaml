@@ -1,0 +1,54 @@
+# Alternative to compose.yaml: Caddy terminates TLS and is the only published entry point.
+# PicBerth publishes no ports; it is reachable only from the caddy container.
+# Run with: docker compose -f deploy/compose.caddy.yaml up -d --build
+
+services:
+  caddy:
+    image: caddy:2.11.7
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile.compose:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      picberth:
+        # Fixed address: PicBerth trusts exactly this peer for X-Forwarded-For.
+        ipv4_address: 172.30.113.10
+    restart: unless-stopped
+
+  picberth:
+    build:
+      context: ..
+    image: picberth:local
+    # No ports: only the caddy container can reach it on the picberth network.
+    environment:
+      PICBERTH_PUBLIC_URL: https://pics.example.com
+      # The caddy container's fixed address. Trust exactly this peer.
+      PICBERTH_TRUSTED_PROXIES: 172.30.113.10
+    networks:
+      - picberth
+    volumes:
+      # Named volume: recommended on Docker Desktop (macOS/Windows). Docker Engine 28.3.3 or newer is recommended.
+      - picberth-data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  picberth:
+    ipam:
+      config:
+        - subnet: 172.30.113.0/24
+          gateway: 172.30.113.1
+
+volumes:
+  picberth-data:
+  caddy-data:
+  caddy-config:
