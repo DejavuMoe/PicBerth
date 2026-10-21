@@ -16,6 +16,9 @@ const multipartSlack = 64 << 10 // headroom for multipart framing on top of maxU
 
 const maxFormParts = 8
 
+// maxTagPartBytes bounds one `tag` part: 32 characters of up to 4 bytes each plus surrounding blanks.
+const maxTagPartBytes = 512
+
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 	ctx := r.Context()
 	maxBytes := s.core.Settings().MaxUploadBytes
@@ -53,10 +56,12 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 			s.writeError(w, r, multipartError(err))
 			return
 		}
-		parts++
-		if parts > maxFormParts {
-			s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "Too many form parts."})
-			return
+		if part.FormName() != "tag" { // tag parts have their own limit (20 per image)
+			parts++
+			if parts > maxFormParts {
+				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "Too many form parts."})
+				return
+			}
 		}
 		switch part.FormName() {
 		case "file":
@@ -75,6 +80,20 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 				return
 			}
 			if err := up.SetVisibility(strings.TrimSpace(string(v))); err != nil {
+				s.writeError(w, r, err)
+				return
+			}
+		case "tag":
+			v, err := io.ReadAll(io.LimitReader(part, maxTagPartBytes+1))
+			if err != nil {
+				s.writeError(w, r, multipartError(err))
+				return
+			}
+			if len(v) > maxTagPartBytes {
+				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "A tag must be at most 32 characters."})
+				return
+			}
+			if err := up.AddTag(string(v)); err != nil {
 				s.writeError(w, r, err)
 				return
 			}
@@ -127,8 +146,18 @@ func uploadReadError(err error) error {
 func (s *Server) listImages(w http.ResponseWriter, r *http.Request, c *call) {
 	q := r.URL.Query()
 	lp := core.ListParams{
-		State: q.Get("state"), Q: q.Get("q"), Format: q.Get("format"), Visibility: q.Get("visibility"),
-		Sort: q.Get("sort"), Cursor: q.Get("cursor"),
+		State: q.Get("state"), Q: q.Get("q"), Formats: q["format"], Tags: q["tag"], Sources: q["source"],
+		Visibility: q.Get("visibility"), Sort: q.Get("sort"), Cursor: q.Get("cursor"),
+	}
+	for name, dst := range map[string]**time.Time{"since": &lp.Since, "until": &lp.Until} {
+		if v := q.Get(name); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: name + " must be an RFC 3339 timestamp."})
+				return
+			}
+			*dst = &t
+		}
 	}
 	if v := q.Get("gps"); v != "" {
 		if v != "true" {
@@ -171,6 +200,15 @@ func (s *Server) listImages(w http.ResponseWriter, r *http.Request, c *call) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
 }
 
+func (s *Server) imageFacets(w http.ResponseWriter, r *http.Request, c *call) {
+	f, err := s.core.ImageFacets(r.Context(), c.p, r.URL.Query().Get("state"))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, f)
+}
+
 func (s *Server) getImage(w http.ResponseWriter, r *http.Request, c *call) {
 	v, err := s.core.GetImage(r.Context(), c.p, r.PathValue("id"))
 	if err != nil {
@@ -185,17 +223,15 @@ func (s *Server) patchImage(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Visibility *string `json:"visibility"`
+		Visibility *string   `json:"visibility"`
+		Filename   *string   `json:"filename"`
+		Tags       *[]string `json:"tags"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	if req.Visibility == nil {
-		s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "visibility is required."})
-		return
-	}
-	v, err := s.core.SetVisibility(r.Context(), c.p, r.PathValue("id"), *req.Visibility)
+	v, err := s.core.PatchImage(r.Context(), c.p, r.PathValue("id"), core.ImagePatch{Visibility: req.Visibility, Filename: req.Filename, Tags: req.Tags})
 	if err != nil {
 		s.writeError(w, r, err)
 		return

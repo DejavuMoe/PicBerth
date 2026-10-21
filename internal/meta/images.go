@@ -91,6 +91,12 @@ func (db *DB) FindActiveDuplicate(ctx context.Context, ownerID int64, sha string
 // transaction: when an active image with the same owner and hash exists it is returned as dup and
 // nothing is inserted.
 func (db *DB) InsertImage(ctx context.Context, im Image, dedupe bool) (dup *Image, err error) {
+	return db.InsertImageWithTags(ctx, im, dedupe, nil)
+}
+
+// InsertImageWithTags is InsertImage plus the new record's tags (already normalized). A returned
+// duplicate keeps its own tags: nothing is written in that case.
+func (db *DB) InsertImageWithTags(ctx context.Context, im Image, dedupe bool, tags []string) (dup *Image, err error) {
 	err = db.WriteTx(ctx, func(tx *sql.Tx) error {
 		if dedupe {
 			row := tx.QueryRowContext(ctx,
@@ -109,7 +115,10 @@ func (db *DB) InsertImage(ctx context.Context, im Image, dedupe bool) (dup *Imag
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', '', ?)`,
 			im.ID, im.OwnerID, im.TokenID, im.Source, im.ObjectKey, im.OriginalName, im.Mime, im.Ext, im.Size, im.Width, im.Height,
 			im.Frames, im.SHA256, b2i(im.HasGPS), im.Visibility, im.CreatedAt)
-		return err
+		if err != nil {
+			return err
+		}
+		return insertTags(ctx, tx, im.ID, tags)
 	})
 	return dup, err
 }
@@ -134,9 +143,23 @@ func (db *DB) MarkRestored(ctx context.Context, id string) (bool, error) {
 	return db.exec1(ctx, `UPDATE images SET state = 'active', trashed_at = NULL WHERE id = ? AND state = 'trashed'`, id)
 }
 
-// MarkPurged turns a trashed record into a tombstone; false when it was not trashed.
+// MarkPurged turns a trashed record into a tombstone and drops its tags; false when it was not trashed.
 func (db *DB) MarkPurged(ctx context.Context, id string, now int64) (bool, error) {
-	return db.exec1(ctx, `UPDATE images SET state = 'purged', purged_at = ? WHERE id = ? AND state = 'trashed'`, now, id)
+	var ok bool
+	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE images SET state = 'purged', purged_at = ? WHERE id = ? AND state = 'trashed'`, now, id)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil || n == 0 {
+			return err
+		}
+		ok = true
+		_, err = tx.ExecContext(ctx, `DELETE FROM image_tags WHERE image_id = ?`, id)
+		return err
+	})
+	return ok && err == nil, err
 }
 
 func (db *DB) exec1(ctx context.Context, q string, args ...any) (bool, error) {
@@ -214,22 +237,37 @@ func (db *DB) ImageStats(ctx context.Context) (Stats, error) {
 
 // Cursor is the keyset position of the last item on a page.
 type Cursor struct {
-	Key int64 // created_at or size, depending on the sort
-	ID  string
+	Key    int64  // created_at or size, depending on the sort
+	StrKey string // original_name for the name sort
+	ID     string
+}
+
+// SourceFilter matches one image source: "web", "cli", or "token" with a token id.
+type SourceFilter struct {
+	Kind    string
+	TokenID int64 // Kind == "token" only
 }
 
 // ListQuery filters and orders the image listing.
 type ListQuery struct {
 	State      string // active | trashed
 	Q          string
-	Ext        string // stored extension ("jpg", "png", ...)
+	Exts       []string // any of these stored extensions ("jpg", "png", ...)
+	Tags       []string // all of these tags
+	Sources    []SourceFilter
 	Visibility string
 	GPS        bool
 	TokenID    *int64 // filter: uploaded by this token
 	OwnerID    *int64 // filter: owned by this user
-	Sort       string // new | old | large | small
+	Since      *int64 // created_at >= Since (unix ms)
+	Until      *int64 // created_at < Until (unix ms)
+	Sort       string // new | old | large | small | name
 	Limit      int
 	After      *Cursor
+}
+
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
 }
 
 func escapeLike(s string) string {
@@ -264,11 +302,43 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 			conds = append(conds, `i.sha256 LIKE ? ESCAPE '\'`)
 			args = append(args, escapeLike(lq)+"%")
 		}
+		conds = append(conds, `EXISTS (SELECT 1 FROM image_tags g WHERE g.image_id = i.id AND g.tag LIKE ? ESCAPE '\')`)
+		args = append(args, "%"+escapeLike(q.Q)+"%")
 		where = append(where, "("+strings.Join(conds, " OR ")+")")
 	}
-	if q.Ext != "" {
-		where = append(where, "i.ext = ?")
-		args = append(args, q.Ext)
+	if len(q.Exts) > 0 {
+		where = append(where, "i.ext IN ("+placeholders(len(q.Exts))+")")
+		for _, e := range q.Exts {
+			args = append(args, e)
+		}
+	}
+	if len(q.Tags) > 0 {
+		where = append(where, "(SELECT COUNT(*) FROM image_tags g WHERE g.image_id = i.id AND g.tag IN ("+placeholders(len(q.Tags))+")) = ?")
+		for _, tg := range q.Tags {
+			args = append(args, tg)
+		}
+		args = append(args, len(q.Tags))
+	}
+	if len(q.Sources) > 0 {
+		var conds []string
+		for _, sf := range q.Sources {
+			if sf.Kind == "token" {
+				conds = append(conds, "(i.source = 'token' AND i.token_id = ?)")
+				args = append(args, sf.TokenID)
+			} else {
+				conds = append(conds, "i.source = ?")
+				args = append(args, sf.Kind)
+			}
+		}
+		where = append(where, "("+strings.Join(conds, " OR ")+")")
+	}
+	if q.Since != nil {
+		where = append(where, "i.created_at >= ?")
+		args = append(args, *q.Since)
+	}
+	if q.Until != nil {
+		where = append(where, "i.created_at < ?")
+		args = append(args, *q.Until)
 	}
 	if q.Visibility != "" {
 		where = append(where, "i.visibility = ?")
@@ -294,6 +364,8 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 		col = "i.size"
 	case "small":
 		col, dir = "i.size", "ASC"
+	case "name":
+		col, dir = "i.original_name COLLATE NOCASE", "ASC"
 	}
 	if q.After != nil {
 		op := "<"
@@ -301,7 +373,11 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 			op = ">"
 		}
 		where = append(where, "("+col+", i.id) "+op+" (?, ?)")
-		args = append(args, q.After.Key, q.After.ID)
+		if q.Sort == "name" {
+			args = append(args, q.After.StrKey, q.After.ID)
+		} else {
+			args = append(args, q.After.Key, q.After.ID)
+		}
 	}
 	args = append(args, q.Limit+1)
 

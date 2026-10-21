@@ -31,7 +31,7 @@ not an approved design and is listed here only as the current runtime.
 
 | Object | User-visible fields | Allowed actions (web session) | Rules | Evidence |
 |---|---|---|---|---|
-| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, visibility 公开/私有, hasGps, broken, duplicate, source (网页 / 令牌名 / 命令行), createdAt, trashedAt, links{url, markdown, html, bbcode} | upload, set visibility, trash, restore, purge, download raw | link bytes never change; purged IDs never reused; private images not publicly reachable | `lib/types.ts` Image, `handlers_images.go` |
+| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, visibility 公开/私有, hasGps, broken, duplicate, source (网页 / 令牌名 / 命令行), tags, createdAt, trashedAt, links{url, markdown, html, bbcode} | upload, set visibility, rename, edit tags, trash, restore, purge, download raw | link bytes never change; purged IDs never reused; private images not publicly reachable | `lib/types.ts` Image, `handlers_images.go` |
 | Upload item | file name, progress, status queued/uploading/processing/done/error, error text, retryable | cancel, retry (retryable only), remove, copy link | concurrency 3; client pre-check of size/format; 429 auto-retry | `lib/upload.svelte.ts` |
 | Token (令牌) | name, prefix, scopes 上传/只读/管理, createdAt, lastUsedAt, expiresAt, revokedAt | create, revoke | secret shown once; tokens cannot manage tokens/settings | `lib/types.ts` Token, `api.md` |
 | Settings (设置) | maxUploadBytes, maxPixels, allowedFormats, dedupe, defaultVisibility, trashRetentionDays, uploadsPerMinute, sessionIdleMinutes, sessionAbsoluteHours; read-only publicUrl, imageUrl, hardMaxUploadBytes | edit writable fields | — | `lib/types.ts` Settings |
@@ -40,18 +40,26 @@ not an approved design and is listed here only as the current runtime.
 
 ## Library query capabilities (what "find / filter" can do today)
 
-`GET /api/v1/images` supports exactly: `state` (active | trashed), `q` (filename, ID or SHA-256),
-`format` (jpeg | png | gif | webp | avif), `visibility` (public | private), `gps=true`,
-`sort` (new | old | large | small), cursor pagination (`limit`, `cursor`). No date range, no source/token
-filter, no size range.
+`GET /api/v1/images` supports, all combined with AND: `state` (active | trashed), `q` (filename or tag
+substring, ID or SHA-256 prefix), `format` (any-of jpeg | png | gif | webp | avif; repeatable and/or
+comma-separated), `tag` (repeatable, image must have all), `source` (repeatable any-of: `web`, `cli`,
+`token:<id>`), `visibility` (public | private), `gps=true`, `since` / `until` (RFC 3339, upload time,
+`since` inclusive, `until` exclusive), `sort` (new | old | large | small | name), cursor pagination
+(`limit`, `cursor`). No size range.
 
-`PATCH /api/v1/images/{id}` accepts only `visibility`. Batch (`POST /api/v1/images/batch`, ≤ 500 ids):
-`trash | restore | purge | visibility`.
+`GET /api/v1/images/facets?state=active|trashed` returns counts for the whole visible set of that state
+(ignoring other filters): total, bytes, per format, per visibility, GPS count, per source (web, each token with
+its name, cli) and per tag. Use it for filter counts and tag/source pickers.
+
+Images carry `tags` (up to 20, 1–32 characters each; no comma, no leading `#`). `PATCH /api/v1/images/{id}`
+accepts any non-empty subset of `visibility`, `filename` (rename; link and id never change) and `tags` (replaces
+the full set). Upload accepts repeated `tag` parts. Batch (`POST /api/v1/images/batch`, ≤ 500 ids):
+`trash | restore | purge | visibility` — no batch tagging or renaming.
 
 ## Not supported by the backend (would need new API work)
 
-Albums / folders, tags, renaming or editing a file name, notes/descriptions, replacing an image's bytes,
-view / traffic statistics, filtering by date range, source or token, multiple users.
+Albums / folders, notes/descriptions, replacing an image's bytes, view / traffic statistics, size-range
+filter, batch tag / rename, tag rename or merge across images (tags are only edited per image), multiple users.
 
 ## State matrix
 
@@ -90,5 +98,5 @@ view / traffic statistics, filtering by date range, source or token, multiple us
 
 ## Known unknowns
 
-- Which management capabilities the user expects beyond the current API (albums, tags, rename, statistics …).
+- Which management capabilities the user expects beyond the current API (albums, notes, batch tagging, statistics …).
 - Preferred default library view (dense list/table vs grid) and reference products.

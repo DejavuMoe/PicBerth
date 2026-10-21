@@ -71,6 +71,7 @@ images(id TEXT PK, owner_id INTEGER NOT NULL REFERENCES users, token_id INTEGER 
        created_at INTEGER NOT NULL, trashed_at INTEGER NULL, purged_at INTEGER NULL, broken_at INTEGER NULL)
   indexes: (state, created_at DESC, id DESC), (state, size, id), (owner_id, sha256) WHERE state='active',
            (token_id, state, created_at DESC)
+image_tags(image_id TEXT NOT NULL REFERENCES images, tag TEXT NOT NULL, PRIMARY KEY(image_id, tag))  -- schema 2; index (tag, image_id); deleted when the image is purged
 settings(key TEXT PK, value TEXT NOT NULL)          -- JSON values; defaults live in code
 audit(id INTEGER PK, at INTEGER NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT, detail TEXT, ip TEXT)
 kv(key TEXT PK, value TEXT NOT NULL)                -- last_snapshot, last_check
@@ -139,7 +140,7 @@ check; non-zero exit on any issue.
 - Rate limits: login 5/min burst 5 per IP and 10 per 10 min per username; uploads `uploadsPerMinute` per principal
   (token id, or user for sessions); 429 + `Retry-After`.
 - Uploads: `MaxBytesReader(maxUploadBytes + 64 KiB)`; `r.MultipartReader()` streaming (never ParseMultipartForm);
-  at most 8 parts; exactly one part named `file`; optional `visibility`; process-wide semaphore of 4 concurrent
+  at most 8 parts (repeated `tag` parts excluded, at most 20 tags); exactly one part named `file`; optional `visibility`; process-wide semaphore of 4 concurrent
   uploads (excess → 429 with Retry-After 2); disk watermark `max(1 GiB, 2% of volume)` checked before writing.
 - Response headers:
   - SPA HTML: `Content-Security-Policy: default-src 'self'; img-src 'self' blob: data: <image origin>; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,

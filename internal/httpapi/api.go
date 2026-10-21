@@ -35,6 +35,7 @@ func (s *Server) apiMux() http.Handler {
 	route("POST /api/v1/images", s.uploadImage)
 	route("GET /api/v1/images", s.listImages)
 	route("POST /api/v1/images/batch", s.batchImages)
+	route("GET /api/v1/images/facets", s.imageFacets) // before {id}: "facets" is not an image id
 	route("GET /api/v1/images/{id}", s.getImage)
 	route("PATCH /api/v1/images/{id}", s.patchImage)
 	route("DELETE /api/v1/images/{id}", s.deleteImage)
