@@ -139,7 +139,8 @@
           "web/src/screens/Login.svelte",
           "web/src/screens/Setup.svelte",
           "web/src/screens/NotFound.svelte",
-          "web/src/components/AuthCard.svelte"
+          "web/src/components/AuthCard.svelte",
+          "web/src/app.css"
         ],
         "interfaces": [
           "POST /api/v1/setup",
@@ -147,7 +148,7 @@
         ],
         "tests": []
       },
-      "status": "approved"
+      "status": "implemented"
     }
   ]
 }
