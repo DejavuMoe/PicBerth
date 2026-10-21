@@ -73,6 +73,7 @@ Anything else → `404`.
   "broken": false,
   "duplicate": false,
   "source": { "kind": "web" },
+  "tags": ["截图", "工作"],
   "createdAt": "2026-10-21T08:15:30Z",
   "trashedAt": null,
   "links": {
@@ -89,6 +90,11 @@ Anything else → `404`.
   but it returns 404 until made public; the SPA shows them via `/api/v1/images/{id}/raw`.
 - `state`: `active` | `trashed`. (`purged` images are never returned.)
 - `source.kind`: `web` (session upload) | `token` (then `source.tokenId` and `source.tokenName`) | `cli`.
+- `tags`: always an array (never `null`), sorted ascending (Go `sort.Strings`, i.e. by UTF-8 bytes). Tag rules:
+  trimmed, 1–32 characters, no control characters, no comma, must not start with `#`; exact duplicates are
+  dropped; at most 20 per image. Violations are `400 validation`.
+- `filename` can be changed with `PATCH` (see below); `id`/`url` never change, `links.markdown`/`html` alt text
+  follows the new name.
 - `duplicate`: only meaningful in upload responses (true when an existing image was returned).
 - `frames` > 1 means animated.
 - Markdown/HTML alt text = filename without extension; characters escaped for the target format.
@@ -143,10 +149,11 @@ Scopes: `upload` (upload; list/read only images it uploaded), `read` (list/read 
 
 | Method & path | Auth | Request | Response |
 |---|---|---|---|
-| `POST /api/v1/images` | session, token `upload`/`manage` | `multipart/form-data`: exactly one file part named `file`; optional text part `visibility` | `201 Image` (new) / `200 Image` with `duplicate:true` |
+| `POST /api/v1/images` | session, token `upload`/`manage` | `multipart/form-data`: exactly one file part named `file`; optional text part `visibility`; optional repeated text part `tag` | `201 Image` (new) / `200 Image` with `duplicate:true` (the existing image keeps its own tags; sent `tag` parts are ignored) |
 | `GET /api/v1/images` | session, token (`upload` sees own only) | query below | `200 {"items": [Image], "nextCursor": string\|null}` |
+| `GET /api/v1/images/facets` | same as list (`state=trashed` needs `manage`) | `?state=active\|trashed` (default `active`) | `200 Facets` |
 | `GET /api/v1/images/{id}` | same | — | `200 Image` |
-| `PATCH /api/v1/images/{id}` | session, `manage` | `{"visibility": "public"\|"private"}` | `200 Image` |
+| `PATCH /api/v1/images/{id}` | session, `manage` | any non-empty subset of `{"visibility": "public"\|"private", "filename": string, "tags": [string]}` | `200 Image` |
 | `DELETE /api/v1/images/{id}` | session, `manage` | — | `204` (moves to trash; idempotent) |
 | `POST /api/v1/images/{id}/restore` | session, `manage` | — | `200 Image`; `409 conflict` if not trashed |
 | `POST /api/v1/images/{id}/purge` | session, `manage` | — | `204`; `409 conflict` if not trashed |
@@ -159,17 +166,48 @@ List query parameters:
 | param | values | default |
 |---|---|---|
 | `state` | `active` \| `trashed` | `active` |
-| `q` | substring of filename, or exact id, or sha256 prefix (≥ 8 hex) | — |
-| `format` | `jpeg` \| `png` \| `gif` \| `webp` \| `avif` | — |
+| `q` | substring of filename or of a tag (case-insensitive), or exact id, or sha256 prefix (≥ 8 hex) | — |
+| `format` | any of `jpeg` \| `png` \| `gif` \| `webp` \| `avif`; repeatable and/or comma-separated (`format=png&format=jpeg`, `format=png,jpeg`) | — |
+| `tag` | repeatable; the image must have **all** given tags (exact match) | — |
+| `source` | repeatable, any-of: `web`, `cli`, `token:<id>` (decimal token id) | — |
 | `visibility` | `public` \| `private` | — |
 | `gps` | `true` | — |
 | `tokenId` | integer | — |
-| `sort` | `new` \| `old` \| `large` \| `small` | `new` |
+| `since`, `until` | RFC 3339 timestamps (URL-encode `+`): `createdAt >= since` and `createdAt < until` | — |
+| `sort` | `new` \| `old` \| `large` \| `small` \| `name` (filename ascending, ASCII case-insensitive, then id) | `new` |
 | `limit` | 1–200 | 60 |
-| `cursor` | opaque string from `nextCursor` | — |
+| `cursor` | opaque string from `nextCursor` (bound to `sort` and `state`) | — |
+
+All params combine with AND; within `format` and `source` the values are alternatives. Invalid values are
+`400 validation`. Upload-only tokens keep seeing only their own uploads whatever the filters say.
+
+`GET /api/v1/images/facets` counts the caller's whole visible set for the given `state`, ignoring all list filters:
+
+```json
+{ "total": 26, "bytes": 23400000,
+  "formats": { "jpeg": 7, "png": 16, "gif": 1, "webp": 2, "avif": 0 },
+  "visibility": { "public": 21, "private": 5 },
+  "gps": 4,
+  "sources": [ { "key": "web", "kind": "web", "count": 13 },
+               { "key": "token:1", "kind": "token", "tokenId": 1, "tokenName": "PicGo · 笔记本", "count": 5 },
+               { "key": "cli", "kind": "cli", "count": 2 } ],
+  "tags": [ { "tag": "截图", "count": 7 } ] }
+```
+
+- `formats` always has all five keys; `visibility` both keys. `sources` lists only kinds with `count > 0`: `web`
+  first, then tokens by count descending (ties by id; a revoked token keeps its name), then `cli`. `tags` are
+  sorted by count descending, then tag ascending. `sources` and `tags` are arrays even when empty.
+- `PATCH` applies every given field in one transaction. `filename`: trimmed, 1–200 characters, no control
+  characters, no `/` or `\`. `tags` replaces the whole tag set. `null` fields count as absent; a body without any
+  known field is `400 validation`. Purged images answer `404`, trashed images can still be edited.
+- Audit actions written by image changes: `image.visibility` (`old -> new`), `image.rename` (target = id,
+  detail = new name), `image.tags` (detail = comma-joined tags, empty when cleared); each only when the value
+  actually changed. Existing: `image.trash`, `image.restore`, `image.purge`.
+- Purging an image deletes its tags together with the tombstone transition.
 
 Upload notes for third-party clients (PicGo web-uploader, ShareX, scripts):
-- field name `file`; URL at JSON path `url` (also `links.markdown` etc.);
+- field name `file`; URL at JSON path `url` (also `links.markdown` etc.); optional repeated field `tag`
+  (same rules as `tags`; `tag` parts do not count towards the 8-part limit, more than 20 is `400 validation`);
 - errors carry a human `detail`; ShareX can use `{json:detail}` as ErrorMessage.
 
 Example:

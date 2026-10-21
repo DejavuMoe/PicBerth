@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -30,6 +31,7 @@ type Upload struct {
 	filename   string
 	haveFile   bool
 	visibility string
+	tags       []string // normalized, sorted
 	release    func()
 	done       bool
 }
@@ -116,6 +118,17 @@ func (u *Upload) SetVisibility(v string) error {
 		return validation("visibility must be public or private.")
 	}
 	u.visibility = v
+	return nil
+}
+
+// AddTag adds one tag from a `tag` form part. The whole set is validated on every call, so an invalid or
+// surplus tag fails the request before any bytes are committed.
+func (u *Upload) AddTag(raw string) error {
+	tags, err := normalizeTags(append(slices.Clone(u.tags), raw))
+	if err != nil {
+		return err
+	}
+	u.tags = tags
 	return nil
 }
 
@@ -226,7 +239,10 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	owner := u.p.UserID
 	if st.Dedupe {
 		if dup, err := s.db.FindActiveDuplicate(ctx, owner, sha); err == nil {
-			v := s.view(dup)
+			v, err := s.viewTagged(ctx, dup)
+			if err != nil {
+				return UploadResult{}, err
+			}
 			v.Duplicate = true
 			return UploadResult{Image: v, Duplicate: true}, nil
 		} else if !errors.Is(err, meta.ErrNotFound) {
@@ -279,7 +295,7 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	if err := s.fault(FaultUploadAfterRename); err != nil {
 		return UploadResult{}, err
 	}
-	dup, err := s.db.InsertImage(cctx, rec, st.Dedupe)
+	dup, err := s.db.InsertImageWithTags(cctx, rec, st.Dedupe, u.tags)
 	if err != nil {
 		if rmErr := s.blobs.Remove(blob.Objects, rec.ObjectKey); rmErr != nil {
 			s.log.Warn("could not remove object after failed insert (the check will quarantine it)", "key", rec.ObjectKey, "err", rmErr)
@@ -290,7 +306,10 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 		if rmErr := s.blobs.Remove(blob.Objects, rec.ObjectKey); rmErr != nil {
 			s.log.Warn("could not remove duplicate object", "key", rec.ObjectKey, "err", rmErr)
 		}
-		v := s.view(dup)
+		v, err := s.viewTagged(cctx, dup)
+		if err != nil {
+			return UploadResult{}, err
+		}
 		v.Duplicate = true
 		return UploadResult{Image: v, Duplicate: true}, nil
 	}
@@ -298,7 +317,11 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	im := rec
 	im.State = meta.StateActive
 	im.TokenName = u.p.TokenName
-	return UploadResult{Image: s.view(&im)}, nil
+	v := s.view(&im)
+	if u.tags != nil {
+		v.Tags = u.tags
+	}
+	return UploadResult{Image: v}, nil
 }
 
 func sourceKind(p Principal) string {

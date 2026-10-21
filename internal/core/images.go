@@ -8,6 +8,8 @@ import (
 	"html"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +51,7 @@ type ImageView struct {
 	Broken     bool        `json:"broken"`
 	Duplicate  bool        `json:"duplicate"`
 	Source     ImageSource `json:"source"`
+	Tags       []string    `json:"tags"`
 	CreatedAt  string      `json:"createdAt"`
 	TrashedAt  *string     `json:"trashedAt"`
 	Links      ImageLinks  `json:"links"`
@@ -80,6 +83,7 @@ func (s *Service) view(im *meta.Image) ImageView {
 		Width: im.Width, Height: im.Height, Frames: im.Frames, SHA256: im.SHA256, Visibility: im.Visibility,
 		State: im.State, HasGPS: im.HasGPS, HasThumb: im.Thumb == "jpg" || im.Thumb == "png", Broken: im.BrokenAt != nil,
 		Source:    ImageSource{Kind: im.Source},
+		Tags:      []string{},
 		CreatedAt: fmtTime(im.CreatedAt), TrashedAt: fmtTimePtr(im.TrashedAt),
 		Links: ImageLinks{
 			URL:      url,
@@ -93,6 +97,17 @@ func (s *Service) view(im *meta.Image) ImageView {
 		v.Source.TokenName = im.TokenName
 	}
 	return v
+}
+
+// viewTagged is view plus the image's tags.
+func (s *Service) viewTagged(ctx context.Context, im *meta.Image) (ImageView, error) {
+	tags, err := s.db.TagsFor(ctx, []string{im.ID})
+	if err != nil {
+		return ImageView{}, err
+	}
+	v := s.view(im)
+	v.Tags = tags[im.ID]
+	return v, nil
 }
 
 func mdEscape(s string) string {
@@ -141,27 +156,98 @@ func (s *Service) GetImage(ctx context.Context, p Principal, id string) (ImageVi
 	if err != nil {
 		return ImageView{}, err
 	}
-	return s.view(im), nil
+	return s.viewTagged(ctx, im)
 }
 
 // ListParams are the parsed list query parameters.
 type ListParams struct {
 	State      string
 	Q          string
-	Format     string
+	Format     string   // one format name, or several separated by commas
+	Formats    []string // repeated format values (each may also be comma-separated); any-of with Format
+	Tags       []string // image must carry all of them
+	Sources    []string // any of: "web", "cli", "token:<id>"
 	Visibility string
 	GPS        bool
 	TokenID    *int64
+	Since      *time.Time // created at or after
+	Until      *time.Time // created before
 	Sort       string
 	Limit      int
 	Cursor     string
 }
 
 type cursorToken struct {
-	Sort  string `json:"s"`
-	State string `json:"t"`
-	Key   int64  `json:"k"`
-	ID    string `json:"i"`
+	Sort   string `json:"s"`
+	State  string `json:"t"`
+	Key    int64  `json:"k"`
+	StrKey string `json:"n,omitempty"` // name sort only
+	ID     string `json:"i"`
+}
+
+const maxFilterValues = 50
+
+// parseExts turns format values (repeated and/or comma-separated) into stored extensions.
+func parseExts(values ...[]string) ([]string, error) {
+	var exts []string
+	for _, vs := range values {
+		for _, v := range vs {
+			for _, name := range strings.Split(v, ",") {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				f, ok := imaging.ParseFormat(name)
+				if !ok {
+					return nil, validation("format must be one of jpeg, png, gif, webp, avif.")
+				}
+				if !slices.Contains(exts, f.Ext()) {
+					exts = append(exts, f.Ext())
+				}
+			}
+		}
+	}
+	return exts, nil
+}
+
+func parseSources(in []string) ([]meta.SourceFilter, error) {
+	var out []meta.SourceFilter
+	for _, v := range in {
+		v = strings.TrimSpace(v)
+		var sf meta.SourceFilter
+		switch {
+		case v == "web" || v == "cli":
+			sf.Kind = v
+		case strings.HasPrefix(v, "token:"):
+			n, err := strconv.ParseUint(strings.TrimPrefix(v, "token:"), 10, 63)
+			if err != nil || n < 1 {
+				return nil, validation("source token ids must be positive integers (token:<id>).")
+			}
+			sf = meta.SourceFilter{Kind: "token", TokenID: int64(n)}
+		default:
+			return nil, validation("source must be web, cli or token:<id>.")
+		}
+		if !slices.Contains(out, sf) {
+			out = append(out, sf)
+		}
+	}
+	if len(out) > maxFilterValues {
+		return nil, validation("At most %d sources can be combined.", maxFilterValues)
+	}
+	return out, nil
+}
+
+// listScope is the part of the library a principal may query: its owner and, for upload-only tokens,
+// its own token. Callers must already have checked that the principal may read at all.
+func (p Principal) listScope() (owner, token *int64) {
+	if !p.CanReadAll() { // upload-only token: its own uploads, nothing else
+		tid := p.TokenID
+		token = &tid
+	}
+	if p.Kind == KindToken || p.Kind == KindSession {
+		owner = &p.UserID
+	}
+	return owner, token
 }
 
 // ListImages returns a page of images visible to the principal.
@@ -185,9 +271,9 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 		lp.Sort = "new"
 	}
 	switch lp.Sort {
-	case "new", "old", "large", "small":
+	case "new", "old", "large", "small", "name":
 	default:
-		return nil, "", validation("sort must be new, old, large or small.")
+		return nil, "", validation("sort must be new, old, large, small or name.")
 	}
 	if lp.Limit == 0 {
 		lp.Limit = 60
@@ -202,27 +288,41 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if len(q.Q) > 200 {
 		return nil, "", validation("q is too long.")
 	}
-	if lp.Format != "" {
-		f, ok := imaging.ParseFormat(lp.Format)
-		if !ok {
-			return nil, "", validation("format must be one of jpeg, png, gif, webp, avif.")
+	var err error
+	if q.Exts, err = parseExts([]string{lp.Format}, lp.Formats); err != nil {
+		return nil, "", err
+	}
+	for _, t := range lp.Tags {
+		if t = strings.TrimSpace(t); t != "" && !slices.Contains(q.Tags, t) {
+			q.Tags = append(q.Tags, t)
 		}
-		q.Ext = f.Ext()
 	}
-	if !p.CanReadAll() { // upload-only token: its own uploads, nothing else
-		tid := p.TokenID
-		q.TokenID = &tid
+	if len(q.Tags) > maxTagsPerImage {
+		return nil, "", validation("At most %d tags can be combined.", maxTagsPerImage)
 	}
-	if p.Kind == KindToken || p.Kind == KindSession {
-		q.OwnerID = &p.UserID
+	if q.Sources, err = parseSources(lp.Sources); err != nil {
+		return nil, "", err
 	}
+	if lp.Since != nil {
+		ms := lp.Since.UnixMilli()
+		q.Since = &ms
+	}
+	if lp.Until != nil {
+		ms := lp.Until.UnixMilli()
+		q.Until = &ms
+	}
+	owner, token := p.listScope()
+	if token != nil {
+		q.TokenID = token
+	}
+	q.OwnerID = owner
 	if lp.Cursor != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(lp.Cursor)
 		var ct cursorToken
 		if err != nil || json.Unmarshal(raw, &ct) != nil || ct.Sort != lp.Sort || ct.State != lp.State || !ids.ValidImageID(ct.ID) {
 			return nil, "", validation("Invalid cursor.")
 		}
-		q.After = &meta.Cursor{Key: ct.Key, ID: ct.ID}
+		q.After = &meta.Cursor{Key: ct.Key, StrKey: ct.StrKey, ID: ct.ID}
 	}
 	rows, err := s.db.ListImages(ctx, q)
 	if err != nil {
@@ -232,18 +332,121 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if len(rows) > lp.Limit {
 		rows = rows[:lp.Limit]
 		last := rows[len(rows)-1]
-		key := last.CreatedAt
-		if lp.Sort == "large" || lp.Sort == "small" {
-			key = last.Size
+		ct := cursorToken{Sort: lp.Sort, State: lp.State, Key: last.CreatedAt, ID: last.ID}
+		switch lp.Sort {
+		case "large", "small":
+			ct.Key = last.Size
+		case "name":
+			ct.Key, ct.StrKey = 0, last.OriginalName
 		}
-		b, _ := json.Marshal(cursorToken{Sort: lp.Sort, State: lp.State, Key: key, ID: last.ID})
+		b, _ := json.Marshal(ct)
 		next = base64.RawURLEncoding.EncodeToString(b)
+	}
+	imageIDs := make([]string, len(rows))
+	for i := range rows {
+		imageIDs[i] = rows[i].ID
+	}
+	tags, err := s.db.TagsFor(ctx, imageIDs) // one query for the whole page
+	if err != nil {
+		return nil, "", err
 	}
 	out := make([]ImageView, len(rows))
 	for i := range rows {
 		out[i] = s.view(&rows[i])
+		out[i].Tags = tags[rows[i].ID]
 	}
 	return out, next, nil
+}
+
+// Facets are the library counts served by GET /api/v1/images/facets.
+type Facets struct {
+	Total      int64            `json:"total"`
+	Bytes      int64            `json:"bytes"`
+	Formats    map[string]int64 `json:"formats"`
+	Visibility map[string]int64 `json:"visibility"`
+	GPS        int64            `json:"gps"`
+	Sources    []FacetSource    `json:"sources"`
+	Tags       []FacetTag       `json:"tags"`
+}
+
+// FacetSource counts the images of one source (web, cli or a single token).
+type FacetSource struct {
+	Key       string `json:"key"`
+	Kind      string `json:"kind"`
+	TokenID   *int64 `json:"tokenId,omitempty"`
+	TokenName string `json:"tokenName,omitempty"`
+	Count     int64  `json:"count"`
+}
+
+// FacetTag counts the images carrying one tag.
+type FacetTag struct {
+	Tag   string `json:"tag"`
+	Count int64  `json:"count"`
+}
+
+// ImageFacets counts the principal's whole visible set for a state (default active), ignoring list filters.
+func (s *Service) ImageFacets(ctx context.Context, p Principal, state string) (Facets, error) {
+	if p.Kind == KindAnonymous {
+		return Facets{}, unauthorized()
+	}
+	if !p.CanReadAll() && !p.canReadOwnUploads() {
+		return Facets{}, forbidden("This token cannot list images.")
+	}
+	if state == "" {
+		state = meta.StateActive
+	}
+	if state != meta.StateActive && state != meta.StateTrashed {
+		return Facets{}, validation("state must be active or trashed.")
+	}
+	if state == meta.StateTrashed && !p.CanManage() {
+		return Facets{}, forbidden("Listing the trash requires the manage scope.")
+	}
+	owner, token := p.listScope()
+	mf, err := s.db.ImageFacets(ctx, meta.FacetQuery{State: state, OwnerID: owner, TokenID: token})
+	if err != nil {
+		return Facets{}, err
+	}
+	f := Facets{
+		Total: mf.Total, Bytes: mf.Bytes, GPS: mf.GPS,
+		Formats:    map[string]int64{},
+		Visibility: map[string]int64{"public": mf.Visibility["public"], "private": mf.Visibility["private"]},
+		Sources:    []FacetSource{},
+		Tags:       []FacetTag{},
+	}
+	for _, fm := range imaging.AllFormats {
+		f.Formats[string(fm)] = mf.Exts[fm.Ext()]
+	}
+	var web, cli *FacetSource
+	var tokens []FacetSource
+	for _, sc := range mf.Sources {
+		switch sc.Source {
+		case "web":
+			web = &FacetSource{Key: "web", Kind: "web", Count: sc.Count}
+		case "cli":
+			cli = &FacetSource{Key: "cli", Kind: "cli", Count: sc.Count}
+		case "token":
+			if sc.TokenID != nil {
+				tokens = append(tokens, FacetSource{Key: "token:" + itoa(*sc.TokenID), Kind: "token", TokenID: sc.TokenID, TokenName: sc.TokenName, Count: sc.Count})
+			}
+		}
+	}
+	sort.Slice(tokens, func(i, j int) bool {
+		if tokens[i].Count != tokens[j].Count {
+			return tokens[i].Count > tokens[j].Count
+		}
+		return *tokens[i].TokenID < *tokens[j].TokenID
+	})
+	if web != nil {
+		f.Sources = append(f.Sources, *web)
+	}
+	f.Sources = append(f.Sources, tokens...)
+	if cli != nil {
+		f.Sources = append(f.Sources, *cli)
+	}
+	for _, tc := range mf.Tags {
+		f.Tags = append(f.Tags, FacetTag{Tag: tc.Tag, Count: tc.Count})
+	}
+	return f, nil
 }
 
 // SetVisibility changes an image's visibility.
@@ -274,7 +477,87 @@ func (s *Service) SetVisibility(ctx context.Context, p Principal, id, vis string
 		s.audit(ctx, p, "image.visibility", id, im.Visibility+" -> "+vis)
 	}
 	im.Visibility = vis
-	return s.view(im), nil
+	return s.viewTagged(ctx, im)
+}
+
+// ImagePatch is the set of changes PatchImage applies; nil fields are left alone.
+type ImagePatch struct {
+	Visibility *string
+	Filename   *string
+	Tags       *[]string // replaces the full tag set
+}
+
+// PatchImage changes visibility, display name and tags of an image in one transaction.
+func (s *Service) PatchImage(ctx context.Context, p Principal, id string, patch ImagePatch) (ImageView, error) {
+	if p.Kind == KindAnonymous {
+		return ImageView{}, unauthorized()
+	}
+	if !p.CanManage() {
+		return ImageView{}, forbidden("Changing an image requires the manage scope.")
+	}
+	if patch.Visibility == nil && patch.Filename == nil && patch.Tags == nil {
+		return ImageView{}, validation("Provide at least one of visibility, filename or tags.")
+	}
+	var mp meta.ImagePatch
+	if patch.Visibility != nil {
+		if *patch.Visibility != "public" && *patch.Visibility != "private" {
+			return ImageView{}, validation("visibility must be public or private.")
+		}
+		mp.Visibility = patch.Visibility
+	}
+	if patch.Filename != nil {
+		name, err := normalizeFilename(*patch.Filename)
+		if err != nil {
+			return ImageView{}, err
+		}
+		mp.Name = &name
+	}
+	if patch.Tags != nil {
+		tags, err := normalizeTags(*patch.Tags)
+		if err != nil {
+			return ImageView{}, err
+		}
+		mp.Tags = &tags
+	}
+	im, err := s.getVisible(ctx, p, id)
+	if err != nil {
+		return ImageView{}, err
+	}
+	unlock := s.lockImage(id)
+	defer unlock.Unlock()
+	old, err := s.db.TagsFor(ctx, []string{id})
+	if err != nil {
+		return ImageView{}, err
+	}
+	ok, err := s.db.PatchImage(ctx, id, mp)
+	if err != nil {
+		return ImageView{}, err
+	}
+	if !ok {
+		return ImageView{}, notFound()
+	}
+	tags := old[id]
+	if mp.Visibility != nil && im.Visibility != *mp.Visibility {
+		s.audit(ctx, p, "image.visibility", id, im.Visibility+" -> "+*mp.Visibility)
+	}
+	if mp.Name != nil && im.OriginalName != *mp.Name {
+		s.audit(ctx, p, "image.rename", id, *mp.Name)
+	}
+	if mp.Tags != nil {
+		if !slices.Equal(tags, *mp.Tags) {
+			s.audit(ctx, p, "image.tags", id, strings.Join(*mp.Tags, ","))
+		}
+		tags = *mp.Tags
+	}
+	if mp.Visibility != nil {
+		im.Visibility = *mp.Visibility
+	}
+	if mp.Name != nil {
+		im.OriginalName = *mp.Name
+	}
+	v := s.view(im)
+	v.Tags = tags
+	return v, nil
 }
 
 // Trash moves an image to the trash. Trashing a trashed image is a no-op. With a retention of 0 days
@@ -365,7 +648,7 @@ func (s *Service) Restore(ctx context.Context, p Principal, id string) (ImageVie
 		s.enqueueThumb(id)
 	}
 	im.State, im.TrashedAt = meta.StateActive, nil
-	return s.view(im), nil
+	return s.viewTagged(ctx, im)
 }
 
 // Purge permanently deletes a trashed image's file; the record stays as a tombstone.
