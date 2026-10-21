@@ -24,6 +24,16 @@
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json",
+      "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -39,7 +49,7 @@
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\m-b-filters.json",
       "D:\\Forgejo\\PicBerth\\.qa\\capture\\m-c-library.json"
     ],
-    "capturedAt": "2026-10-21T12:26:58Z",
+    "capturedAt": "2026-10-21T15:19:52Z",
     "surfaces": [
       {
         "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-detail.json",
@@ -238,6 +248,106 @@
         "viewport": {
           "width": 1440,
           "height": 900,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "devicePixelRatio": 1
+        }
+      },
+      {
+        "source": "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "url": "http://127.0.0.1:4391/picberth/auth.html",
+        "title": "PicBerth",
+        "viewport": {
+          "width": 1280,
+          "height": 720,
           "devicePixelRatio": 1
         }
       },
@@ -450,6 +560,7 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > div.main-a > header.topbar-a > nav.crumbs > span.hide-sm:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > div.main-a > header.topbar-a > nav.crumbs > span.hide-sm:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > div.main-a > header.topbar-a > nav.crumbs > span.hide-sm:nth-of-type(4)",
         "div#root > div.shell-a:nth-of-type(1) > div.main-a > main > div.page > div.toolbar:nth-of-type(2) > label.search > kbd.hide-sm",
@@ -487,6 +598,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -9295,6 +9407,16 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -9730,6 +9852,28 @@
       "notes": null
     },
     {
+      "id": "content-f507a5088d932fb0",
+      "text": "not-found",
+      "channels": [
+        "data-*"
+      ],
+      "locations": [
+        "div#root > div.shell-a"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json"
+      ],
+      "purpose": "machine-identifier",
+      "origin": "framework-runtime",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-261ced035e58e146",
       "text": "p1jees431n2qbcsjqgxk",
       "channels": [
@@ -9858,6 +10002,8 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > a.brand > span:nth-of-type(2)",
+        "div#root > div.shell-a > div.main-a > header.topbar-a > nav.crumbs > span.hide-sm:nth-of-type(1)",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > a.brand > span:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > a.brand > span:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > a.brand > span:nth-of-type(2)",
@@ -9865,6 +10011,7 @@
         "div#root > div.shell-a:nth-of-type(1) > div.main-a:nth-of-type(1) > header.topbar-a > nav.crumbs > span.hide-sm:nth-of-type(1)",
         "div#root > div.shell-b:nth-of-type(1) > header.header-b > a.brand > span:nth-of-type(2)",
         "div#root > div.shell-c:nth-of-type(1) > header.header-c > div.bar > a.brand > span:nth-of-type(2)",
+        "div#root > main.auth > div.auth-card > a.brand > span:nth-of-type(2)",
         "html > head > title"
       ],
       "visibility": [
@@ -9893,6 +10040,16 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -11939,6 +12096,32 @@
       "notes": null
     },
     {
+      "id": "content-12cafdd53605b128",
+      "text": "XXXX-XXXX-XXXX",
+      "channels": [
+        "placeholder"
+      ],
+      "locations": [
+        "input#setup-code"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "task-help",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-f7c722b160dc15dd",
       "text": "yf7vca54av8ehjtwfg02",
       "channels": [
@@ -12791,12 +12974,35 @@
       "notes": "synthetic fixture value"
     },
     {
+      "id": "content-58807745708ed726",
+      "text": "两次输入的密码不一致",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(4) > span.error-text"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json"
+      ],
+      "purpose": "validation",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-9bae680405099fc8",
       "text": "主导航",
       "channels": [
         "aria-label"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1)",
         "div#root > div.shell-b:nth-of-type(1) > div.body-b > aside.facets:nth-of-type(1) > nav.b-nav:nth-of-type(1)",
@@ -12830,6 +13036,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -12895,6 +13102,7 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > nav > button.nav-item:nth-of-type(3)",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > nav > button.nav-item:nth-of-type(3)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > nav > button.nav-item:nth-of-type(3)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > nav > button.nav-item:nth-of-type(3)",
@@ -12931,6 +13139,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -13030,6 +13239,7 @@
         "aria-label"
       ],
       "locations": [
+        "div#root > div.shell-a > div.main-a > header.topbar-a > nav.crumbs",
         "div#root > div.shell-a:nth-of-type(1) > div.main-a > header.topbar-a > nav.crumbs",
         "div#root > div.shell-a:nth-of-type(1) > div.main-a:nth-of-type(1) > header.topbar-a > nav.crumbs"
       ],
@@ -13057,6 +13267,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\ext-off.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\m-a-nav.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\m-a-sel.json",
@@ -13454,6 +13665,8 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > nav > button.nav-item:nth-of-type(1)",
+        "div#root > div.shell-a > div.main-a > main > div.page > div.empty > div.actions > a.btn.btn-secondary",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > nav > button.nav-item:nth-of-type(1)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > nav > button.nav-item:nth-of-type(1)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > nav > button.nav-item:nth-of-type(1)",
@@ -13491,6 +13704,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -14081,6 +14295,127 @@
       ],
       "purpose": "user-action",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-09728129c91c1530",
+      "text": "创建管理员",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > button.btn.btn-primary"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "user-action",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-65622e8ee9fb116b",
+      "text": "初始化",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > h1"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "orientation",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-d18149c5bb088fb4",
+      "text": "初始化代码",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(1) > label"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "domain-field",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-c1f62bb39f5fabf2",
+      "text": "初始化代码不正确",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.alert.danger:nth-of-type(5) > span"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "error",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-a2afb04804711121",
+      "text": "初始化代码共 12 位，格式为 XXXX-XXXX-XXXX",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(1) > span.error-text:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json"
+      ],
+      "purpose": "validation",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
@@ -15002,6 +15337,7 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > nav > button.nav-item:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > nav > button.nav-item:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > nav > button.nav-item:nth-of-type(2)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > nav > button.nav-item:nth-of-type(2)",
@@ -15043,6 +15379,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -15329,6 +15666,33 @@
       ],
       "purpose": "user-action",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-8091c725beb75f27",
+      "text": "在服务器日志中找到初始化代码",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(1) > span.hint",
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(1) > span.hint:nth-of-type(1)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "task-help",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
@@ -16033,6 +16397,59 @@
       ],
       "purpose": "domain-field",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-a621ab606db2a11f",
+      "text": "密码",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(2) > label",
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(3) > label"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "domain-field",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-9b6e9cd2fa6f8b48",
+      "text": "密码需要 10–256 个字符",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(3) > span.error-text:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json"
+      ],
+      "purpose": "validation",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
@@ -17612,6 +18029,7 @@
         "div#root > div.shell-a:nth-of-type(1) > div.main-a > main > div.page > div.alert.danger:nth-of-type(3) > div.grow > div",
         "div#root > div.shell-a:nth-of-type(1) > div.modal.full-sm:nth-of-type(3) > div.modal-body:nth-of-type(2) > ul.up-list > li.up-row:nth-of-type(5) > div.up-info:nth-of-type(1) > span.sub.err:nth-of-type(2)",
         "div#root > div.shell-b:nth-of-type(1) > div.tray:nth-of-type(2) > div.tray-body:nth-of-type(2) > ul.up-list > li.up-row:nth-of-type(5) > div.up-info:nth-of-type(1) > span.sub.err:nth-of-type(2)",
+        "div#root > main.auth > div.auth-card > form.auth-form > div.alert.danger:nth-of-type(3) > span",
         "div.shell-c:nth-of-type(1) > main > div.page > div.quick:nth-of-type(1) > div.card.recent:nth-of-type(2) > div.recent-pending:nth-of-type(2) > ul.up-list > li.up-row:nth-of-type(3) > div.up-info:nth-of-type(1) > span.sub.err:nth-of-type(2)"
       ],
       "visibility": [
@@ -17621,6 +18039,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-error.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-upload.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\c-upload.json"
       ],
@@ -18382,6 +18801,28 @@
       "notes": null
     },
     {
+      "id": "content-7c0305bc0ce607b2",
+      "text": "正在创建…",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > button.btn.btn-primary"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json"
+      ],
+      "purpose": "progress",
+      "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-f020e4630a54d322",
       "text": "正在加载",
       "channels": [
@@ -18395,6 +18836,28 @@
       ],
       "captures": [
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-loading.json"
+      ],
+      "purpose": "progress",
+      "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-d8712b0d82e63a46",
+      "text": "正在登录…",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > button.btn.btn-primary"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json"
       ],
       "purpose": "progress",
       "origin": "agent-generated-task-copy",
@@ -18715,6 +19178,7 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > nav > button.nav-item:nth-of-type(5)",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > nav > button.nav-item:nth-of-type(5)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > nav > button.nav-item:nth-of-type(5)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > nav > button.nav-item:nth-of-type(5)",
@@ -18750,6 +19214,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -18798,6 +19263,85 @@
       "notes": null
     },
     {
+      "id": "content-1a3f0617d6de8e52",
+      "text": "用户名",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(1) > label",
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(2) > label"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "domain-field",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-3b7b56eef3c32250",
+      "text": "用户名或密码不正确",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.alert.danger:nth-of-type(3) > span"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json"
+      ],
+      "purpose": "error",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-1e2df9c3075ae9e4",
+      "text": "登录",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > button.btn.btn-primary",
+        "div#root > main.auth > div.auth-card > h1"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_error.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_login_p_offline.json"
+      ],
+      "purpose": "user-action",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-41c5db790cd3b512",
       "text": "百万像素",
       "channels": [
@@ -18836,6 +19380,32 @@
       ],
       "purpose": "task-help",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-81b17bc0c362dfe5",
+      "text": "确认密码",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(4) > label"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "domain-field",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
@@ -19354,6 +19924,28 @@
       "notes": null
     },
     {
+      "id": "content-8f3979b93bc48589",
+      "text": "管理员已经创建，请直接登录",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.alert.danger:nth-of-type(5) > span"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json"
+      ],
+      "purpose": "error",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-5b50d7c4b5950dc5",
       "text": "系统",
       "channels": [
@@ -19535,6 +20127,33 @@
       "notes": null
     },
     {
+      "id": "content-81e121421903cee1",
+      "text": "至少 10 个字符",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(3) > span.hint",
+        "div#root > main.auth > div.auth-card > form.auth-form > div.field:nth-of-type(3) > span.hint:nth-of-type(1)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_busy.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_done.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_errors.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_setup_p_wrong.json"
+      ],
+      "purpose": "task-help",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
       "id": "content-1c5c067138704dda",
       "text": "视图",
       "channels": [
@@ -19648,6 +20267,7 @@
         "text"
       ],
       "locations": [
+        "div#root > div.shell-a > aside.sidenav > nav > button.nav-item:nth-of-type(4)",
         "div#root > div.shell-a:nth-of-type(1) > aside.drawer.left:nth-of-type(2) > div.sidenav.in-drawer > nav > button.nav-item:nth-of-type(4)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav > nav > button.nav-item:nth-of-type(4)",
         "div#root > div.shell-a:nth-of-type(1) > aside.sidenav:nth-of-type(1) > nav > button.nav-item:nth-of-type(4)",
@@ -19683,6 +20303,7 @@
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-trash.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload-done.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\a-upload.json",
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-library.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-sel.json",
         "D:\\Forgejo\\PicBerth\\.qa\\capture\\b-trash-sel.json",
@@ -19893,6 +20514,28 @@
       ],
       "purpose": "empty-state",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-22b4c8a9c6b6d6ad",
+      "text": "这个地址没有对应的页面。",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > div.shell-a > div.main-a > main > div.page > div.empty > p"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json"
+      ],
+      "purpose": "empty-state",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
@@ -21572,6 +22215,29 @@
       ],
       "purpose": "domain-field",
       "origin": "agent-generated-task-copy",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": null
+    },
+    {
+      "id": "content-e75737c1ab90e168",
+      "text": "页面不存在",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#root > div.shell-a > div.main-a > header.topbar-a > nav.crumbs > strong",
+        "div#root > div.shell-a > div.main-a > main > div.page > div.empty > strong"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "D:\\Forgejo\\PicBerth\\.qa\\capture\\auth-s_not-found.json"
+      ],
+      "purpose": "error",
+      "origin": "production-behavior",
       "decision": "allow",
       "evidence": null,
       "flags": [],
