@@ -3,7 +3,11 @@
   import type { Library } from '../../lib/library.svelte';
   import Icon from '../Icon.svelte';
 
-  let { lib, el = $bindable(null) }: { lib: Library; el?: HTMLInputElement | null } = $props();
+  let {
+    lib,
+    el = $bindable(null),
+    placeholder = '搜索文件名、标签、ID 或 SHA-256',
+  }: { lib: Library; el?: HTMLInputElement | null; placeholder?: string } = $props();
 
   // The box edits local text; the URL follows after a short pause. Enter applies at once.
   let value = $state(untrack(() => lib.filters.q));
@@ -27,18 +31,21 @@
     bind:this={el}
     class="input"
     type="search"
-    placeholder="搜索文件名、ID 或 SHA-256"
+    {placeholder}
     aria-label="搜索图片"
     autocomplete="off"
     spellcheck="false"
     bind:value
     onkeydown={(e) => {
       if (e.key === 'Enter') lib.setFilters({ q: value.trim() });
-      if (e.key === 'Escape' && value) {
-        value = '';
-        lib.setFilters({ q: '' });
+      if (e.key === 'Escape') {
+        if (value) {
+          value = '';
+          lib.setFilters({ q: '' });
+        }
+        e.currentTarget.blur();
       }
     }}
   />
-  {#if !value}<kbd class="hide-sm">/</kbd>{/if}
+  {#if !value}<kbd class="hide-touch">/</kbd>{/if}
 </label>

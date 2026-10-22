@@ -7,8 +7,10 @@
     align?: 'left' | 'right';
     up?: boolean;
     width?: number;
+    /** Extra class on the popover (e.g. `menu-facets`). */
+    class?: string;
   }
-  let { trigger, children, align = 'left', up = false, width }: Props = $props();
+  let { trigger, children, align = 'left', up = false, width, class: className = '' }: Props = $props();
 
   let open = $state(false);
   let wrap = $state<HTMLElement | null>(null);
@@ -50,7 +52,7 @@
 <div class="menu-wrap" bind:this={wrap}>
   {@render trigger(open, toggle)}
   {#if open}
-    <div class="menu" class:right={align === 'right'} class:up role="menu" style:min-width={width ? `${width}px` : undefined}>
+    <div class="menu {className}" class:right={align === 'right'} class:up role="menu" style:min-width={width ? `${width}px` : undefined}>
       {@render children(close)}
     </div>
   {/if}

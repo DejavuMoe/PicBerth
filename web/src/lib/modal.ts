@@ -82,7 +82,10 @@ export function overlay(node: HTMLElement, opts: OverlayOptions) {
       if (i >= 0) stack.splice(i, 1);
       if (stack.length === 0) document.removeEventListener('keydown', onkeydown);
       unlock();
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      // Give focus back only if it is still inside the overlay (or lost); a screen that moved it on keeps it.
+      const active = document.activeElement;
+      const lost = !active || active === document.body || node.contains(active);
+      if (lost && previous?.isConnected) previous.focus({ preventScroll: true });
     },
   };
 }

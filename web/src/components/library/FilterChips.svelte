@@ -14,7 +14,6 @@
       out.push({ key: `f${k}`, label: FORMAT_NAMES[k] ?? k, remove: () => lib.setFilters({ formats: f.formats.filter((x) => x !== k) }) });
     }
     if (f.vis) out.push({ key: 'vis', label: f.vis === 'public' ? '公开' : '私有', remove: () => lib.setFilters({ vis: '' }) });
-    if (f.gps) out.push({ key: 'gps', label: '含位置', remove: () => lib.setFilters({ gps: false }) });
     if (f.date) {
       out.push({ key: 'date', label: DATE_RANGES.find((d) => d.key === f.date)?.label ?? '', remove: () => lib.setFilters({ date: '' }) });
     }
@@ -24,6 +23,7 @@
     for (const t of f.tags) {
       out.push({ key: `t${t}`, label: `#${t}`, remove: () => lib.setFilters({ tags: f.tags.filter((x) => x !== t) }) });
     }
+    if (f.gps) out.push({ key: 'gps', label: '含位置', remove: () => lib.setFilters({ gps: false }) });
     return out;
   });
 </script>

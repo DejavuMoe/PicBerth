@@ -6,7 +6,7 @@
 </script>
 
 {#if visibility === 'public'}
-  <span class="badge badge-success"><span class="dot"></span>公开</span>
+  <span class="vis"><Icon name="globe" size={13} />公开</span>
 {:else}
-  <span class="badge"><Icon name="lock" size={12} />私有</span>
+  <span class="vis vis-private"><Icon name="lock" size={13} />私有</span>
 {/if}

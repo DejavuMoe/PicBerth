@@ -22,7 +22,7 @@
 
 <div class="toasts" class:lifted={bottomBar.active} role="status" aria-live="polite">
   {#each toasts as t (t.id)}
-    <div class="toast" class:has-action={!!t.action} use:pausable={t.id}>
+    <div class="toast" use:pausable={t.id}>
       <span>{t.message}</span>
       {#if t.action}
         {@const action = t.action}

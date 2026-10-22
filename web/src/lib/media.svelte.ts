@@ -7,5 +7,11 @@ function watch(query: string) {
   return state;
 }
 
-/** Phone layout: list rows, filter sheet, fixed bulk bar. */
+/** Phone layout: tab bar, list rows, filter sheet, fixed bulk bar. */
 export const phone = watch('(max-width: 720px)');
+
+/** Tablet layout: the sidebar collapses to an icon rail. */
+export const tablet = watch('(min-width: 721px) and (max-width: 1099px)');
+
+/** Wide layout: room for a docked detail column. */
+export const wide = watch('(min-width: 1280px)');

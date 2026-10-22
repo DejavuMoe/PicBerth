@@ -1,27 +1,30 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { createLeave } from '../lib/leave.svelte';
   import { overlay } from '../lib/modal';
 
   interface Props {
     label: string;
     onclose: () => void;
-    side?: 'left' | 'right';
     width?: string;
-    children: Snippet;
+    /** Receives `close`, which plays the exit animation before calling `onclose`. */
+    children: Snippet<[() => void]>;
   }
-  let { label, onclose, side = 'right', width, children }: Props = $props();
+  let { label, onclose, width, children }: Props = $props();
+
+  const leave = createLeave(() => onclose, 200);
 </script>
 
-<div class="scrim" role="presentation" onclick={onclose}></div>
+<div class="scrim" class:leaving={leave.leaving} role="presentation" onclick={leave.close}></div>
 <div
   class="drawer"
-  class:left={side === 'left'}
+  class:leaving={leave.leaving}
   role="dialog"
   aria-modal="true"
   aria-label={label}
   tabindex="-1"
   style:--w={width}
-  use:overlay={{ onescape: onclose }}
+  use:overlay={{ onescape: leave.close }}
 >
-  {@render children()}
+  {@render children(leave.close)}
 </div>

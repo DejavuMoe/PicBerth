@@ -10,15 +10,19 @@
   import Icon from '../Icon.svelte';
   import Seg from '../Seg.svelte';
   import Switch from '../Switch.svelte';
+  import VisLabel from '../VisLabel.svelte';
   import RenameField from './RenameField.svelte';
   import TagEditor from './TagEditor.svelte';
 
   interface Props {
     lib: Library;
     image: Image;
+    /** Docked column beside the list, right drawer, or full phone sheet. */
+    mode: 'dock' | 'drawer' | 'sheet';
+    /** In a drawer or sheet this is the overlay's animated close. */
     onclose: () => void;
   }
-  let { lib, image, onclose }: Props = $props();
+  let { lib, image, mode, onclose }: Props = $props();
 
   const trashed = $derived(image.state === 'trashed');
   const pub = $derived(image.visibility === 'public');
@@ -32,40 +36,53 @@
   let linkField = $state<HTMLInputElement | null>(null);
 </script>
 
-<div class="detail">
+<div class="detail detail-{mode}">
   <div class="detail-head">
     <h2 class="truncate" title={image.filename}>{image.filename}</h2>
-    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="上一张" title="上一张 (←)" disabled={!lib.prev} onclick={() => lib.prev && lib.open(lib.prev.id)}>
-      <Icon name="chevron-left" />
-    </button>
-    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="下一张" title="下一张 (→)" disabled={!lib.canNext} onclick={() => lib.step(1)}>
-      <Icon name="chevron-right" />
-    </button>
-    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="关闭" title="关闭 (Esc)" onclick={onclose}>
-      <Icon name="x" />
-    </button>
+    <div class="detail-nav">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="上一张" title="上一张 (←)" disabled={!lib.prev} onclick={() => lib.prev && lib.open(lib.prev.id)}>
+        <Icon name="chevron-left" />
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="下一张" title="下一张 (→)" disabled={!lib.canNext} onclick={() => lib.step(1)}>
+        <Icon name="chevron-right" />
+      </button>
+      <span class="detail-nav-sep"></span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="关闭" title="关闭 (Esc)" onclick={onclose}>
+        <Icon name="x" />
+      </button>
+    </div>
   </div>
 
   <div class="detail-scroll">
-    {#key image.id}
-      <a
-        class="preview"
-        class:checker={hasAlpha(image)}
-        href={originalHref(image)}
-        target="_blank"
-        rel="noreferrer"
-        title="打开原图"
-      >
-        {#if image.broken}
-          <Icon name="image" size={28} />
-        {:else}
-          <img src={previewSrc} alt={image.filename} />
-        {/if}
+    <div class="detail-media">
+      <a class="preview" class:checker={hasAlpha(image)} href={originalHref(image)} target="_blank" rel="noreferrer">
+        {#key image.id}
+          {#if image.broken}
+            <Icon name="image" size={28} />
+          {:else}
+            <img src={previewSrc} alt={image.filename} />
+          {/if}
+        {/key}
+        <span class="preview-open">
+          <Icon name="external" size={14} />
+          打开原图
+        </span>
       </a>
-    {/key}
+      <div class="facts">
+        <span>{formatName(image)}</span>
+        <span class="num">{image.width} × {image.height}</span>
+        <span class="num">{formatBytes(image.size)}</span>
+        {#if image.frames > 1}<span>动图 · {image.frames} 帧</span>{/if}
+        {#if trashed}
+          {#if left}<span class="badge">{left}</span>{/if}
+        {:else}
+          <VisLabel visibility={image.visibility} />
+        {/if}
+      </div>
+    </div>
 
     {#if !trashed}
-      <section>
+      <section class="d-section">
         <div class="section-label">链接</div>
         <Seg
           label="链接格式"
@@ -78,17 +95,10 @@
           <input bind:this={linkField} class="input" readonly value={image.links[fmt]} aria-label={`${fmtLabel} 链接`} onfocus={(e) => e.currentTarget.select()} />
           <CopyButton variant="primary" text={image.links[fmt]} field={linkField} />
         </div>
-        {#if !pub}<p class="hint" style="margin-top: 6px">私有图片的链接只在登录后可以打开。</p>{/if}
+        {#if !pub}<p class="hint">私有图片的链接只在登录后可以打开。</p>{/if}
       </section>
 
-      <section>
-        <div class="section-label">文件名</div>
-        {#key image.id}
-          <RenameField filename={image.filename} onsave={(n) => lib.rename(image.id, n)} />
-        {/key}
-      </section>
-
-      <section>
+      <section class="d-section">
         <div class="setting-row">
           <div>
             <div class="label">公开访问</div>
@@ -103,7 +113,14 @@
         </div>
       </section>
 
-      <section>
+      <section class="d-section">
+        <div class="section-label">文件名</div>
+        {#key image.id}
+          <RenameField filename={image.filename} onsave={(n) => lib.rename(image.id, n)} />
+        {/key}
+      </section>
+
+      <section class="d-section">
         <div class="section-label">标签</div>
         {#key image.id}
           <TagEditor id={image.id} tags={image.tags} known={knownTags} onchange={(tags) => lib.setTags(image.id, tags)} />
@@ -111,18 +128,17 @@
       </section>
     {/if}
 
-    <section>
+    <section class="d-section">
       <div class="section-label">信息</div>
       <dl class="props">
-        <dt>格式</dt>
-        <dd>
-          {formatName(image)}
-          {#if image.frames > 1}<span class="badge">动图 · {image.frames} 帧</span>{/if}
-        </dd>
-        <dt>尺寸</dt>
-        <dd class="num">{image.width} × {image.height}</dd>
-        <dt>大小</dt>
-        <dd>{formatBytes(image.size)}</dd>
+        <dt>来源</dt>
+        <dd>{sourceLabel(image.source)}</dd>
+        <dt>上传时间</dt>
+        <dd class="num">{formatAbsolute(image.createdAt)}</dd>
+        {#if trashed}
+          <dt>删除时间</dt>
+          <dd class="num">{image.trashedAt ? formatAbsolute(image.trashedAt) : '—'}</dd>
+        {/if}
         <dt>位置信息</dt>
         <dd>
           {#if image.hasGps}
@@ -131,18 +147,6 @@
             无
           {/if}
         </dd>
-        <dt>来源</dt>
-        <dd>{sourceLabel(image.source)}</dd>
-        <dt>上传时间</dt>
-        <dd class="num">{formatAbsolute(image.createdAt)}</dd>
-        {#if trashed}
-          <dt>删除时间</dt>
-          <dd class="num">{image.trashedAt ? formatAbsolute(image.trashedAt) : '—'}</dd>
-          {#if left}
-            <dt>自动清除</dt>
-            <dd>{left}</dd>
-          {/if}
-        {/if}
         <dt>ID</dt>
         <dd>
           <span class="mono truncate">{image.id}</span>

@@ -47,6 +47,12 @@ export const ICONS = {
   edit: ['M4 20h4L19 9l-4-4L4 16z', 'm13.5 6.5 4 4'],
   clipboard: ['M9 4h6v3H9z', 'M15 5.5h3v14.5H6V5.5h3'],
   refresh: ['M20 11a8 8 0 0 0-14.5-4.5', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.5 4.5', 'M20 20v-4h-4'],
+  tag: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5z', 'M8.5 8.5h.01'],
+  info: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z', 'M12 11v5', 'M12 8h.01'],
+  select: ['M4.5 4.5h15v15h-15z', 'm8.5 12 2.5 2.5 4.5-5'],
 } satisfies Record<string, string[]>;
 
 export type IconName = keyof typeof ICONS;
+
+/** Dot glyphs need a heavier stroke to carry the same visual weight as line icons. */
+export const ICON_STROKE: Partial<Record<IconName, number>> = { more: 3.2 };
