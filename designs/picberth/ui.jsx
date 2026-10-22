@@ -28,8 +28,6 @@ const ICON_PATHS = {
   sort: ['M7 4v16', 'm4 7 3-3 3 3', 'M17 20V4', 'm14 17 3 3 3-3'],
   plus: ['M12 5v14', 'M5 12h14'],
   alert: ['M12 3.5 21 19.5H3z', 'M12 10v4', 'M12 17h.01'],
-  sun: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4'],
-  moon: ['M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z'],
   logout: ['M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5', 'M10 8l-4 4 4 4', 'M6 12h10'],
   edit: ['M4 20h4L19 9l-4-4L4 16z', 'm13.5 6.5 4 4'],
   refresh: ['M20 11a8 8 0 0 0-14.5-4.5', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.5 4.5', 'M20 20v-4h-4'],
@@ -37,12 +35,12 @@ const ICON_PATHS = {
 };
 
 // Dot glyphs need a heavier stroke to carry the same visual weight as line icons.
-const ICON_STROKE = { more: 3.2 };
+const ICON_STROKE = { more: 3 };
 
 function Icon({ name, size = 16 }) {
   const d = ICON_PATHS[name] || [];
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE[name] ?? 1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flex: 'none' }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE[name] ?? 1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flex: 'none' }}>
       {d.map((p, i) => (
         <path key={i} d={p} />
       ))}
@@ -78,22 +76,30 @@ function useWidth() {
   return [ref, w];
 }
 
-function useOutside(ref, onOut, active) {
+/** Closes a floating layer on an outside press, Escape, or a scroll outside it. `refs`: the layer and its trigger. */
+function useOutside(refs, onOut, active) {
   React.useEffect(() => {
     if (!active) return;
+    const list = Array.isArray(refs) ? refs : [refs];
+    const inside = (t) => list.some((r) => r.current && r.current.contains(t));
     const down = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onOut();
+      if (!inside(e.target)) onOut();
     };
     const key = (e) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
       onOut();
     };
+    const scroll = (e) => {
+      if (!inside(e.target)) onOut();
+    };
     document.addEventListener('pointerdown', down);
     document.addEventListener('keydown', key, true);
+    window.addEventListener('scroll', scroll, true);
     return () => {
       document.removeEventListener('pointerdown', down);
       document.removeEventListener('keydown', key, true);
+      window.removeEventListener('scroll', scroll, true);
     };
   }, [active]);
 }
@@ -123,20 +129,88 @@ function useLeave(onClose, ms = 180) {
   return [leaving, close];
 }
 
-// ---------------------------------------------------------------- menus
+// ---------------------------------------------------------------- floating layers
+
+/** A layer drawn into <body> and placed beside `anchor`: below by default, above when it does not fit, never clipped
+ *  by a scrolling ancestor. `align="right"` lines the right edges up; `matchWidth` makes it at least as wide as the anchor. */
+function Floating({ anchor, align = 'left', up = false, matchWidth = false, minW, className = '', floatRef, children, ...rest }) {
+  const own = React.useRef(null);
+  const ref = floatRef || own;
+  const [pos, setPos] = React.useState(null);
+  React.useLayoutEffect(() => {
+    const a = anchor.current;
+    const el = ref.current;
+    if (!a || !el) return;
+    const r = a.getBoundingClientRect();
+    const M = 8;
+    const G = 4;
+    const minWidth = matchWidth ? r.width : minW;
+    if (minWidth) el.style.minWidth = `${minWidth}px`;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const below = window.innerHeight - r.bottom - G - M;
+    const above = r.top - G - M;
+    const dir = up ? (above >= h ? 'up' : below >= h ? 'down' : above > below ? 'up' : 'down') : below >= h ? 'down' : above >= h ? 'up' : above > below ? 'up' : 'down';
+    const room = dir === 'up' ? above : below;
+    const left = Math.max(M, Math.min(r.left, window.innerWidth - w - M));
+    setPos({
+      left,
+      minWidth,
+      maxHeight: h > room ? Math.max(120, room) : undefined,
+      ...(dir === 'up' ? { bottom: window.innerHeight - r.top + G } : { top: r.bottom + G }),
+    });
+  }, []);
+  return ReactDOM.createPortal(
+    <div ref={ref} className={`float ${className} ${pos ? '' : 'measuring'}`} style={pos ?? { top: 0, left: 0 }} {...rest}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 /** Dropdown: `trigger(open, toggle)` renders the button; children receive `close`. */
-function Menu({ trigger, children, align = 'left', up = false, width, className = '', wrapClass = '' }) {
+function Menu({ trigger, children, align = 'left', up = false, width, className = '', wrapClass = '', matchWidth = false }) {
   const [open, setOpen] = React.useState(false);
-  const ref = React.useRef(null);
-  useOutside(ref, () => setOpen(false), open);
+  const wrap = React.useRef(null);
+  const menu = React.useRef(null);
+  const kbd = React.useRef(false);
+  const close = React.useCallback(() => {
+    if (menu.current && menu.current.contains(document.activeElement)) wrap.current?.querySelector('button')?.focus();
+    setOpen(false);
+  }, []);
+  useOutside([wrap, menu], close, open);
+  React.useEffect(() => {
+    if (open && kbd.current) menu.current?.querySelector('[aria-checked="true"], [role^="menuitem"]')?.focus();
+    kbd.current = false;
+  }, [open]);
+  const onWrapKey = (e) => {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      kbd.current = true;
+      setOpen(true);
+    } else if (e.key === 'Enter' || e.key === ' ') kbd.current = true;
+  };
+  const onMenuKey = (e) => {
+    const items = [...menu.current.querySelectorAll('[role^="menuitem"]:not(:disabled)')];
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement);
+    const go = (n) => {
+      e.preventDefault();
+      items[(n + items.length) % items.length].focus();
+    };
+    if (e.key === 'ArrowDown') go(i + 1);
+    else if (e.key === 'ArrowUp') go(i < 0 ? -1 : i - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(-1);
+    else if (e.key === 'Tab') close();
+  };
   return (
-    <div className={`menu-wrap ${wrapClass}`} ref={ref}>
+    <div className={`menu-wrap ${wrapClass}`} ref={wrap} onKeyDown={onWrapKey} onPointerDown={() => (kbd.current = false)}>
       {trigger(open, () => setOpen((o) => !o))}
       {open && (
-        <div className={`menu ${align === 'right' ? 'right' : ''} ${up ? 'up' : ''} ${className}`} role="menu" style={width ? { minWidth: width } : undefined}>
-          {typeof children === 'function' ? children(() => setOpen(false)) : children}
-        </div>
+        <Floating anchor={wrap} floatRef={menu} align={align} up={up} matchWidth={matchWidth} minW={width} className={`menu ${className}`} role="menu" onKeyDown={onMenuKey}>
+          {typeof children === 'function' ? children(close) : children}
+        </Floating>
       )}
     </div>
   );
@@ -160,6 +234,129 @@ function RadioItem({ on, children, onClick }) {
   );
 }
 
+/** Product-drawn select: a button that opens a menu of radio items. */
+function Select({ id, value, options, onChange, label }) {
+  const cur = options.find((o) => o.value === value);
+  return (
+    <Menu
+      wrapClass="block"
+      matchWidth
+      trigger={(open, toggle) => (
+        <button type="button" id={id} className="select" aria-haspopup="menu" aria-expanded={open} aria-label={label} onClick={toggle}>
+          <span className="truncate">{cur?.label}</span>
+          <Icon name="chevron-down" />
+        </button>
+      )}
+    >
+      {(close) =>
+        options.map((o) => (
+          <RadioItem
+            key={o.value}
+            on={o.value === value}
+            onClick={() => {
+              onChange(o.value);
+              close();
+            }}
+          >
+            {o.label}
+          </RadioItem>
+        ))
+      }
+    </Menu>
+  );
+}
+
+/** Product-drawn combobox: `trigger` opens an elevated popover with a filter field and a list of `options`
+ *  ({ value, label, count }). `normalize(text)` returns the cleaned text that may be created, or '' for none.
+ *  `taken(value)` tells whether a created value already exists. ↑/↓ move, Enter picks, Esc closes. */
+function Combobox({ trigger, options, onPick, normalize, taken, onEmptyBackspace, placeholder, label, align = 'left' }) {
+  const uid = React.useId();
+  const [open, setOpen] = React.useState(false);
+  const [text, setText] = React.useState('');
+  const [hi, setHi] = React.useState(0);
+  const wrap = React.useRef(null);
+  const pop = React.useRef(null);
+  const close = React.useCallback(() => {
+    if (pop.current && pop.current.contains(document.activeElement)) wrap.current?.querySelector('button')?.focus();
+    setOpen(false);
+    setText('');
+  }, []);
+  useOutside([wrap, pop], close, open);
+
+  const cand = normalize ? normalize(text) : '';
+  const needle = (cand || text.trim()).toLowerCase();
+  const matches = options.filter((o) => !needle || o.label.toLowerCase().includes(needle));
+  const exact = cand && (taken?.(cand) || options.some((o) => o.label.toLowerCase() === cand.toLowerCase()));
+  const items = [...matches.map((o) => ({ kind: 'opt', ...o })), ...(cand && !exact ? [{ kind: 'new', value: cand, label: cand }] : [])];
+  const cur = Math.min(hi, items.length - 1);
+
+  React.useEffect(() => setHi(0), [text]);
+  React.useEffect(() => {
+    pop.current?.querySelector('.opt.hi')?.scrollIntoView({ block: 'nearest' });
+  }, [cur, open]);
+
+  const pick = (it) => {
+    if (!it) return;
+    onPick(it.value);
+    setText('');
+    setHi(0);
+  };
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length) setHi((cur + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      pick(items[cur]);
+    } else if (e.key === 'Backspace' && !text) onEmptyBackspace?.();
+  };
+  return (
+    <div className="menu-wrap" ref={wrap}>
+      {trigger(open, () => (open ? close() : setOpen(true)))}
+      {open && (
+        <Floating anchor={wrap} floatRef={pop} align={align} className="pop">
+          <input
+            className="pop-input"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={`${uid}-list`}
+            aria-activedescendant={items.length ? `${uid}-${cur}` : undefined}
+            aria-label={label}
+            placeholder={placeholder}
+            autoFocus
+            autoComplete="off"
+            spellCheck="false"
+            maxLength={64}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKey}
+          />
+          {items.length > 0 && (
+            <div className="pop-list" id={`${uid}-list`} role="listbox">
+              {items.map((it, i) => (
+                <div
+                  key={`${it.kind}-${it.value}`}
+                  id={`${uid}-${i}`}
+                  role="option"
+                  aria-selected={i === cur}
+                  className={`opt ${i === cur ? 'hi' : ''}`}
+                  onMouseEnter={() => setHi(i)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(it)}
+                >
+                  {it.kind === 'new' && <Icon name="plus" />}
+                  <span className="truncate">{it.label}</span>
+                  {it.kind === 'opt' && it.count !== undefined && <span className="count">{it.count}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Floating>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- controls
 
 function Switch({ checked, onChange, label, disabled }) {
@@ -180,12 +377,33 @@ function Seg({ options, value, onChange, label, icons, fill, className = '' }) {
   );
 }
 
+/** Text tabs with an underline on the active one. */
+function Tabs({ options, value, onChange, label }) {
+  const move = (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.stopPropagation();
+    const i = options.findIndex((o) => o.key === value);
+    const n = options[(i + (e.key === 'ArrowRight' ? 1 : -1) + options.length) % options.length];
+    onChange(n.key);
+    e.currentTarget.querySelector(`[data-key="${n.key}"]`)?.focus();
+  };
+  return (
+    <div className="tabs" role="tablist" aria-label={label} onKeyDown={move}>
+      {options.map((o) => (
+        <button key={o.key} data-key={o.key} type="button" role="tab" aria-selected={value === o.key} tabIndex={value === o.key ? 0 : -1} onClick={() => onChange(o.key)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- overlays
 
 const renderKids = (children, close) => (typeof children === 'function' ? children(close) : children);
 
 function Modal({ title, onClose, children, footer, width, className = '' }) {
-  const [leaving, close] = useLeave(onClose, 140);
+  const [leaving, close] = useLeave(onClose, 120);
   useEsc(close);
   return (
     <>
@@ -205,7 +423,7 @@ function Modal({ title, onClose, children, footer, width, className = '' }) {
 }
 
 function Drawer({ onClose, children, width, label }) {
-  const [leaving, close] = useLeave(onClose, 200);
+  const [leaving, close] = useLeave(onClose, 160);
   useEsc(close);
   return (
     <>
@@ -218,7 +436,7 @@ function Drawer({ onClose, children, width, label }) {
 }
 
 function Sheet({ onClose, children, label, full }) {
-  const [leaving, close] = useLeave(onClose, 220);
+  const [leaving, close] = useLeave(onClose, 180);
   useEsc(close);
   return (
     <>
@@ -301,7 +519,7 @@ function Toasts({ toasts, dismiss }) {
   );
 }
 
-function BrandMark({ size = 14, className = '' }) {
+function BrandMark({ size = 12, className = '' }) {
   return (
     <span className={`brand-mark ${className}`}>
       <Icon name="image" size={size} />
@@ -328,15 +546,11 @@ const NAV = [
   { key: 'status', label: '状态', short: '状态', icon: 'activity', group: 2 },
 ];
 const TAB_KEYS = ['images', 'trash', 'tokens'];
-
-function ThemeItem({ theme, setTheme, close }) {
-  const dark = theme === 'dark';
-  return (
-    <MenuItem icon={dark ? 'sun' : 'moon'} onClick={() => (setTheme(dark ? 'light' : 'dark'), close())}>
-      {dark ? '切换到浅色' : '切换到深色'}
-    </MenuItem>
-  );
-}
+const THEMES = [
+  { key: 'system', label: '跟随系统' },
+  { key: 'light', label: '浅色' },
+  { key: 'dark', label: '深色' },
+];
 
 function AccountMenu({ theme, setTheme, toast }) {
   return (
@@ -345,7 +559,7 @@ function AccountMenu({ theme, setTheme, toast }) {
       width={200}
       wrapClass="account-wrap"
       trigger={(open, toggle) => (
-        <button type="button" className="account" aria-label="账户" title="admin" aria-expanded={open} onClick={toggle}>
+        <button type="button" className="account" aria-label="账户" title="admin" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
           <span className="avatar">A</span>
           <span className="account-name">admin</span>
         </button>
@@ -353,7 +567,12 @@ function AccountMenu({ theme, setTheme, toast }) {
     >
       {(close) => (
         <>
-          <ThemeItem theme={theme} setTheme={setTheme} close={close} />
+          {THEMES.map((t) => (
+            <RadioItem key={t.key} on={theme === t.key} onClick={() => (setTheme(t.key), close())}>
+              {t.label}
+            </RadioItem>
+          ))}
+          <div className="menu-sep" />
           <MenuItem icon="logout" onClick={() => (close(), toast('已退出登录'))}>
             退出登录
           </MenuItem>
@@ -428,10 +647,7 @@ function MoreSheet({ route, go, status, theme, setTheme, toast, onClose }) {
               {n.key === 'status' && status.warnings.length > 0 && <span className="warn-dot" role="img" aria-label="有警告" />}
             </button>
           ))}
-          <div className="setting-row more-row">
-            <span className="label">深色模式</span>
-            <Switch checked={theme === 'dark'} label="深色模式" onChange={(v) => setTheme(v ? 'dark' : 'light')} />
-          </div>
+          <Seg fill label="主题" value={theme} onChange={setTheme} options={THEMES} />
           <button type="button" className="nav-item" onClick={() => (close(), toast('已退出登录'))}>
             <Icon name="logout" />
             <span className="nav-label">退出登录</span>
@@ -442,7 +658,7 @@ function MoreSheet({ route, go, status, theme, setTheme, toast, onClose }) {
   );
 }
 
-/** Sticky page header: title on the left, page actions (children) on the right. */
+/** Page header inside the panel: title on the left, page actions (children) on the right. */
 function PageHead({ title, children }) {
   return (
     <header className="page-head">
@@ -453,6 +669,6 @@ function PageHead({ title, children }) {
 }
 
 Object.assign(window, {
-  Icon, useMedia, useWidth, useOutside, useEsc, useLeave, Menu, MenuItem, RadioItem, Switch, Seg, Modal, Drawer, Sheet, Thumb,
-  CopyButton, Toasts, Brand, BrandMark, writeClipboard, hasAlpha, NAV, TAB_KEYS, Sidebar, TabBar, MoreSheet, PageHead,
+  Icon, useMedia, useWidth, useOutside, useEsc, useLeave, Floating, Menu, MenuItem, RadioItem, Select, Combobox, Switch, Seg, Tabs, Modal, Drawer, Sheet, Thumb,
+  CopyButton, Toasts, Brand, BrandMark, writeClipboard, hasAlpha, NAV, TAB_KEYS, THEMES, Sidebar, TabBar, MoreSheet, PageHead,
 });

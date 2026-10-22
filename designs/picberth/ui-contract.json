@@ -59,7 +59,11 @@
           "desktop-1440",
           "tablet-1024",
           "mobile-390",
-          "reduced-motion"
+          "reduced-motion",
+          "theme-follow-system",
+          "tag-combobox",
+          "custom-select",
+          "disabled-primary"
         ],
         "stableIds": [
           "library",

@@ -151,7 +151,7 @@ function AdmTokenModal({ onClose, onDone, toast }) {
           {tried && nameErr && <span className="error-text">{nameErr}</span>}
         </div>
         <div className="field">
-          <span style={{ fontSize: 13, fontWeight: 500 }}>权限</span>
+          <span className="field-label">权限</span>
           <div className="adm-opts">
             {ADM_SCOPE_OPTIONS.map((o) => (
               <label key={o.key} className="adm-opt">
@@ -167,13 +167,7 @@ function AdmTokenModal({ onClose, onDone, toast }) {
         </div>
         <div className="field">
           <label htmlFor="adm-tk-exp">有效期</label>
-          <select id="adm-tk-exp" className="select" value={days} onChange={(e) => setDays(e.target.value)}>
-            {ADM_EXPIRY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <Select id="adm-tk-exp" value={days} options={ADM_EXPIRY_OPTIONS} onChange={setDays} />
         </div>
       </div>
     </Modal>
@@ -237,61 +231,61 @@ function TokensPage({ tokens, setTokens, toast }) {
   );
 
   return (
-    <div className="page adm-wide">
+    <div className="page">
       <PageHead title="令牌">{tokens.length > 0 && newBtn}</PageHead>
       <div className="page-body">
         {tokens.length === 0 ? (
           <div className="empty">
-            <Icon name="key" size={28} />
+            <Icon name="key" size={32} />
             <strong>还没有令牌</strong>
             <div className="actions">{newBtn}</div>
           </div>
-        ) : mobile ? (
-          <div className="adm-trows">
-            {tokens.map((t) => (
-              <div key={t.id} className={`adm-trow ${t.revokedAt ? 'adm-revoked' : ''}`}>
-                <div className="adm-trow-top">
-                  {nameCell(t)}
-                  {revokeBtn(t)}
-                </div>
-                <AdmScopeBadges scopes={t.scopes} />
-                <div className="adm-trow-meta">
-                  <span>{lastUsed(t)}</span>
-                  <AdmExpiry t={t} />
-                </div>
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="table-wrap">
-            <table className="table adm-table">
-              <thead>
-                <tr>
-                  <th>名称</th>
-                  <th>权限</th>
-                  <th>最近使用</th>
-                  <th>过期</th>
-                  <th className="c-actions">
-                    <span className="sr-only">操作</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="adm-col">
+            {mobile ? (
+              <div className="adm-trows">
                 {tokens.map((t) => (
-                  <tr key={t.id} className={t.revokedAt ? 'adm-revoked' : ''}>
-                    <td>{nameCell(t)}</td>
-                    <td>
-                      <AdmScopeBadges scopes={t.scopes} />
-                    </td>
-                    <td>{lastUsed(t)}</td>
-                    <td>
+                  <div key={t.id} className={`adm-trow ${t.revokedAt ? 'adm-revoked' : ''}`}>
+                    <div className="adm-trow-top">
+                      {nameCell(t)}
+                      {revokeBtn(t)}
+                    </div>
+                    <AdmScopeBadges scopes={t.scopes} />
+                    <div className="adm-trow-meta">
+                      <span>{lastUsed(t)}</span>
                       <AdmExpiry t={t} />
-                    </td>
-                    <td className="c-actions">{revokeBtn(t)}</td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              <div className="adm-tokens" role="table" aria-label="令牌">
+                <div className="alink-grid head" role="row">
+                  <span role="columnheader">名称</span>
+                  <span role="columnheader">权限</span>
+                  <span role="columnheader">最近使用</span>
+                  <span role="columnheader">过期</span>
+                  <span role="columnheader" className="sr-only">
+                    操作
+                  </span>
+                </div>
+                {tokens.map((t) => (
+                  <div key={t.id} role="row" className={`alink-grid ${t.revokedAt ? 'adm-revoked' : ''}`}>
+                    <span role="cell">{nameCell(t)}</span>
+                    <span role="cell">
+                      <AdmScopeBadges scopes={t.scopes} />
+                    </span>
+                    <span role="cell">{lastUsed(t)}</span>
+                    <span role="cell">
+                      <AdmExpiry t={t} />
+                    </span>
+                    <span role="cell" className="end">
+                      {revokeBtn(t)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -409,26 +403,19 @@ function SettingsPage({ settings, setSettings, toast }) {
 
   const num = (key, id, unit) => (
     <>
-      <div className="adm-inline">
-        <input
-          id={id}
-          className="input num"
-          style={{ width: 112 }}
-          inputMode="numeric"
-          aria-invalid={errors[key] ? 'true' : undefined}
-          value={draft[key]}
-          onChange={(e) => set(key, e.target.value)}
-        />
-        {unit && <span className="subtle">{unit}</span>}
+      <div className={`input-unit ${errors[key] ? 'invalid' : ''}`}>
+        <input id={id} className="num" inputMode="numeric" aria-invalid={errors[key] ? 'true' : undefined} value={draft[key]} onChange={(e) => set(key, e.target.value)} />
+        {unit && <span className="unit">{unit}</span>}
       </div>
       {errors[key] && <span className="error-text">{errors[key]}</span>}
     </>
   );
 
   return (
-    <div className="page adm-narrow">
+    <div className="page">
       <PageHead title="设置" />
       <div className="page-body">
+       <div className="adm-col">
         <AdmSection title="上传">
           <AdmRow label="单文件上限" htmlFor="adm-max-mb">
             {num('maxUploadMB', 'adm-max-mb', 'MB')}
@@ -498,6 +485,7 @@ function SettingsPage({ settings, setSettings, toast }) {
             </button>
           </div>
         )}
+       </div>
       </div>
     </div>
   );
@@ -621,7 +609,7 @@ function StatusPage({ status, images, toast }) {
   const audit = [...auditExtra, ...AUDIT];
 
   return (
-    <div className="page adm-wide">
+    <div className="page">
       <PageHead title="状态">
         <button type="button" className="btn btn-ghost" onClick={() => toast('状态已刷新')}>
           <Icon name="refresh" />
@@ -629,6 +617,7 @@ function StatusPage({ status, images, toast }) {
         </button>
       </PageHead>
       <div className="page-body">
+       <div className="adm-col">
         {warnings.map((w) => (
           <div key={w.code} className="alert warning">
             <Icon name="alert" />
@@ -716,32 +705,33 @@ function StatusPage({ status, images, toast }) {
               ))}
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="table adm-table adm-audit">
-                <thead>
-                  <tr>
-                    <th>时间</th>
-                    <th>操作者</th>
-                    <th>操作</th>
-                    <th>对象</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {audit.map((a, i) => (
-                    <tr key={i}>
-                      <td className="mono subtle nowrap">{fmtDate(a.at)}</td>
-                      <td>{a.actor}</td>
-                      <td className="nowrap">{a.action}</td>
-                      <td className="c-name">
-                        <div className="truncate">{a.target}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="adm-audit" role="table" aria-label="操作记录">
+              <div className="alink-grid head" role="row">
+                <span role="columnheader">时间</span>
+                <span role="columnheader">操作者</span>
+                <span role="columnheader">操作</span>
+                <span role="columnheader">对象</span>
+              </div>
+              {audit.map((a, i) => (
+                <div key={i} className="alink-grid" role="row">
+                  <span role="cell" className="mono subtle nowrap">
+                    {fmtDate(a.at)}
+                  </span>
+                  <span role="cell" className="truncate">
+                    {a.actor}
+                  </span>
+                  <span role="cell" className="nowrap">
+                    {a.action}
+                  </span>
+                  <span role="cell" className="truncate">
+                    {a.target}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </section>
+       </div>
       </div>
     </div>
   );
