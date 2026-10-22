@@ -129,31 +129,50 @@ function LoginScreen({ preset }) {
 }
 
 function NotFoundScreen() {
+  const mobile = useMedia('(max-width: 720px)');
+  const rail = useMedia('(max-width: 1099px)') && !mobile;
+  let group = null;
   return (
-    <div className="shell-a" data-screen-label="not-found">
-      <aside className="sidenav" aria-label="主导航">
-        <Brand />
-        <nav>
-          {NAV.map((n) => (
-            <button key={n.key} type="button" className="nav-item">
-              <Icon name={n.icon} />
-              {n.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-      <div className="main-a">
-        <header className="topbar-a">
-          <nav className="crumbs" aria-label="位置">
-            <span className="hide-sm">PicBerth</span>
-            <span className="hide-sm">/</span>
-            <strong>页面不存在</strong>
+    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="not-found">
+      {!mobile && (
+        <aside className="sidenav" aria-label="主导航">
+          <Brand />
+          <nav>
+            {NAV.map((n) => {
+              const head = n.group !== group ? <div className="nav-group">{(group = n.group)}</div> : null;
+              return (
+                <React.Fragment key={n.key}>
+                  {head}
+                  <button type="button" className="nav-item" title={n.label}>
+                    <span className="nav-icon">
+                      <Icon name={n.icon} />
+                    </span>
+                    <span className="nav-label">{n.label}</span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
           </nav>
+        </aside>
+      )}
+      <div className="main">
+        <header className="topbar">
+          {mobile ? (
+            <Brand />
+          ) : (
+            <nav className="crumbs" aria-label="位置">
+              <span>PicBerth</span>
+              <Icon name="chevron-right" size={12} />
+              <strong>页面不存在</strong>
+            </nav>
+          )}
         </header>
         <main>
           <div className="page" style={{ '--page-w': '720px' }}>
             <div className="empty">
-              <Icon name="search" size={28} />
+              <span className="empty-icon">
+                <Icon name="search" size={22} />
+              </span>
               <strong>页面不存在</strong>
               <p>这个地址没有对应的页面。</p>
               <div className="actions">
@@ -165,16 +184,30 @@ function NotFoundScreen() {
           </div>
         </main>
       </div>
+      {mobile && (
+        <nav className="tabbar" aria-label="主导航">
+          {NAV.slice(0, 3).map((n) => (
+            <button key={n.key} type="button" className="tab">
+              <Icon name={n.icon} size={20} />
+              <span>{n.short}</span>
+            </button>
+          ))}
+          <button type="button" className="tab">
+            <Icon name="more" size={20} />
+            <span>更多</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
 
 const NAV = [
-  { key: 'images', label: '全部图片', icon: 'images' },
-  { key: 'trash', label: '回收站', icon: 'trash' },
-  { key: 'tokens', label: '令牌', icon: 'key' },
-  { key: 'settings', label: '设置', icon: 'gear' },
-  { key: 'status', label: '状态', icon: 'activity' },
+  { key: 'images', label: '全部图片', short: '图片', icon: 'images', group: '图片' },
+  { key: 'trash', label: '回收站', short: '回收站', icon: 'trash', group: '图片' },
+  { key: 'tokens', label: '令牌', short: '令牌', icon: 'key', group: '接入' },
+  { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: '系统' },
+  { key: 'status', label: '状态', short: '状态', icon: 'activity', group: '系统' },
 ];
 
 const SCREENS = {

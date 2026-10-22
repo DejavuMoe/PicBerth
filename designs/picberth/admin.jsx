@@ -11,39 +11,42 @@
 .adm-revoked td { color: var(--subtle); }
 .adm-revoked .cell-name .name { font-weight: 400; }
 .adm-tcards { display: flex; flex-direction: column; gap: 8px; }
-.adm-tcard { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.adm-tcard { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 .adm-tcard.adm-revoked { color: var(--subtle); }
 .adm-tcard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .adm-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .adm-kv > span:first-child { color: var(--subtle); }
 .adm-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .adm-form { display: flex; flex-direction: column; gap: 18px; }
-.adm-opts { display: flex; flex-direction: column; gap: 10px; }
+.adm-opts { display: flex; flex-direction: column; gap: 4px; }
 .adm-opts-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.adm-opt { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.adm-opt { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin: 0 -10px; border-radius: var(--r); cursor: pointer; transition: background-color var(--d1) var(--ease-out); }
+.adm-opt:hover { background: var(--tint); }
 .adm-opt .check { margin-top: 2px; flex: none; }
 .adm-opt strong { display: block; font-size: 13px; font-weight: 500; }
 .adm-opt-inline { display: inline-flex; align-items: center; gap: 8px; min-height: var(--h); font-size: 13px; cursor: pointer; }
 .adm-invalid, .adm-invalid:hover { border-color: var(--danger); }
 .adm-invalid:focus { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
-.adm-pre { margin: 0; padding: 12px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--tint); font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.adm-pre { margin: 0; padding: 12px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--tint); font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm-secret { display: flex; gap: 6px; }
 .adm-secret .input { flex: 1; font-family: var(--mono); font-size: 12px; }
-.adm-row { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 8px 24px; align-items: start; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
+.adm-row { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 8px 32px; align-items: start; padding: 16px 20px; border-bottom: 1px solid var(--hairline); }
 .adm-row:last-child { border-bottom: 0; }
+.adm-row > div:first-child { padding-top: calc((var(--h) - 20px) / 2); }
 .adm-row .label { display: block; font-size: 13px; font-weight: 500; line-height: 20px; }
 .adm-row .hint { margin-top: 2px; }
 .adm-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
 .adm-inline { display: flex; align-items: center; gap: 8px; }
 .adm-value { display: flex; align-items: center; min-height: var(--h); min-width: 0; overflow-wrap: anywhere; }
-.adm-sticky { position: sticky; bottom: var(--adm-sticky-bottom, 0px); z-index: 10; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; padding: 12px; border-top: 1px solid var(--hairline); background: var(--base); }
-.adm-sticky .grow { flex: 1; min-width: 140px; font-size: 13px; color: var(--subtle); }
-.adm-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.adm-metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 16px; }
+.adm-sticky { position: sticky; bottom: calc(16px + var(--bottom-ui, 0px)); z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; padding: 10px 10px 10px 16px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--raised); box-shadow: var(--shadow-float); animation: bar-in var(--d2) var(--ease-out); }
+.adm-sticky .grow { flex: 1; min-width: 140px; font-size: 13px; color: var(--text); font-weight: 500; }
+.adm-sticky .grow::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 0; border-radius: 50%; background: var(--warning); vertical-align: middle; }
+.adm-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; }
+.adm-metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 16px 20px; box-shadow: -1px 0 0 var(--hairline), 0 -1px 0 var(--hairline); }
 .adm-metric .k { font-size: 12px; color: var(--subtle); }
-.adm-metric .v { font-size: 24px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; color: var(--strong); }
+.adm-metric .v { font-size: 22px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; color: var(--strong); letter-spacing: -0.01em; }
 .adm-metric .s { font-size: 12px; color: var(--subtle); }
-.adm-metric .progress { margin: 4px 0 2px; }
+.adm-metric .progress { margin: 6px 0 2px; }
 .adm-result { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; overflow-wrap: anywhere; }
 .adm-result.subtle { color: var(--subtle); }
 .adm-run { width: min(260px, 100%); }
@@ -51,8 +54,7 @@
 .adm-audit-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border-bottom: 1px solid var(--hairline); font-size: 13px; }
 .adm-audit-item:last-child { border-bottom: 0; }
 @media (max-width: 900px) { .adm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .adm-row { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 480px) { .adm-metrics { gap: 8px; } }
+@media (max-width: 720px) { .adm-row { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; } .adm-row > div:first-child { padding-top: 0; } .card-head { padding: 12px 16px; } .adm-sticky .btn { height: var(--h-touch); } .adm-metric { padding: 14px 16px; } .adm-metric .v { font-size: 20px; } }
 `;
   document.head.appendChild(el);
 })();
@@ -603,7 +605,7 @@ const ADM_GB = 1073741824;
 
 function AdmMetric({ label, value, sub, children }) {
   return (
-    <div className="card adm-metric">
+    <div className="adm-metric">
       <span className="k">{label}</span>
       <span className="v">{value}</span>
       {children}
@@ -748,7 +750,7 @@ function StatusPage({ status, images, toast }) {
           </div>
         )}
 
-        <div className="adm-metrics">
+        <div className="card adm-metrics">
           <AdmMetric label="图片" value={active.length.toLocaleString()} />
           <AdmMetric label="占用空间" value={fmtBytes(totalBytes)} />
           <AdmMetric label="回收站" value={trashed.length.toLocaleString()} />

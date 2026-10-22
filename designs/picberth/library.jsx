@@ -1,5 +1,4 @@
-// Image management building blocks shared by the three directions.
-// Every component receives `lib`, the library controller created in app.jsx.
+// Image management building blocks. Every component receives `lib`, the library controller created in app.jsx.
 
 const FORMATS = ['jpeg', 'png', 'gif', 'webp', 'avif'];
 const VIS_OPTS = [
@@ -25,24 +24,14 @@ function stop(e) {
   e.stopPropagation();
 }
 
-function RadioItem({ on, children, end, onClick }) {
-  return (
-    <button type="button" role="menuitemradio" aria-checked={on} className="menu-item" onClick={onClick}>
-      <span className="menu-tick">{on && <Icon name="check" />}</span>
-      <span className="truncate">{children}</span>
-      {end !== undefined && <span className="end">{end}</span>}
-    </button>
-  );
-}
-
 // ---------------------------------------------------------------- filters
 
-function FilterButton({ label, n, open, toggle }) {
+function FilterButton({ label, n, open, toggle, icon }) {
   return (
     <button type="button" className={`btn btn-secondary filter-btn ${n ? 'active' : ''}`} aria-expanded={open} onClick={toggle}>
+      {icon && <Icon name={icon} />}
       <span>{label}</span>
-      {n ? <span className="filter-n">{n}</span> : null}
-      <Icon name="chevron-down" size={14} />
+      {n ? <span className="filter-n">{n}</span> : <Icon name="chevron-down" size={14} />}
     </button>
   );
 }
@@ -74,40 +63,34 @@ function FilterMenus({ lib }) {
           </>
         )}
       </Menu>
-      {lib.ext && (
-        <Menu trigger={(open, toggle) => <FilterButton label="上传时间" n={f.date ? 1 : 0} open={open} toggle={toggle} />}>
-          {(close) => (
-            <>
-              <RadioItem on={!f.date} onClick={() => (set({ date: '' }), close())}>
-                不限
+      <Menu trigger={(open, toggle) => <FilterButton label="上传时间" n={f.date ? 1 : 0} open={open} toggle={toggle} />}>
+        {(close) => (
+          <>
+            <RadioItem on={!f.date} onClick={() => (set({ date: '' }), close())}>
+              不限
+            </RadioItem>
+            {DATE_RANGES.map((d) => (
+              <RadioItem key={d.key} on={f.date === d.key} onClick={() => (set({ date: d.key }), close())}>
+                {d.label}
               </RadioItem>
-              {DATE_RANGES.map((d) => (
-                <RadioItem key={d.key} on={f.date === d.key} onClick={() => (set({ date: d.key }), close())}>
-                  {d.label}
-                </RadioItem>
-              ))}
-            </>
-          )}
-        </Menu>
-      )}
-      {lib.ext && (
-        <Menu width={220} trigger={(open, toggle) => <FilterButton label="来源" n={f.sources.length} open={open} toggle={toggle} />}>
-          {SOURCES.map((s) => (
-            <MenuItem key={s.key} checked={f.sources.includes(s.key)} end={countWhere(base, (i) => i.source === s.key)} onClick={() => set({ sources: toggleIn(f.sources, s.key) })}>
-              {s.label}
-            </MenuItem>
-          ))}
-        </Menu>
-      )}
-      {lib.ext && (
-        <Menu trigger={(open, toggle) => <FilterButton label="标签" n={f.tags.length} open={open} toggle={toggle} />}>
-          {allTags(base).map(([t, n]) => (
-            <MenuItem key={t} checked={f.tags.includes(t)} end={n} onClick={() => set({ tags: toggleIn(f.tags, t) })}>
-              {t}
-            </MenuItem>
-          ))}
-        </Menu>
-      )}
+            ))}
+          </>
+        )}
+      </Menu>
+      <Menu width={220} trigger={(open, toggle) => <FilterButton label="来源" n={f.sources.length} open={open} toggle={toggle} />}>
+        {SOURCES.map((s) => (
+          <MenuItem key={s.key} checked={f.sources.includes(s.key)} end={countWhere(base, (i) => i.source === s.key)} onClick={() => set({ sources: toggleIn(f.sources, s.key) })}>
+            {s.label}
+          </MenuItem>
+        ))}
+      </Menu>
+      <Menu trigger={(open, toggle) => <FilterButton label="标签" n={f.tags.length} open={open} toggle={toggle} />}>
+        {allTags(base).map(([t, n]) => (
+          <MenuItem key={t} checked={f.tags.includes(t)} end={n} onClick={() => set({ tags: toggleIn(f.tags, t) })}>
+            {t}
+          </MenuItem>
+        ))}
+      </Menu>
       <button type="button" className={`btn btn-secondary filter-btn ${f.gps ? 'active' : ''}`} aria-pressed={f.gps} onClick={() => set({ gps: !f.gps })}>
         <Icon name="pin" />
         <span>含位置</span>
@@ -122,12 +105,10 @@ function FilterChips({ lib }) {
   const chips = [];
   f.formats.forEach((k) => chips.push({ k: 'f' + k, label: FORMAT_LABEL[k], rm: () => set({ formats: f.formats.filter((x) => x !== k) }) }));
   if (f.vis) chips.push({ k: 'vis', label: f.vis === 'public' ? '公开' : '私有', rm: () => set({ vis: '' }) });
+  if (f.date) chips.push({ k: 'date', label: DATE_RANGES.find((d) => d.key === f.date).label, rm: () => set({ date: '' }) });
+  f.sources.forEach((s) => chips.push({ k: 's' + s, label: sourceLabel(s), rm: () => set({ sources: f.sources.filter((x) => x !== s) }) }));
+  f.tags.forEach((t) => chips.push({ k: 't' + t, label: `#${t}`, rm: () => set({ tags: f.tags.filter((x) => x !== t) }) }));
   if (f.gps) chips.push({ k: 'gps', label: '含位置', rm: () => set({ gps: false }) });
-  if (lib.ext) {
-    if (f.date) chips.push({ k: 'date', label: DATE_RANGES.find((d) => d.key === f.date).label, rm: () => set({ date: '' }) });
-    f.sources.forEach((s) => chips.push({ k: 's' + s, label: sourceLabel(s), rm: () => set({ sources: f.sources.filter((x) => x !== s) }) }));
-    f.tags.forEach((t) => chips.push({ k: 't' + t, label: `#${t}`, rm: () => set({ tags: f.tags.filter((x) => x !== t) }) }));
-  }
   if (!chips.length) return null;
   return (
     <div className="chips">
@@ -146,14 +127,20 @@ function FilterChips({ lib }) {
   );
 }
 
-/** Faceted filter list: left column in direction B, filter sheet on phones. */
+/** Faceted filter list, shown in the compact filter popover and the phone filter sheet. */
 function FacetPanel({ lib }) {
   const f = lib.filters;
   const base = lib.base;
   const set = (p) => lib.setFilters({ ...f, ...p });
   const opt = (key, on, label, count, onClick, multi) => (
     <button type="button" key={key} className={`facet-opt ${on ? 'on' : ''}`} aria-pressed={on} onClick={onClick}>
-      {multi ? <input type="checkbox" className="check" checked={on} readOnly tabIndex={-1} aria-hidden="true" /> : <span className={`radio ${on ? 'on' : ''}`} aria-hidden="true" />}
+      {multi ? (
+        <span className={`menu-check ${on ? 'on' : ''}`} aria-hidden="true">
+          {on && <Icon name="check" size={12} />}
+        </span>
+      ) : (
+        <span className={`radio ${on ? 'on' : ''}`} aria-hidden="true" />
+      )}
       <span className="truncate">{label}</span>
       {count !== undefined && <span className="count">{count}</span>}
     </button>
@@ -170,39 +157,30 @@ function FacetPanel({ lib }) {
   );
   return (
     <div className="facet-list">
-      {lib.ext && (
-        <div className="facet">
-          {head('上传时间', !!f.date, () => set({ date: '' }))}
-          {opt('all', !f.date, '不限', base.length, () => set({ date: '' }))}
-          {DATE_RANGES.map((d) =>
-            opt(d.key, f.date === d.key, d.label, countWhere(base, (i) => (d.since ? i.createdAt >= d.since() : i.createdAt < d.until())), () => set({ date: f.date === d.key ? '' : d.key })),
-          )}
-        </div>
-      )}
+      <div className="facet">
+        {head('格式', f.formats.length > 0, () => set({ formats: [] }))}
+        {FORMATS.map((k) => opt(k, f.formats.includes(k), FORMAT_LABEL[k], countWhere(base, (i) => i.format === k), () => set({ formats: toggleIn(f.formats, k) }), true))}
+      </div>
       <div className="facet">
         {head('可见性', !!f.vis, () => set({ vis: '' }))}
         {opt('all', !f.vis, '全部', base.length, () => set({ vis: '' }))}
         {VIS_OPTS.map((o) => opt(o.key, f.vis === o.key, o.label, countWhere(base, (i) => i.visibility === o.key), () => set({ vis: f.vis === o.key ? '' : o.key })))}
       </div>
       <div className="facet">
-        {head('格式', f.formats.length > 0, () => set({ formats: [] }))}
-        {FORMATS.map((k) => {
-          const n = countWhere(base, (i) => i.format === k);
-          return opt(k, f.formats.includes(k), FORMAT_LABEL[k], n, () => set({ formats: toggleIn(f.formats, k) }), true);
-        })}
+        {head('上传时间', !!f.date, () => set({ date: '' }))}
+        {opt('all', !f.date, '不限', base.length, () => set({ date: '' }))}
+        {DATE_RANGES.map((d) =>
+          opt(d.key, f.date === d.key, d.label, countWhere(base, (i) => (d.since ? i.createdAt >= d.since() : i.createdAt < d.until())), () => set({ date: f.date === d.key ? '' : d.key })),
+        )}
       </div>
-      {lib.ext && (
-        <div className="facet">
-          {head('来源', f.sources.length > 0, () => set({ sources: [] }))}
-          {SOURCES.map((s) => opt(s.key, f.sources.includes(s.key), s.label, countWhere(base, (i) => i.source === s.key), () => set({ sources: toggleIn(f.sources, s.key) }), true))}
-        </div>
-      )}
-      {lib.ext && (
-        <div className="facet">
-          {head('标签', f.tags.length > 0, () => set({ tags: [] }))}
-          {allTags(base).map(([t, n]) => opt(t, f.tags.includes(t), t, n, () => set({ tags: toggleIn(f.tags, t) }), true))}
-        </div>
-      )}
+      <div className="facet">
+        {head('来源', f.sources.length > 0, () => set({ sources: [] }))}
+        {SOURCES.map((s) => opt(s.key, f.sources.includes(s.key), s.label, countWhere(base, (i) => i.source === s.key), () => set({ sources: toggleIn(f.sources, s.key) }), true))}
+      </div>
+      <div className="facet">
+        {head('标签', f.tags.length > 0, () => set({ tags: [] }))}
+        {allTags(base).map(([t, n]) => opt(t, f.tags.includes(t), t, n, () => set({ tags: toggleIn(f.tags, t) }), true))}
+      </div>
       <div className="facet">
         {head('位置信息', f.gps, () => set({ gps: false }))}
         {opt('gps', f.gps, '含位置', countWhere(base, (i) => i.hasGps), () => set({ gps: !f.gps }), true)}
@@ -211,43 +189,56 @@ function FacetPanel({ lib }) {
   );
 }
 
+/** Single 筛选 button with all facets in a popover, used when the toolbar is too narrow for one menu per facet. */
+function FilterPopover({ lib }) {
+  const n = activeFilterCount({ ...lib.filters, q: '' }, true);
+  return (
+    <Menu className="menu-facets" width={300} trigger={(open, toggle) => <FilterButton label="筛选" icon="filter" n={n} open={open} toggle={toggle} />}>
+      <FacetPanel lib={lib} />
+    </Menu>
+  );
+}
+
 /** Phone filter sheet; same facets, applied live. */
 function FilterSheet({ lib, onClose }) {
-  const n = activeFilterCount({ ...lib.filters, q: '' }, lib.ext);
+  const n = activeFilterCount({ ...lib.filters, q: '' }, true);
   return (
     <Sheet onClose={onClose} label="筛选">
-      <div className="sheet-head">
-        <h2>筛选</h2>
-        {n > 0 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => lib.setFilters({ ...EMPTY_FILTERS, q: lib.filters.q })}>
-            清除
-          </button>
-        )}
-      </div>
-      <div className="sheet-body">
-        <div className="facet">
-          <h3>排序</h3>
-          {SORTS.filter((s) => lib.ext || s.key !== 'name').map((s) => (
-            <button type="button" key={s.key} className={`facet-opt ${lib.sort === s.key ? 'on' : ''}`} aria-pressed={lib.sort === s.key} onClick={() => lib.setSort(s.key)}>
-              <span className={`radio ${lib.sort === s.key ? 'on' : ''}`} aria-hidden="true" />
-              {s.label}
+      {(close) => (
+        <>
+          <div className="sheet-head">
+            <h2>筛选</h2>
+            {n > 0 && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => lib.setFilters({ ...EMPTY_FILTERS, q: lib.filters.q })}>
+                清除
+              </button>
+            )}
+          </div>
+          <div className="sheet-body">
+            <div className="facet">
+              <h3>排序</h3>
+              {SORTS.map((s) => (
+                <button type="button" key={s.key} className={`facet-opt ${lib.sort === s.key ? 'on' : ''}`} aria-pressed={lib.sort === s.key} onClick={() => lib.setSort(s.key)}>
+                  <span className={`radio ${lib.sort === s.key ? 'on' : ''}`} aria-hidden="true" />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <FacetPanel lib={lib} />
+          </div>
+          <div className="sheet-foot">
+            <button type="button" className="btn btn-primary btn-block btn-lg" onClick={close}>
+              显示 {lib.items.length} 张图片
             </button>
-          ))}
-        </div>
-        <FacetPanel lib={lib} />
-      </div>
-      <div className="sheet-foot">
-        <button type="button" className="btn btn-primary btn-block" onClick={onClose}>
-          显示 {lib.items.length} 张图片
-        </button>
-      </div>
+          </div>
+        </>
+      )}
     </Sheet>
   );
 }
 
 function SortMenu({ lib, iconOnly }) {
-  const opts = SORTS.filter((s) => lib.ext || s.key !== 'name');
-  const cur = opts.find((s) => s.key === lib.sort) ?? opts[0];
+  const cur = SORTS.find((s) => s.key === lib.sort) ?? SORTS[0];
   return (
     <Menu
       align="right"
@@ -260,7 +251,7 @@ function SortMenu({ lib, iconOnly }) {
       )}
     >
       {(close) =>
-        opts.map((s) => (
+        SORTS.map((s) => (
           <RadioItem key={s.key} on={s.key === lib.sort} onClick={() => (lib.setSort(s.key), close())}>
             {s.label}
           </RadioItem>
@@ -285,7 +276,7 @@ function ViewToggle({ lib }) {
   );
 }
 
-function SearchBox({ lib, inputRef, placeholder = '搜索文件名、ID 或 SHA-256', size }) {
+function SearchBox({ lib, inputRef, placeholder = '搜索文件名、标签、ID 或 SHA-256' }) {
   return (
     <label className="search">
       <Icon name="search" />
@@ -297,44 +288,48 @@ function SearchBox({ lib, inputRef, placeholder = '搜索文件名、ID 或 SHA-
         aria-label="搜索图片"
         value={lib.filters.q}
         onChange={(e) => lib.setFilters({ ...lib.filters, q: e.target.value })}
-        onKeyDown={(e) => e.key === 'Escape' && lib.setFilters({ ...lib.filters, q: '' })}
-        style={size ? { height: size } : undefined}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return;
+          lib.setFilters({ ...lib.filters, q: '' });
+          e.currentTarget.blur();
+        }}
       />
-      {!lib.filters.q && <kbd className="hide-sm">/</kbd>}
+      {!lib.filters.q && <kbd className="hide-touch">/</kbd>}
     </label>
   );
 }
 
-/** Toolbar used by directions A and C: search, filter menus, sort, view. */
-function LibraryToolbar({ lib, searchRef, onOpenFilters }) {
-  const n = activeFilterCount({ ...lib.filters, q: '' }, lib.ext);
-  if (lib.sel.size || lib.selectMode) return <BulkBar lib={lib} />;
-  if (lib.dataState === 'ok' && !lib.base.length) return null;
+/** Search, filters, sort and view. `width` is the space the library content gets, not the viewport. */
+function LibraryToolbar({ lib, searchRef, onOpenFilters, width }) {
+  const n = activeFilterCount({ ...lib.filters, q: '' }, true);
+  if ((lib.dataState === 'ok' || lib.dataState === 'empty') && !lib.base.length) return null;
+  const bulk = lib.sel.size > 0 || lib.selectMode;
+  if (lib.isMobile)
+    return (
+      <>
+        <div className="toolbar">
+          <SearchBox lib={lib} inputRef={searchRef} placeholder="搜索图片" />
+          <button type="button" className={`btn btn-secondary filter-btn btn-icon-sm ${n ? 'active' : ''}`} onClick={onOpenFilters} aria-label={n ? `筛选（${n}）` : '筛选'}>
+            <Icon name="filter" />
+            {n ? <span className="filter-n">{n}</span> : null}
+          </button>
+          <button type="button" className={`btn btn-secondary btn-icon ${bulk ? 'active-soft' : ''}`} aria-label="选择" aria-pressed={bulk} onClick={() => (bulk ? lib.clearSel() : lib.setSelectMode(true))}>
+            <Icon name="select" />
+          </button>
+          <ViewToggle lib={lib} />
+        </div>
+        <FilterChips lib={lib} />
+      </>
+    );
+  const roomy = width >= 940;
   return (
     <>
       <div className="toolbar">
         <SearchBox lib={lib} inputRef={searchRef} />
-        {lib.isMobile ? (
-          <>
-            <button type="button" className={`btn btn-secondary filter-btn ${n ? 'active' : ''}`} onClick={onOpenFilters}>
-              <Icon name="filter" />
-              <span>筛选</span>
-              {n ? <span className="filter-n">{n}</span> : null}
-            </button>
-            <span className="grow" />
-            <button type="button" className="btn btn-ghost" onClick={() => lib.setSelectMode(true)}>
-              选择
-            </button>
-            <ViewToggle lib={lib} />
-          </>
-        ) : (
-          <>
-            <FilterMenus lib={lib} />
-            <span className="grow" />
-            <SortMenu lib={lib} />
-            <ViewToggle lib={lib} />
-          </>
-        )}
+        {roomy ? <FilterMenus lib={lib} /> : <FilterPopover lib={lib} />}
+        <span className="grow" />
+        <SortMenu lib={lib} iconOnly={width < 720} />
+        <ViewToggle lib={lib} />
       </div>
       <FilterChips lib={lib} />
     </>
@@ -343,9 +338,9 @@ function LibraryToolbar({ lib, searchRef, onOpenFilters }) {
 
 // ---------------------------------------------------------------- selection
 
-function copyMany(lib, imgs) {
-  writeClipboard(imgs.map((i) => i.links[lib.linkFormat]).join('\n'));
-  lib.toast(imgs.length === 1 ? `已复制 ${fmtLabel(lib.linkFormat)} 链接` : `已复制 ${imgs.length} 条 ${fmtLabel(lib.linkFormat)} 链接`);
+function copyMany(lib, imgs, fmt = lib.linkFormat) {
+  writeClipboard(imgs.map((i) => i.links[fmt]).join('\n'));
+  lib.toast(imgs.length === 1 ? `已复制 ${fmtLabel(fmt)} 链接` : `已复制 ${imgs.length} 条 ${fmtLabel(fmt)} 链接`);
 }
 
 function BulkBar({ lib }) {
@@ -354,51 +349,39 @@ function BulkBar({ lib }) {
   const trash = lib.route === 'trash';
   const all = lib.items.length;
   const m = lib.isMobile;
-  if (!ids.length)
-    return (
-      <div className="bulkbar" role="toolbar" aria-label="批量操作">
-        <span className="count">点按图片以选择</span>
-        <span className="grow" />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={lib.selectAll}>
-          全选
-        </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={lib.clearSel}>
-          完成
-        </button>
-      </div>
-    );
+  const allOn = ids.length === all && all > 0;
   return (
     <div className="bulkbar" role="toolbar" aria-label="批量操作">
-      <span className="count">已选 {ids.length} 张</span>
-      {ids.length < all && (
-        <button type="button" className="btn btn-ghost btn-sm" onClick={lib.selectAll}>
-          {m ? '全选' : `全选 ${all} 张`}
-        </button>
-      )}
+      <span className="count">{ids.length ? `已选 ${ids.length} 张` : '点按图片以选择'}</span>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={allOn ? lib.clearSel : lib.selectAll}>
+        {allOn ? '取消全选' : m ? '全选' : `全选 ${all} 张`}
+      </button>
       <span className="grow" />
-      {trash ? (
-        <>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.act.restore(ids)}>
-            <Icon name="restore" />
-            恢复
-          </button>
-          <button type="button" className="btn btn-danger btn-sm" onClick={() => lib.act.purge(ids)}>
-            永久删除
-          </button>
-        </>
-      ) : (
-        <>
-          <button type="button" className={`btn btn-secondary btn-sm ${m ? 'btn-icon' : ''}`} aria-label={m ? '复制链接' : undefined} onClick={() => copyMany(lib, imgs)}>
-            <Icon name="copy" />
-            {!m && '复制链接'}
-          </button>
-          {m ? (
+      {ids.length > 0 &&
+        (trash ? (
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.act.restore(ids)}>
+              <Icon name="restore" />
+              恢复
+            </button>
+            <button type="button" className="btn btn-danger btn-sm" onClick={() => lib.act.purge(ids)}>
+              永久删除
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className={`btn btn-secondary btn-sm ${m ? 'btn-icon' : ''}`} aria-label={m ? '复制链接' : undefined} title={m ? '复制链接' : undefined} onClick={() => copyMany(lib, imgs)}>
+              <Icon name="copy" />
+              {!m && '复制链接'}
+            </button>
             <Menu
               align="right"
-              up
+              up={m}
               trigger={(open, toggle) => (
-                <button type="button" className="btn btn-secondary btn-sm btn-icon" aria-label="可见性" aria-expanded={open} onClick={toggle}>
+                <button type="button" className={`btn btn-secondary btn-sm ${m ? 'btn-icon' : ''}`} aria-label={m ? '可见性' : undefined} title={m ? '可见性' : undefined} aria-expanded={open} onClick={toggle}>
                   <Icon name="lock" />
+                  {!m && '可见性'}
+                  {!m && <Icon name="chevron-down" size={14} />}
                 </button>
               )}
             >
@@ -413,24 +396,12 @@ function BulkBar({ lib }) {
                 </>
               )}
             </Menu>
-          ) : (
-            <>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.act.setVis(ids, 'public')}>
-                <Icon name="globe" />
-                设为公开
-              </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.act.setVis(ids, 'private')}>
-                <Icon name="lock" />
-                设为私有
-              </button>
-            </>
-          )}
-          <button type="button" className={`btn btn-danger btn-sm ${m ? 'btn-icon' : ''}`} aria-label={m ? '移到回收站' : undefined} onClick={() => lib.act.trash(ids)}>
-            <Icon name="trash" />
-            {!m && '移到回收站'}
-          </button>
-        </>
-      )}
+            <button type="button" className={`btn btn-danger btn-sm ${m ? 'btn-icon' : ''}`} aria-label={m ? '移到回收站' : undefined} title={m ? '移到回收站' : undefined} onClick={() => lib.act.trash(ids)}>
+              <Icon name="trash" />
+              {!m && '移到回收站'}
+            </button>
+          </>
+        ))}
       <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="取消选择" title="取消选择 (Esc)" onClick={lib.clearSel}>
         <Icon name="x" />
       </button>
@@ -438,7 +409,7 @@ function BulkBar({ lib }) {
   );
 }
 
-// ---------------------------------------------------------------- per-image menu
+// ---------------------------------------------------------------- per-image actions
 
 function RowMenu({ lib, image, up }) {
   const trash = image.state === 'trashed';
@@ -447,9 +418,9 @@ function RowMenu({ lib, image, up }) {
       <Menu
         align="right"
         up={up}
-        width={180}
+        width={196}
         trigger={(open, toggle) => (
-          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`${image.filename} 的更多操作`} aria-expanded={open} onClick={toggle}>
+          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`${image.filename} 的更多操作`} title="更多操作" aria-expanded={open} onClick={toggle}>
             <Icon name="more" />
           </button>
         )}
@@ -474,19 +445,26 @@ function RowMenu({ lib, image, up }) {
             </>
           ) : (
             <>
-              <MenuItem icon="image" onClick={run(() => lib.open(image.id))}>
-                查看详情
-              </MenuItem>
+              <div className="menu-label">复制为</div>
+              {LINK_FORMATS.map((f) => (
+                <RadioItem
+                  key={f.key}
+                  on={f.key === lib.linkFormat}
+                  onClick={run(() => {
+                    lib.setLinkFormat(f.key);
+                    copyMany(lib, [image], f.key);
+                  })}
+                >
+                  {f.label}
+                </RadioItem>
+              ))}
+              <div className="menu-sep" />
               <MenuItem icon="external" onClick={run(() => lib.toast('已在新标签页打开原图'))}>
                 打开原图
               </MenuItem>
               <MenuItem icon="download" onClick={run(() => lib.act.download(image))}>
                 下载
               </MenuItem>
-              <MenuItem icon="clipboard" onClick={run(() => (writeClipboard(image.id), lib.toast('已复制 ID')))}>
-                复制 ID
-              </MenuItem>
-              <div className="menu-sep" />
               {image.visibility === 'public' ? (
                 <MenuItem icon="lock" onClick={run(() => lib.act.setVis([image.id], 'private'))}>
                   设为私有
@@ -496,6 +474,7 @@ function RowMenu({ lib, image, up }) {
                   设为公开
                 </MenuItem>
               )}
+              <div className="menu-sep" />
               <MenuItem icon="trash" danger onClick={run(() => lib.act.trash([image.id]))}>
                 移到回收站
               </MenuItem>
@@ -507,42 +486,57 @@ function RowMenu({ lib, image, up }) {
   );
 }
 
-function NameSub({ lib, image }) {
+function CopyLink({ lib, image, className = 'btn-ghost' }) {
+  return <CopyButton iconOnly size="sm" className={className} text={image.links[lib.linkFormat]} label={`复制 ${fmtLabel(lib.linkFormat)}`} onCopied={() => lib.toast(`已复制 ${fmtLabel(lib.linkFormat)} 链接`)} />;
+}
+
+function NameSub({ image }) {
   return (
     <span className="sub">
       <span>{FORMAT_LABEL[image.format]}</span>
-      {image.frames > 1 && <span>· 动图</span>}
-      {image.hasGps && (
-        <span className="gps" title="含位置信息">
-          · <Icon name="pin" size={12} /> 含位置
+      <span className="sub-dim num">
+        {image.width} × {image.height}
+      </span>
+      {image.visibility === 'private' && (
+        <span className="sub-vis">
+          <Icon name="lock" size={12} />
+          私有
         </span>
       )}
-      {lib.ext &&
-        image.tags.map((t) => (
-          <span key={t} className="tag">
-            {t}
-          </span>
-        ))}
+      {image.frames > 1 && <span>动图</span>}
+      {image.hasGps && (
+        <span className="gps">
+          <Icon name="pin" size={12} />
+          含位置
+        </span>
+      )}
+      {image.tags.map((t) => (
+        <span key={t} className="tag">
+          {t}
+        </span>
+      ))}
     </span>
   );
 }
 
-// ---------------------------------------------------------------- table (desktop)
+// ---------------------------------------------------------------- table (desktop and tablet)
 
-function SortHead({ lib, label, desc, asc, numeric }) {
+function SortHead({ lib, label, desc, asc, numeric, className = '' }) {
   const on = lib.sort === desc || lib.sort === asc;
   const dir = lib.sort === asc ? 'ascending' : 'descending';
   return (
-    <th className={numeric ? 'c-num' : undefined} aria-sort={on ? dir : 'none'}>
+    <th className={`${numeric ? 'c-num' : ''} ${className}`} aria-sort={on ? dir : 'none'}>
       <button type="button" className={on ? 'sorted' : ''} onClick={() => lib.setSort(lib.sort === desc ? asc : desc)}>
         {label}
-        <Icon name={on && lib.sort === asc ? 'chevron-up' : 'chevron-down'} size={12} />
+        <span className="sort-ind">
+          <Icon name={on && lib.sort === asc ? 'chevron-up' : 'chevron-down'} size={12} />
+        </span>
       </button>
     </th>
   );
 }
 
-function ImageTable({ lib, items, compact }) {
+function ImageTable({ lib, items }) {
   const trash = lib.route === 'trash';
   const allOn = items.length > 0 && items.every((i) => lib.sel.has(i.id));
   const someOn = !allOn && items.some((i) => lib.sel.has(i.id));
@@ -552,7 +546,7 @@ function ImageTable({ lib, items, compact }) {
   }, [someOn]);
   return (
     <div className="table-wrap">
-      <table className="table">
+      <table className={`table ${lib.sel.size ? 'selecting' : ''}`}>
         <thead>
           <tr>
             <th className="c-check">
@@ -561,18 +555,18 @@ function ImageTable({ lib, items, compact }) {
             <th className="c-thumb">
               <span className="sr-only">预览</span>
             </th>
-            {lib.ext ? <SortHead lib={lib} label="文件名" desc="name" asc="name" /> : <th>文件名</th>}
-            {!compact && <th className="c-num">尺寸</th>}
+            <SortHead lib={lib} label="文件名" desc="name" asc="name" />
+            <th className="c-num c-dim">尺寸</th>
             <SortHead lib={lib} label="大小" desc="large" asc="small" numeric />
             {trash ? (
               <>
-                <th>删除时间</th>
+                <th className="c-date">删除时间</th>
                 <th>自动清除</th>
               </>
             ) : (
               <>
-                <th>可见性</th>
-                <SortHead lib={lib} label="上传时间" desc="new" asc="old" />
+                <th className="c-vis">可见性</th>
+                <SortHead lib={lib} label="上传时间" desc="new" asc="old" className="c-date" />
               </>
             )}
             <th className="c-actions">
@@ -603,25 +597,23 @@ function ImageTable({ lib, items, compact }) {
                   <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
                 </td>
                 <td className="c-thumb">
-                  <Thumb image={im} className="thumb-sm" />
+                  <Thumb image={im} className="thumb-sm" cover={!hasAlpha(im)} />
                 </td>
-                <td>
+                <td className="c-name">
                   <span className="cell-name">
                     <span className="name truncate" title={im.filename}>
                       {im.filename}
                     </span>
-                    <NameSub lib={lib} image={im} />
+                    <NameSub image={im} />
                   </span>
                 </td>
-                {!compact && (
-                  <td className="c-num subtle">
-                    {im.width} × {im.height}
-                  </td>
-                )}
+                <td className="c-num c-dim subtle">
+                  {im.width} × {im.height}
+                </td>
                 <td className="c-num">{fmtBytes(im.size)}</td>
                 {trash ? (
                   <>
-                    <td className="nowrap subtle" title={fmtDate(im.trashedAt)}>
+                    <td className="nowrap subtle c-date" title={fmtDate(im.trashedAt)}>
                       {fmtRel(im.trashedAt)}
                     </td>
                     <td className="nowrap">
@@ -630,16 +622,16 @@ function ImageTable({ lib, items, compact }) {
                   </>
                 ) : (
                   <>
-                    <td>
-                      <VisBadge v={im.visibility} />
+                    <td className="c-vis">
+                      <VisLabel v={im.visibility} />
                     </td>
-                    <td className="nowrap subtle" title={fmtDate(im.createdAt)}>
+                    <td className="nowrap subtle c-date" title={fmtDate(im.createdAt)}>
                       {fmtRel(im.createdAt)}
                     </td>
                   </>
                 )}
                 <td className="c-actions">
-                  <span className="cell-actions">
+                  <span className="row-actions">
                     {trash ? (
                       <button
                         type="button"
@@ -652,7 +644,7 @@ function ImageTable({ lib, items, compact }) {
                         恢复
                       </button>
                     ) : (
-                      <CopyLinkSplit image={im} format={lib.linkFormat} onFormat={lib.setLinkFormat} />
+                      <CopyLink lib={lib} image={im} />
                     )}
                     <RowMenu lib={lib} image={im} up={items.length > 5 && idx >= items.length - 3} />
                   </span>
@@ -689,29 +681,31 @@ function Tile({ lib, image }) {
       }}
       {...longPress(lib, image.id)}
     >
-      <Thumb image={image} cover />
-      <label className="tile-check" onClick={stop}>
-        <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(image.id, e.shiftKey)} aria-label={`选择 ${image.filename}`} />
-      </label>
-      <span className="tile-badges">
-        {image.visibility === 'private' && (
-          <span className="badge">
-            <Icon name="lock" size={12} />
-            私有
-          </span>
-        )}
-        {image.frames > 1 && <span className="badge">GIF</span>}
-        {image.hasGps && (
-          <span className="badge" title="含位置信息" aria-label="含位置信息">
-            <Icon name="pin" size={12} />
+      <span className="tile-media">
+        <Thumb image={image} cover />
+        <label className="tile-check" onClick={stop}>
+          <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(image.id, e.shiftKey)} aria-label={`选择 ${image.filename}`} />
+        </label>
+        <span className="tile-badges">
+          {image.visibility === 'private' && (
+            <span className="badge badge-overlay">
+              <Icon name="lock" size={12} />
+              私有
+            </span>
+          )}
+          {image.frames > 1 && <span className="badge badge-overlay">GIF</span>}
+          {image.hasGps && (
+            <span className="badge badge-overlay" title="含位置信息" aria-label="含位置信息">
+              <Icon name="pin" size={12} />
+            </span>
+          )}
+        </span>
+        {!trash && (
+          <span className="tile-copy" onClick={stop}>
+            <CopyLink lib={lib} image={image} className="btn-overlay" />
           </span>
         )}
       </span>
-      {!trash && (
-        <span className="tile-copy" onClick={stop}>
-          <CopyButton iconOnly size="sm" text={image.links[lib.linkFormat]} label={`复制 ${fmtLabel(lib.linkFormat)}`} />
-        </span>
-      )}
       <span className="tile-meta">
         <span className="name truncate" title={image.filename}>
           {image.filename}
@@ -722,27 +716,15 @@ function Tile({ lib, image }) {
   );
 }
 
-function ImageGrid({ lib, items, groupDays, tile }) {
+function ImageGrid({ lib, items }) {
   const selecting = lib.sel.size > 0 || lib.selectMode;
-  const body = (list) => (
-    <div className={`grid ${selecting ? 'selecting' : ''}`} style={tile ? { '--tile': tile } : undefined}>
-      {list.map((im) => (
+  return (
+    <div className={`grid ${selecting ? 'selecting' : ''}`}>
+      {items.map((im) => (
         <Tile key={im.id} lib={lib} image={im} />
       ))}
     </div>
   );
-  if (!groupDays) return body(items);
-  return groupByDay(items).map((g) => (
-    <section key={g.key} aria-label={g.label[0]}>
-      <h2 className="date-group">
-        {g.label[0]}
-        <span>
-          {g.label[1]} · {g.items.length} 张
-        </span>
-      </h2>
-      {body(g.items)}
-    </section>
-  ));
 }
 
 // ---------------------------------------------------------------- phone rows
@@ -758,6 +740,7 @@ function longPress(lib, id) {
         lib.setSelectMode(true);
         lib.toggle(id);
         lib.suppressClick();
+        navigator.vibrate?.(10);
       }, 450);
     },
     onPointerUp: cancel,
@@ -770,12 +753,14 @@ function ImageRows({ lib, items }) {
   const selecting = lib.sel.size > 0 || lib.selectMode;
   const trash = lib.route === 'trash';
   return (
-    <div className="rows">
+    <div className={`rows ${selecting ? 'selecting' : ''}`}>
       {items.map((im) => {
         const on = lib.sel.has(im.id);
         return (
-          <div key={im.id} className={`row ${on ? 'selected' : ''}`} {...longPress(lib, im.id)}>
-            {selecting && <input type="checkbox" className="check" checked={on} onChange={() => lib.toggle(im.id)} aria-label={`选择 ${im.filename}`} />}
+          <div key={im.id} className={`row ${on ? 'selected' : ''} ${lib.activeId === im.id ? 'active' : ''}`} {...longPress(lib, im.id)}>
+            <span className="row-check" aria-hidden={!selecting}>
+              <input type="checkbox" className="check" checked={on} tabIndex={selecting ? 0 : -1} onChange={() => lib.toggle(im.id)} aria-label={`选择 ${im.filename}`} />
+            </span>
             <button type="button" className="row-btn" onClick={(e) => lib.clickItem(im.id, e)}>
               <Thumb image={im} cover />
               <span className="row-main">
@@ -787,7 +772,7 @@ function ImageRows({ lib, items }) {
                 </span>
               </span>
             </button>
-            {!selecting && (trash ? <RowMenu lib={lib} image={im} /> : <CopyButton iconOnly className="btn-ghost" text={im.links[lib.linkFormat]} label={`复制 ${fmtLabel(lib.linkFormat)}`} />)}
+            {!selecting && (trash ? <RowMenu lib={lib} image={im} /> : <CopyLink lib={lib} image={im} />)}
           </div>
         );
       })}
@@ -797,12 +782,12 @@ function ImageRows({ lib, items }) {
 
 // ---------------------------------------------------------------- collection with states
 
-function LoadingList({ grid }) {
+function LoadingList({ grid, mobile }) {
   if (grid)
     return (
       <div className="grid" aria-busy="true" aria-label="正在加载">
         {Array.from({ length: 12 }, (_, i) => (
-          <div key={i} className="tile" style={{ cursor: 'default' }}>
+          <div key={i} className="tile is-skeleton">
             <div className="skeleton" style={{ aspectRatio: '4 / 3', borderRadius: 0 }} />
             <div className="tile-meta">
               <div className="skeleton" style={{ height: 12, width: '70%', margin: '3px 0' }} />
@@ -813,10 +798,10 @@ function LoadingList({ grid }) {
       </div>
     );
   return (
-    <div className="rows" aria-busy="true" aria-label="正在加载">
+    <div className={mobile ? 'rows' : 'rows rows-skeleton'} aria-busy="true" aria-label="正在加载">
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="row">
-          <div className="skeleton" style={{ width: 40, height: 40, flex: 'none' }} />
+          <div className="skeleton" style={{ width: 44, height: 44, flex: 'none' }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div className="skeleton" style={{ height: 12, width: `${40 + ((i * 17) % 35)}%` }} />
             <div className="skeleton" style={{ height: 10, width: '22%' }} />
@@ -831,14 +816,18 @@ function EmptyState({ lib }) {
   if (lib.route === 'trash')
     return (
       <div className="empty">
-        <Icon name="trash" size={28} />
+        <span className="empty-icon">
+          <Icon name="trash" size={22} />
+        </span>
         <strong>回收站是空的</strong>
         <p>移到回收站的图片会保留 {lib.settings.trashRetentionDays} 天，之后自动永久删除。</p>
       </div>
     );
   return (
-    <div className="empty">
-      <Icon name="image" size={28} />
+    <div className="empty empty-drop">
+      <span className="empty-icon">
+        <Icon name="upload" size={22} />
+      </span>
       <strong>还没有图片</strong>
       <p>把图片拖到此页面、直接粘贴，或选择文件上传。</p>
       <div className="actions">
@@ -855,9 +844,9 @@ function EmptyState({ lib }) {
   );
 }
 
-function ImageCollection({ lib, groupDays, tile, compact }) {
+function ImageCollection({ lib }) {
   const grid = lib.view === 'grid';
-  if (lib.dataState === 'loading') return <LoadingList grid={grid} />;
+  if (lib.dataState === 'loading') return <LoadingList grid={grid} mobile={lib.isMobile} />;
   if (lib.dataState === 'error')
     return (
       <div className="alert danger" role="alert">
@@ -876,7 +865,9 @@ function ImageCollection({ lib, groupDays, tile, compact }) {
   if (!lib.items.length)
     return (
       <div className="empty">
-        <Icon name="search" size={28} />
+        <span className="empty-icon">
+          <Icon name="search" size={22} />
+        </span>
         <strong>没有符合条件的图片</strong>
         <p>修改搜索词或清除筛选条件后再试。</p>
         <div className="actions">
@@ -889,9 +880,9 @@ function ImageCollection({ lib, groupDays, tile, compact }) {
   const total = lib.items.reduce((s, i) => s + i.size, 0);
   return (
     <>
-      {grid ? <ImageGrid lib={lib} items={lib.items} groupDays={groupDays} tile={tile} /> : lib.isMobile ? <ImageRows lib={lib} items={lib.items} /> : <ImageTable lib={lib} items={lib.items} compact={compact} />}
+      {grid ? <ImageGrid lib={lib} items={lib.items} /> : lib.isMobile ? <ImageRows lib={lib} items={lib.items} /> : <ImageTable lib={lib} items={lib.items} />}
       <div className="pager">
-        <span>
+        <span className="num">
           {lib.items.length < lib.base.length ? `${lib.items.length} / ${lib.base.length} 张` : `共 ${lib.items.length} 张`} · {fmtBytes(total)}
         </span>
         <span>已全部加载</span>
@@ -912,8 +903,8 @@ function RenameField({ image, onSave }) {
   const err = !v.trim() ? '请输入文件名' : v.length > 200 ? '文件名不能超过 200 个字符' : null;
   if (!edit)
     return (
-      <div className="setting-row">
-        <span className="truncate" title={image.filename}>
+      <div className="name-row">
+        <span className="name-text" title={image.filename}>
           {image.filename}
         </span>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEdit(true)}>
@@ -936,11 +927,16 @@ function RenameField({ image, onSave }) {
           value={v}
           aria-label="文件名"
           aria-invalid={!!err}
+          onFocus={(e) => {
+            const dot = e.target.value.lastIndexOf('.');
+            e.target.setSelectionRange(0, dot > 0 ? dot : e.target.value.length);
+          }}
           onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') save();
             if (e.key === 'Escape') {
               e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
               setEdit(false);
               setV(image.filename);
             }
@@ -953,7 +949,7 @@ function RenameField({ image, onSave }) {
           取消
         </button>
       </div>
-      {err ? <p className="error-text" style={{ marginTop: 6 }}>{err}</p> : <p className="hint" style={{ marginTop: 6 }}>只修改显示的文件名，链接不变。</p>}
+      {err ? <p className="error-text">{err}</p> : <p className="hint">只修改显示的文件名，链接不变。</p>}
     </>
   );
 }
@@ -961,15 +957,15 @@ function RenameField({ image, onSave }) {
 function TagEditor({ image, onChange, known }) {
   const [v, setV] = React.useState('');
   const add = () => {
-    const t = v.trim();
-    if (t && !image.tags.includes(t)) onChange([...image.tags, t]);
+    const t = v.trim().replace(/^#/, '');
+    if (t && !image.tags.includes(t) && image.tags.length < 20) onChange([...image.tags, t]);
     setV('');
   };
   const listId = `tags-${image.id}`;
   return (
     <div className="tag-editor">
       {image.tags.map((t) => (
-        <span key={t} className="tag">
+        <span key={t} className="tag tag-edit">
           {t}
           <button type="button" aria-label={`移除标签 ${t}`} onClick={() => onChange(image.tags.filter((x) => x !== t))}>
             <Icon name="x" size={12} />
@@ -977,12 +973,12 @@ function TagEditor({ image, onChange, known }) {
         </span>
       ))}
       <input
-        className="input"
+        className="input tag-input"
         placeholder="添加标签"
         aria-label="添加标签"
         list={listId}
         value={v}
-        maxLength={20}
+        maxLength={32}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') {
@@ -1007,148 +1003,133 @@ function TagEditor({ image, onChange, known }) {
 function LinkSection({ lib, image }) {
   const fmt = lib.linkFormat;
   return (
-    <section>
+    <section className="d-section">
       <div className="section-label">链接</div>
       <Seg label="链接格式" value={fmt} onChange={lib.setLinkFormat} options={LINK_FORMATS} className="fill" />
       <div className="link-box">
         <input className="input" readOnly value={image.links[fmt]} aria-label={`${fmtLabel(fmt)} 链接`} onFocus={(e) => e.target.select()} />
         <CopyButton text={image.links[fmt]} className="btn-primary" />
       </div>
-      {image.visibility === 'private' && <p className="hint" style={{ marginTop: 6 }}>私有图片的链接只在登录后可以打开。</p>}
+      {image.visibility === 'private' && <p className="hint">私有图片的链接只在登录后可以打开。</p>}
     </section>
   );
 }
 
-function DetailPanel({ lib, image, onClose, wide, closeIcon = 'x' }) {
+/** `mode`: dock (column beside the list), drawer (overlay on tablets) or sheet (phones). */
+function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
   const trash = image.state === 'trashed';
   const [prev, next] = lib.neighbors(image.id);
   const pub = image.visibility === 'public';
-  const props = (
-    <dl className="props">
-      <dt>格式</dt>
-      <dd>
-        {FORMAT_LABEL[image.format]}
-        {image.frames > 1 && <span className="badge">动图 · {image.frames} 帧</span>}
-      </dd>
-      <dt>尺寸</dt>
-      <dd className="num">
-        {image.width} × {image.height}
-      </dd>
-      <dt>大小</dt>
-      <dd>{fmtBytes(image.size)}</dd>
-      <dt>位置信息</dt>
-      <dd>
-        {image.hasGps ? (
-          <span className="badge badge-warning">
-            <Icon name="pin" size={12} />
-            含位置
-          </span>
-        ) : (
-          '无'
-        )}
-      </dd>
-      <dt>来源</dt>
-      <dd>{sourceLabel(image.source)}</dd>
-      <dt>上传时间</dt>
-      <dd className="num">{fmtDate(image.createdAt)}</dd>
-      {trash && (
-        <>
-          <dt>删除时间</dt>
-          <dd className="num">{fmtDate(image.trashedAt)}</dd>
-          <dt>自动清除</dt>
-          <dd>{daysLeft(image, lib.settings.trashRetentionDays)}</dd>
-        </>
-      )}
-      <dt>ID</dt>
-      <dd>
-        <span className="mono truncate">{image.id}</span>
-        <CopyButton iconOnly size="sm" className="btn-ghost" text={image.id} label="复制 ID" />
-      </dd>
-      <dt>SHA-256</dt>
-      <dd>
-        <span className="mono truncate" title={image.sha256}>
-          {image.sha256}
-        </span>
-        <CopyButton iconOnly size="sm" className="btn-ghost" text={image.sha256} label="复制 SHA-256" />
-      </dd>
-    </dl>
-  );
-  const info = (
-    <>
-      {!trash && <LinkSection lib={lib} image={image} />}
-      {lib.ext && !trash && (
-        <section>
-          <div className="section-label">文件名</div>
-          <RenameField image={image} onSave={(n) => lib.act.rename(image.id, n)} />
-        </section>
-      )}
-      {!trash && (
-        <section>
-          <div className="setting-row">
-            <div>
-              <div className="label">公开访问</div>
-              <div className="hint">{pub ? '任何人都可以通过链接打开' : '只有登录后才能打开'}</div>
-            </div>
-            <Switch checked={pub} label="公开访问" onChange={(v) => lib.act.setVis([image.id], v ? 'public' : 'private')} />
-          </div>
-        </section>
-      )}
-      {lib.ext && !trash && (
-        <section>
-          <div className="section-label">标签</div>
-          <TagEditor image={image} known={lib.knownTags} onChange={(tags) => lib.act.setTags(image.id, tags)} />
-        </section>
-      )}
-      <section>
-        <div className="section-label">信息</div>
-        {props}
-      </section>
-    </>
-  );
-  const preview = (
-    <a
-      className={`preview ${hasAlpha(image) ? 'checker' : ''}`}
-      href={image.url}
-      target="_blank"
-      rel="noreferrer"
-      title="打开原图"
-      onClick={(e) => {
-        e.preventDefault();
-        lib.toast('已在新标签页打开原图');
-      }}
-    >
-      <img src={image.thumb} alt={image.filename} />
-    </a>
-  );
   return (
-    <div className={`detail ${wide ? 'detail-wide' : ''}`}>
+    <div className={`detail detail-${mode}`}>
       <div className="detail-head">
         <h2 className="truncate" title={image.filename}>
           {image.filename}
         </h2>
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="上一张" title="上一张 (←)" disabled={!prev} onClick={() => prev && lib.open(prev.id)}>
-          <Icon name="chevron-left" />
-        </button>
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="下一张" title="下一张 (→)" disabled={!next} onClick={() => next && lib.open(next.id)}>
-          <Icon name="chevron-right" />
-        </button>
-        {onClose && (
-          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="关闭" title="关闭 (Esc)" onClick={onClose}>
-            <Icon name={closeIcon} />
+        <div className="detail-nav">
+          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="上一张" title="上一张 (←)" disabled={!prev} onClick={() => prev && lib.open(prev.id)}>
+            <Icon name="chevron-left" />
           </button>
-        )}
+          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="下一张" title="下一张 (→)" disabled={!next} onClick={() => next && lib.open(next.id)}>
+            <Icon name="chevron-right" />
+          </button>
+          <span className="detail-nav-sep" />
+          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="关闭" title="关闭 (Esc)" onClick={onClose}>
+            <Icon name="x" />
+          </button>
+        </div>
       </div>
-      {wide ? (
-        <div className="detail-body">
-          <div className="detail-stage">{preview}</div>
-          <div className="detail-scroll">{info}</div>
+      <div className="detail-scroll">
+        <div className="detail-media">
+          <a
+            className={`preview ${hasAlpha(image) ? 'checker' : ''}`}
+            href={image.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              lib.toast('已在新标签页打开原图');
+            }}
+          >
+            <img key={image.id} src={image.thumb} alt={image.filename} />
+            <span className="preview-open">
+              <Icon name="external" size={14} />
+              打开原图
+            </span>
+          </a>
+          <div className="facts">
+            <span>{FORMAT_LABEL[image.format]}</span>
+            <span className="num">
+              {image.width} × {image.height}
+            </span>
+            <span className="num">{fmtBytes(image.size)}</span>
+            {image.frames > 1 && <span>动图 · {image.frames} 帧</span>}
+            {trash ? <span className="badge">{daysLeft(image, lib.settings.trashRetentionDays)}</span> : <VisLabel v={image.visibility} />}
+          </div>
         </div>
-      ) : (
-        <div className="detail-scroll">
-          {preview}
-          {info}
-        </div>
-      )}
+        {!trash && <LinkSection lib={lib} image={image} />}
+        {!trash && (
+          <section className="d-section">
+            <div className="setting-row">
+              <div>
+                <div className="label">公开访问</div>
+                <div className="hint">{pub ? '任何人都可以通过链接打开' : '只有登录后才能打开'}</div>
+              </div>
+              <Switch checked={pub} label="公开访问" onChange={(v) => lib.act.setVis([image.id], v ? 'public' : 'private')} />
+            </div>
+          </section>
+        )}
+        {!trash && (
+          <section className="d-section">
+            <div className="section-label">文件名</div>
+            <RenameField image={image} onSave={(n) => lib.act.rename(image.id, n)} />
+          </section>
+        )}
+        {!trash && (
+          <section className="d-section">
+            <div className="section-label">标签</div>
+            <TagEditor image={image} known={lib.knownTags} onChange={(tags) => lib.act.setTags(image.id, tags)} />
+          </section>
+        )}
+        <section className="d-section">
+          <div className="section-label">信息</div>
+          <dl className="props">
+            <dt>来源</dt>
+            <dd>{sourceLabel(image.source)}</dd>
+            <dt>上传时间</dt>
+            <dd className="num">{fmtDate(image.createdAt)}</dd>
+            {trash && (
+              <>
+                <dt>删除时间</dt>
+                <dd className="num">{fmtDate(image.trashedAt)}</dd>
+              </>
+            )}
+            <dt>位置信息</dt>
+            <dd>
+              {image.hasGps ? (
+                <span className="badge badge-warning">
+                  <Icon name="pin" size={12} />
+                  含位置
+                </span>
+              ) : (
+                '无'
+              )}
+            </dd>
+            <dt>ID</dt>
+            <dd>
+              <span className="mono truncate">{image.id}</span>
+              <CopyButton iconOnly size="sm" className="btn-ghost" text={image.id} label="复制 ID" />
+            </dd>
+            <dt>SHA-256</dt>
+            <dd>
+              <span className="mono truncate" title={image.sha256}>
+                {image.sha256}
+              </span>
+              <CopyButton iconOnly size="sm" className="btn-ghost" text={image.sha256} label="复制 SHA-256" />
+            </dd>
+          </dl>
+        </section>
+      </div>
       <div className="detail-foot">
         {trash ? (
           <>
@@ -1179,101 +1160,15 @@ function DetailPanel({ lib, image, onClose, wide, closeIcon = 'x' }) {
   );
 }
 
-/** Inspector content for a multi-selection (direction B). */
-function BatchPanel({ lib }) {
-  const imgs = [...lib.sel].map((id) => lib.byId[id]).filter(Boolean);
-  const trash = lib.route === 'trash';
-  const size = imgs.reduce((s, i) => s + i.size, 0);
-  const pub = countWhere(imgs, (i) => i.visibility === 'public');
-  const ids = imgs.map((i) => i.id);
-  return (
-    <div className="detail">
-      <div className="detail-head">
-        <h2>已选 {imgs.length} 张</h2>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={lib.clearSel}>
-          取消选择
-        </button>
-      </div>
-      <div className="detail-scroll">
-        <div className="mosaic">
-          {imgs.slice(0, 8).map((im) => (
-            <Thumb key={im.id} image={im} cover />
-          ))}
-          {imgs.length > 8 && <span className="mosaic-more">+{imgs.length - 8}</span>}
-        </div>
-        <dl className="props">
-          <dt>合计大小</dt>
-          <dd>{fmtBytes(size)}</dd>
-          {!trash && (
-            <>
-              <dt>可见性</dt>
-              <dd>
-                公开 {pub} · 私有 {imgs.length - pub}
-              </dd>
-            </>
-          )}
-          <dt>含位置</dt>
-          <dd>{countWhere(imgs, (i) => i.hasGps)} 张</dd>
-        </dl>
-        {!trash && (
-          <section>
-            <div className="section-label">复制全部链接</div>
-            <Seg label="链接格式" value={lib.linkFormat} onChange={lib.setLinkFormat} options={LINK_FORMATS} className="fill" />
-            <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 8 }} onClick={() => copyMany(lib, imgs)}>
-              <Icon name="copy" />
-              复制 {imgs.length} 条链接
-            </button>
-          </section>
-        )}
-        {!trash && (
-          <section>
-            <div className="section-label">可见性</div>
-            <div className="btn-row">
-              <button type="button" className="btn btn-secondary" onClick={() => lib.act.setVis(ids, 'public')}>
-                <Icon name="globe" />
-                设为公开
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => lib.act.setVis(ids, 'private')}>
-                <Icon name="lock" />
-                设为私有
-              </button>
-            </div>
-          </section>
-        )}
-      </div>
-      <div className="detail-foot">
-        {trash ? (
-          <>
-            <button type="button" className="btn btn-secondary" onClick={() => lib.act.restore(ids)}>
-              <Icon name="restore" />
-              恢复 {imgs.length} 张
-            </button>
-            <span className="grow" />
-            <button type="button" className="btn btn-danger" onClick={() => lib.act.purge(ids)}>
-              永久删除
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="grow" />
-            <button type="button" className="btn btn-danger" onClick={() => lib.act.trash(ids)}>
-              <Icon name="trash" />
-              移到回收站
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- upload
 
-function Dropzone({ lib, row }) {
+function Dropzone({ lib }) {
   const s = lib.settings;
   return (
-    <button type="button" className={`dropzone ${row ? 'row-mode' : ''}`} onClick={lib.pick}>
-      <Icon name="upload" size={row ? 22 : 26} />
+    <button type="button" className="dropzone" onClick={lib.pick}>
+      <span className="dz-icon">
+        <Icon name="upload" size={20} />
+      </span>
       <span className="dz-text">
         <span className="dz-main">
           拖放或粘贴图片，或 <span className="dz-link">选择文件</span>
@@ -1286,19 +1181,14 @@ function Dropzone({ lib, row }) {
   );
 }
 
-function UploadVisibility({ lib }) {
-  return <Seg label="上传后可见性" value={lib.uploadVis} onChange={lib.setUploadVis} options={VIS_OPTS} />;
-}
-
-function UploadList({ lib, items }) {
-  const list = items ?? lib.uploads;
+function UploadList({ lib }) {
   return (
     <ul className="up-list">
-      {list.map((u) => {
+      {lib.uploads.map((u) => {
         const img = u.imageId ? lib.byId[u.imageId] : null;
         const thumbSrc = { thumb: u.thumb, format: u.format };
         return (
-          <li className="up-row" key={u.id}>
+          <li className={`up-row up-${u.status}`} key={u.id}>
             <Thumb image={img ?? thumbSrc} cover />
             <div className="up-info">
               <span className="name truncate" title={u.name}>
@@ -1323,13 +1213,19 @@ function UploadList({ lib, items }) {
                   <span className="sub">处理中</span>
                 </>
               )}
-              {u.status === 'done' && <span className="sub">已上传 · {fmtBytes(u.size)}{img?.visibility === 'private' ? ' · 私有' : ''}</span>}
+              {u.status === 'done' && (
+                <span className="sub ok">
+                  <Icon name="check" size={12} />
+                  已上传 · {fmtBytes(u.size)}
+                  {img?.visibility === 'private' ? ' · 私有' : ''}
+                </span>
+              )}
               {u.status === 'duplicate' && <span className="sub">已存在相同图片，返回原链接</span>}
               {u.status === 'error' && <span className="sub err">{u.error}</span>}
             </div>
             <div className="up-act">
               {(u.status === 'uploading' || u.status === 'queued' || u.status === 'processing') && (
-                <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`取消上传 ${u.name}`} onClick={() => lib.cancelUpload(u.id)}>
+                <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`取消上传 ${u.name}`} title="取消上传" onClick={() => lib.cancelUpload(u.id)}>
                   <Icon name="x" />
                 </button>
               )}
@@ -1337,10 +1233,11 @@ function UploadList({ lib, items }) {
               {u.status === 'error' &&
                 (u.retryable ? (
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.retryUpload(u.id)}>
+                    <Icon name="refresh" />
                     重试
                   </button>
                 ) : (
-                  <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`移除 ${u.name}`} onClick={() => lib.removeUpload(u.id)}>
+                  <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`移除 ${u.name}`} title="移除" onClick={() => lib.removeUpload(u.id)}>
                     <Icon name="x" />
                   </button>
                 ))}
@@ -1364,16 +1261,17 @@ function copyFinished(lib) {
   if (imgs.length) copyMany(lib, imgs);
 }
 
-/** Direction A: upload dialog. */
 function UploadDialog({ lib, onClose }) {
   const s = uploadSummary(lib.uploads);
+  const counted = lib.uploads.filter((u) => u.status !== 'error');
+  const pct = counted.length ? Math.round(counted.reduce((n, u) => n + (u.status === 'uploading' ? u.progress : u.status === 'queued' ? 0 : 100), 0) / counted.length) : 0;
   return (
     <Modal
       title="上传图片"
       onClose={onClose}
       width="560px"
-      className="full-sm"
-      footer={
+      className="full-sm upload-modal"
+      footer={(close) => (
         <>
           {s.done > 0 && (
             <button type="button" className="btn btn-ghost" onClick={lib.clearFinished} style={{ marginRight: 'auto' }}>
@@ -1386,139 +1284,30 @@ function UploadDialog({ lib, onClose }) {
               复制全部链接
             </button>
           )}
-          <button type="button" className="btn btn-primary" onClick={onClose}>
+          <button type="button" className="btn btn-primary" onClick={close}>
             {s.active ? '在后台继续' : '完成'}
           </button>
         </>
-      }
+      )}
     >
       <Dropzone lib={lib} />
-      <div className="setting-row" style={{ marginTop: 12 }}>
+      <div className="setting-row up-opts">
         <span className="label">上传后可见性</span>
-        <UploadVisibility lib={lib} />
+        <Seg label="上传后可见性" value={lib.uploadVis} onChange={lib.setUploadVis} options={VIS_OPTS} />
       </div>
       {lib.uploads.length > 0 && (
-        <>
-          <div className="section-label" style={{ marginTop: 16, marginBottom: 0 }}>
-            {s.active ? `正在上传 ${s.active} 个，已完成 ${s.done} 个` : `已完成 ${s.done} 个`}
-            {s.failed ? `，失败 ${s.failed} 个` : ''}
+        <div className="up-summary">
+          <div className="up-summary-row">
+            <span>
+              {s.active ? `正在上传 ${s.active} 个，已完成 ${s.done} 个` : `已完成 ${s.done} 个`}
+              {s.failed ? `，失败 ${s.failed} 个` : ''}
+            </span>
+            {s.active > 0 && <span className="num subtle">{pct}%</span>}
           </div>
           <UploadList lib={lib} />
-        </>
+        </div>
       )}
     </Modal>
-  );
-}
-
-/** Direction B: collapsible tray in the corner. */
-function UploadTray({ lib, onClose }) {
-  const [open, setOpen] = React.useState(true);
-  const s = uploadSummary(lib.uploads);
-  if (!lib.uploads.length) return null;
-  return (
-    <div className="tray" role="region" aria-label="上传">
-      <div className="tray-head">
-        <span>{s.active ? `正在上传 ${s.done}/${s.total}` : `已上传 ${s.done} 个`}</span>
-        {s.failed > 0 && <span className="badge badge-danger">失败 {s.failed}</span>}
-        <span className="grow" />
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={open ? '收起' : '展开'} aria-expanded={open} onClick={() => setOpen(!open)}>
-          <Icon name={open ? 'chevron-down' : 'chevron-up'} />
-        </button>
-        {!s.active && (
-          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="关闭" onClick={onClose}>
-            <Icon name="x" />
-          </button>
-        )}
-      </div>
-      {open && (
-        <>
-          <div className="tray-body">
-            <UploadList lib={lib} />
-          </div>
-          {s.done > 0 && (
-            <div className="tray-foot">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => copyFinished(lib)}>
-                <Icon name="copy" />
-                复制全部链接
-              </button>
-              <span className="grow" />
-              <span className="hint">可见性</span>
-              <UploadVisibility lib={lib} />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/** Direction C: upload + recent uploads panel at the top of the library. */
-function QuickUpload({ lib }) {
-  const recent = [...lib.images.filter((i) => i.state === 'active')].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
-  const pending = lib.uploads.filter((u) => u.status !== 'done' && u.status !== 'duplicate');
-  return (
-    <div className="quick">
-      <div className="quick-up">
-        <Dropzone lib={lib} />
-        <div className="quick-opts">
-          <span>可见性</span>
-          <UploadVisibility lib={lib} />
-          <span className="quick-gap" />
-          <span>复制格式</span>
-          <Menu
-            trigger={(open, toggle) => (
-              <button type="button" className="btn btn-secondary btn-sm" aria-expanded={open} onClick={toggle}>
-                {fmtLabel(lib.linkFormat)}
-                <Icon name="chevron-down" size={14} />
-              </button>
-            )}
-          >
-            {(close) =>
-              LINK_FORMATS.map((f) => (
-                <RadioItem key={f.key} on={lib.linkFormat === f.key} onClick={() => (lib.setLinkFormat(f.key), close())}>
-                  {f.label}
-                </RadioItem>
-              ))
-            }
-          </Menu>
-        </div>
-      </div>
-      <div className="card recent">
-        <div className="card-head">
-          <h2>最近上传</h2>
-          {lib.uploads.length > 0 && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={lib.clearFinished}>
-              清除记录
-            </button>
-          )}
-        </div>
-        {pending.length > 0 && (
-          <div className="recent-pending">
-            <UploadList lib={lib} items={pending} />
-          </div>
-        )}
-        <div className="recent-list">
-          {lib.dataState === 'loading'
-            ? Array.from({ length: 4 }, (_, i) => (
-                <div className="recent-row" key={i}>
-                  <div className="skeleton" style={{ width: 36, height: 36 }} />
-                  <div className="skeleton" style={{ height: 12, width: '50%' }} />
-                </div>
-              ))
-            : recent.map((im) => (
-                <div className="recent-row" key={im.id}>
-                  <Thumb image={im} cover />
-                  <button type="button" className="recent-main" onClick={() => lib.open(im.id)}>
-                    <span className="name truncate">{im.filename}</span>
-                    <span className="sub truncate mono">{im.links[lib.linkFormat]}</span>
-                  </button>
-                  <CopyButton size="sm" text={im.links[lib.linkFormat]} label="复制" />
-                </div>
-              ))}
-          {lib.dataState !== 'loading' && !recent.length && !pending.length && <p className="recent-empty">上传的图片会显示在这里</p>}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1528,16 +1317,16 @@ function PurgeConfirm({ count, onCancel, onConfirm }) {
       title={count === 1 ? '永久删除这张图片？' : `永久删除 ${count} 张图片？`}
       onClose={onCancel}
       width="420px"
-      footer={
+      footer={(close) => (
         <>
-          <button type="button" className="btn btn-secondary" onClick={onCancel} autoFocus>
+          <button type="button" className="btn btn-secondary" onClick={close} autoFocus>
             取消
           </button>
           <button type="button" className="btn btn-danger-solid" onClick={onConfirm}>
             永久删除
           </button>
         </>
-      }
+      )}
     >
       <p>文件会立即从磁盘删除，已发出的链接将失效。此操作无法撤销。</p>
     </Modal>
@@ -1548,7 +1337,9 @@ function DropOverlay() {
   return (
     <div className="drop-overlay" aria-hidden="true">
       <div>
-        <Icon name="upload" size={28} />
+        <span className="dz-icon">
+          <Icon name="upload" size={22} />
+        </span>
         <strong>松开以上传</strong>
         <span className="hint">可以一次放入多张图片</span>
       </div>
@@ -1557,8 +1348,7 @@ function DropOverlay() {
 }
 
 Object.assign(window, {
-  FORMATS, VIS_OPTS, toggleIn, countWhere, fmtLabel, RadioItem, FilterMenus, FilterChips, FacetPanel, FilterSheet, SortMenu,
+  FORMATS, VIS_OPTS, toggleIn, countWhere, fmtLabel, FilterMenus, FilterChips, FacetPanel, FilterPopover, FilterSheet, SortMenu,
   ViewToggle, SearchBox, LibraryToolbar, BulkBar, RowMenu, ImageTable, ImageGrid, ImageRows, ImageCollection,
-  DetailPanel, BatchPanel, Dropzone, UploadList, UploadDialog, UploadTray, QuickUpload, PurgeConfirm, DropOverlay,
-  uploadSummary, copyMany,
+  DetailPanel, Dropzone, UploadList, UploadDialog, PurgeConfirm, DropOverlay, uploadSummary, copyMany,
 });

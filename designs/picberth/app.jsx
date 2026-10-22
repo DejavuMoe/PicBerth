@@ -1,4 +1,4 @@
-// App state, the three layout directions and the prototype options panel.
+// App state, the console shell and the prototype options panel.
 
 const PARAMS = new URLSearchParams(location.search);
 const EMBED = PARAMS.has('embed');
@@ -10,7 +10,7 @@ const NAV = [
   { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: '系统' },
   { key: 'status', label: '状态', short: '状态', icon: 'activity', group: '系统' },
 ];
-const DEFAULT_VIEW = { a: 'table', b: 'grid', c: 'grid' };
+const TAB_KEYS = ['images', 'trash', 'tokens'];
 
 const SAMPLE_UPLOADS = [
   { file: 'dashboard-light.png', name: 'screenshot-2026-10-21-153012.png', size: 418000, format: 'png', width: 1920, height: 1200 },
@@ -72,9 +72,7 @@ const isTyping = (e) => !!e.target.closest?.('input, textarea, select, [contente
 const isActiveUpload = (u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing';
 
 function App() {
-  const [dir, setDirRaw] = React.useState(PARAMS.get('d') || 'a');
   const [theme, setTheme] = React.useState(PARAMS.get('theme') || 'light');
-  const [ext, setExt] = React.useState(PARAMS.get('ext') !== '0');
   const [dataState, setDataStateRaw] = React.useState(PARAMS.get('state') || 'ok');
   const [route, setRoute] = React.useState(PARAMS.get('r') || 'images');
   const [images, setImages] = React.useState(() => (PARAMS.get('state') === 'empty' ? [] : initialImages()));
@@ -82,7 +80,7 @@ function App() {
   const [settings, setSettings] = React.useState(SETTINGS);
   const [filters, setFilters] = React.useState(EMPTY_FILTERS);
   const [sort, setSort] = React.useState('new');
-  const [view, setView] = React.useState(PARAMS.get('view') || DEFAULT_VIEW[PARAMS.get('d') || 'a']);
+  const [view, setView] = React.useState(PARAMS.get('view') || 'table');
   const [sel, setSel] = React.useState(() => new Set());
   const [selectMode, setSelectMode] = React.useState(false);
   const [activeId, setActiveId] = React.useState(null);
@@ -93,11 +91,10 @@ function App() {
   const [toasts, setToasts] = React.useState([]);
   const [purgeIds, setPurgeIds] = React.useState(null);
   const [dragging, setDragging] = React.useState(false);
-  const [navOpen, setNavOpen] = React.useState(false);
+  const [moreOpen, setMoreOpen] = React.useState(false);
   const [filterSheet, setFilterSheet] = React.useState(false);
 
   const isMobile = useMedia('(max-width: 720px)');
-  const wideB = useMedia('(min-width: 1181px)');
   const anchor = React.useRef(null);
   const suppress = React.useRef(false);
   const fileInput = React.useRef(null);
@@ -113,7 +110,7 @@ function App() {
   const byId = React.useMemo(() => Object.fromEntries(images.map((i) => [i.id, i])), [images]);
   const inLibrary = route === 'images' || route === 'trash';
   const base = React.useMemo(() => images.filter((i) => i.state === (route === 'trash' ? 'trashed' : 'active')), [images, route]);
-  const items = React.useMemo(() => applyFilters(base, filters, sort, ext), [base, filters, sort, ext]);
+  const items = React.useMemo(() => applyFilters(base, filters, sort, true), [base, filters, sort]);
   const knownTags = React.useMemo(() => allTags(images).map(([t]) => t), [images]);
   const active = activeId ? byId[activeId] : null;
 
@@ -148,10 +145,7 @@ function App() {
     });
     anchor.current = id;
   };
-  const open = (id) => {
-    setActiveId(id);
-    if (dir === 'b') setSel(new Set());
-  };
+  const open = (id) => setActiveId(id);
   const clickItem = (id, e) => {
     if (suppress.current) {
       suppress.current = false;
@@ -223,8 +217,7 @@ function App() {
       return { ...m, id: Math.random().toString(36).slice(2), format: m.format || 'png', vis: uploadVis, status: error ? 'error' : 'queued', error, retryable: false, progress: 0, dupOf };
     });
     setUploads((u) => [...list, ...u]);
-    if (dir === 'a') setUploadOpen(true);
-    if (dir === 'c' && route !== 'images') setRoute('images');
+    setUploadOpen(true);
   };
   const pickFiles = () => fileInput.current?.click();
   const simulateUploads = () => addUploads(SAMPLE_UPLOADS.map((s) => ({ ...s, thumb: `assets/fixtures/${s.file}` })));
@@ -271,7 +264,7 @@ function App() {
     if (wasActive.current && !hasActive) {
       const done = uploads.filter((u) => u.status === 'done' || u.status === 'duplicate').length;
       const failed = uploads.filter((u) => u.status === 'error').length;
-      if (!(dir === 'a' && uploadOpen)) toast(failed ? `上传完成 ${done} 个，失败 ${failed} 个` : `已上传 ${done} 张图片`);
+      if (!uploadOpen) toast(failed ? `上传完成 ${done} 个，失败 ${failed} 个` : `已上传 ${done} 张图片`);
     }
     wasActive.current = hasActive;
   }, [hasActive]);
@@ -285,6 +278,8 @@ function App() {
   const clearFinished = () => setUploads((u) => u.filter((x) => isActiveUpload(x) || x.status === 'error'));
 
   // ---------------------------------------------------------------- window-wide drop, paste and shortcuts
+  const addUploadsRef = React.useRef(addUploads);
+  addUploadsRef.current = addUploads;
   React.useEffect(() => {
     let depth = 0;
     const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
@@ -325,8 +320,6 @@ function App() {
       window.removeEventListener('paste', paste);
     };
   }, []);
-  const addUploadsRef = React.useRef(addUploads);
-  addUploadsRef.current = addUploads;
 
   const keyRef = React.useRef(null);
   keyRef.current = (e) => {
@@ -357,15 +350,7 @@ function App() {
     setRoute(r);
     clearSel();
     setActiveId(null);
-    setNavOpen(false);
     window.scrollTo(0, 0);
-  };
-  const setDir = (d) => {
-    setDirRaw(d);
-    setView(DEFAULT_VIEW[d]);
-    setActiveId(null);
-    setUploadOpen(false);
-    clearSel();
   };
   const setDataState = (s) => {
     setDataStateRaw(s);
@@ -383,18 +368,17 @@ function App() {
     if (PARAMS.get('upload')) setUploadOpen(true);
     if (PARAMS.get('filters')) setFilterSheet(true);
     if (PARAMS.get('purge')) setPurgeIds(base.slice(0, 1).map((i) => i.id));
-    if (PARAMS.get('nav')) setNavOpen(true);
-    if (PARAMS.get('f')) setFilters({ ...EMPTY_FILTERS, formats: ['png'], vis: 'public', tags: ext ? ['博客'] : [] });
+    if (PARAMS.get('more')) setMoreOpen(true);
+    if (PARAMS.get('f')) setFilters({ ...EMPTY_FILTERS, formats: ['png'], vis: 'public', tags: ['博客'] });
   }, []);
 
   const lib = {
     images, base, items, byId, route, filters, setFilters, sort, setSort, view, setView, sel, selectMode, setSelectMode,
     activeId, open, clickItem, toggle, neighbors, selectAll: () => setSel(new Set(items.map((i) => i.id))), clearSel,
-    suppressClick: () => (suppress.current = true), ext, linkFormat, setLinkFormat, act, dataState,
+    suppressClick: () => (suppress.current = true), linkFormat, setLinkFormat, act, dataState,
     retry: () => setDataState('ok'), settings, isMobile, toast, pick: pickFiles, go, knownTags,
     uploads, uploadVis, setUploadVis, cancelUpload, retryUpload, removeUpload, clearFinished,
   };
-  const shared = { lib, route, go, theme, setTheme, toast, status: STATUS, images, isMobile };
 
   const page =
     route === 'tokens' ? (
@@ -405,10 +389,27 @@ function App() {
       <StatusPage status={STATUS} images={images} toast={toast} />
     ) : null;
 
-  const Shell = dir === 'b' ? ShellB : dir === 'c' ? ShellC : ShellA;
   return (
     <>
-      <Shell {...shared} page={page} searchRef={searchRef} navOpen={navOpen} setNavOpen={setNavOpen} openFilters={() => setFilterSheet(true)} uploadOpen={uploadOpen} setUploadOpen={setUploadOpen} active={active} closeDetail={() => setActiveId(null)} wideB={wideB} />
+      <Shell
+        lib={lib}
+        route={route}
+        go={go}
+        theme={theme}
+        setTheme={setTheme}
+        toast={toast}
+        status={STATUS}
+        images={images}
+        page={page}
+        searchRef={searchRef}
+        moreOpen={moreOpen}
+        setMoreOpen={setMoreOpen}
+        openFilters={() => setFilterSheet(true)}
+        uploadOpen={uploadOpen}
+        setUploadOpen={setUploadOpen}
+        active={active}
+        closeDetail={() => setActiveId(null)}
+      />
       {filterSheet && <FilterSheet lib={lib} onClose={() => setFilterSheet(false)} />}
       {purgeIds && <PurgeConfirm count={purgeIds.length} onCancel={() => setPurgeIds(null)} onConfirm={confirmPurge} />}
       {dragging && <DropOverlay />}
@@ -424,14 +425,12 @@ function App() {
         }}
       />
       <Toasts toasts={toasts} dismiss={dismiss} />
-      {!EMBED && (
-        <ProtoPanel dir={dir} setDir={setDir} theme={theme} setTheme={setTheme} ext={ext} setExt={setExt} dataState={dataState} setDataState={setDataState} simulate={simulateUploads} />
-      )}
+      {!EMBED && <ProtoPanel theme={theme} setTheme={setTheme} dataState={dataState} setDataState={setDataState} simulate={simulateUploads} />}
     </>
   );
 }
 
-// ---------------------------------------------------------------- shared chrome
+// ---------------------------------------------------------------- shell pieces
 
 function ThemeButton({ theme, setTheme }) {
   const dark = theme === 'dark';
@@ -477,16 +476,20 @@ function NavList({ route, go, images, status }) {
   return NAV.map((n) => {
     const head = n.group !== group ? <div className="nav-group">{(group = n.group)}</div> : null;
     const count = navCount(images, n.key);
+    const warn = n.key === 'status' && status.warnings.length > 0;
     return (
       <React.Fragment key={n.key}>
         {head}
-        <button type="button" className="nav-item" aria-current={route === n.key ? 'page' : undefined} onClick={() => go(n.key)}>
-          <Icon name={n.icon} />
-          {n.label}
-          {count !== undefined && <span className="count">{count}</span>}
-          {n.key === 'status' && status.warnings.length > 0 && (
+        <button type="button" className="nav-item" aria-current={route === n.key ? 'page' : undefined} title={n.label} onClick={() => go(n.key)}>
+          <span className="nav-icon">
+            <Icon name={n.icon} />
+            {warn && <span className="nav-dot" aria-hidden="true" />}
+          </span>
+          <span className="nav-label">{n.label}</span>
+          {count !== undefined && <span className="count num">{count}</span>}
+          {warn && (
             <span className="count" aria-label={`${status.warnings.length} 条警告`}>
-              <span className="dot" style={{ color: 'var(--warning)' }} />
+              <span className="badge badge-warning badge-xs">{status.warnings.length}</span>
             </span>
           )}
         </button>
@@ -495,34 +498,29 @@ function NavList({ route, go, images, status }) {
   });
 }
 
-function UsageMeter({ images, status }) {
-  const bytes = images.reduce((s, i) => s + i.size, 0);
+function DiskMeter({ status }) {
   const used = 1 - status.disk.freeBytes / status.disk.totalBytes;
   return (
     <div className="usage">
       <div className="usage-row">
-        <span>图片占用</span>
-        <span className="num">{fmtBytes(bytes)}</span>
-      </div>
-      <div className="progress" aria-label="磁盘已用">
-        <span style={{ width: `${Math.round(used * 100)}%` }} />
-      </div>
-      <div className="usage-row">
         <span>磁盘剩余</span>
         <span className="num">{fmtBytes(status.disk.freeBytes)}</span>
+      </div>
+      <div className="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(used * 100)}>
+        <span style={{ width: `${Math.round(used * 100)}%` }} />
       </div>
     </div>
   );
 }
 
-function LibraryHead({ lib, route, onUpload, compact }) {
+function LibraryHead({ lib, route, onUpload }) {
   const total = lib.base.reduce((s, i) => s + i.size, 0);
   if (route === 'trash')
     return (
       <div className="page-head">
         <div>
           <h1>回收站</h1>
-          <p>
+          <p className="num">
             {lib.base.length} 张 · {fmtBytes(total)} · 保留 {lib.settings.trashRetentionDays} 天后自动永久删除
           </p>
         </div>
@@ -538,14 +536,14 @@ function LibraryHead({ lib, route, onUpload, compact }) {
   return (
     <div className="page-head">
       <div>
-        <h1>{compact ? '图片' : '全部图片'}</h1>
-        <p>
+        <h1>全部图片</h1>
+        <p className="num">
           {lib.base.length} 张 · {fmtBytes(total)}
         </p>
       </div>
-      {onUpload && (
+      {!lib.isMobile && (
         <div className="page-actions">
-          <button type="button" className="btn btn-primary" onClick={onUpload}>
+          <button type="button" className="btn btn-primary" onClick={onUpload} title="上传 (U)">
             <Icon name="upload" />
             上传
           </button>
@@ -555,271 +553,172 @@ function LibraryHead({ lib, route, onUpload, compact }) {
   );
 }
 
-// ================================================================ A — sidebar console
-
-function ShellA({ lib, route, go, theme, setTheme, toast, status, images, page, searchRef, navOpen, setNavOpen, openFilters, uploadOpen, setUploadOpen, active, closeDetail, isMobile }) {
-  const cur = NAV.find((n) => n.key === route);
+function TabBar({ route, go, status, onMore, moreOpen }) {
+  const moreOn = moreOpen || !TAB_KEYS.includes(route);
   return (
-    <div className="shell-a" data-screen-label="direction-a">
-      <aside className="sidenav" aria-label="主导航">
-        <Brand />
-        <nav>
-          <NavList route={route} go={go} images={images} status={status} />
-        </nav>
-        <UsageMeter images={images} status={status} />
-      </aside>
-      <div className="main-a">
-        <header className="topbar-a">
-          <button type="button" className="btn btn-ghost btn-icon only-mobile" aria-label="打开导航" onClick={() => setNavOpen(true)}>
-            <Icon name="menu" />
-          </button>
-          <nav className="crumbs" aria-label="位置">
-            <span className="hide-sm">PicBerth</span>
-            <span className="hide-sm">/</span>
-            {cur.group !== '图片' && (
-              <>
-                <span className="hide-sm">{cur.group}</span>
-                <span className="hide-sm">/</span>
-              </>
-            )}
-            <strong>{cur.label}</strong>
+    <nav className="tabbar" aria-label="主导航">
+      {NAV.filter((n) => TAB_KEYS.includes(n.key)).map((n) => (
+        <button key={n.key} type="button" className="tab" aria-current={route === n.key && !moreOpen ? 'page' : undefined} onClick={() => go(n.key)}>
+          <Icon name={n.icon} size={20} />
+          <span>{n.short}</span>
+        </button>
+      ))}
+      <button type="button" className="tab" aria-current={moreOn ? 'page' : undefined} aria-expanded={moreOpen} onClick={onMore}>
+        <span className="nav-icon">
+          <Icon name="more" size={20} />
+          {status.warnings.length > 0 && <span className="nav-dot" aria-hidden="true" />}
+        </span>
+        <span>更多</span>
+      </button>
+    </nav>
+  );
+}
+
+function MoreSheet({ route, go, status, theme, setTheme, onClose }) {
+  return (
+    <Sheet onClose={onClose} label="更多">
+      {(close) => (
+        <>
+          <div className="sheet-head">
+            <h2>更多</h2>
+          </div>
+          <div className="sheet-body more-body">
+            {NAV.filter((n) => !TAB_KEYS.includes(n.key)).map((n) => (
+              <button
+                key={n.key}
+                type="button"
+                className="nav-item"
+                aria-current={route === n.key ? 'page' : undefined}
+                onClick={() => {
+                  go(n.key);
+                  close();
+                }}
+              >
+                <span className="nav-icon">
+                  <Icon name={n.icon} />
+                </span>
+                <span className="nav-label">{n.label}</span>
+                {n.key === 'status' && status.warnings.length > 0 && (
+                  <span className="count">
+                    <span className="badge badge-warning">{status.warnings.length} 条警告</span>
+                  </span>
+                )}
+                <span className="count">
+                  <Icon name="chevron-right" />
+                </span>
+              </button>
+            ))}
+            <div className="menu-sep" />
+            <div className="setting-row more-row">
+              <span className="label">深色模式</span>
+              <Switch checked={theme === 'dark'} label="深色模式" onChange={(v) => setTheme(v ? 'dark' : 'light')} />
+            </div>
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------- shell
+
+const DOCK_MS = 260;
+
+function Shell({ lib, route, go, theme, setTheme, toast, status, images, page, searchRef, moreOpen, setMoreOpen, openFilters, uploadOpen, setUploadOpen, active, closeDetail }) {
+  const mobile = lib.isMobile;
+  const rail = useMedia('(max-width: 1099px)') && !mobile;
+  const wide = useMedia('(min-width: 1280px)');
+  const [measure, width] = useWidth();
+  const cur = NAV.find((n) => n.key === route);
+  const inLib = !page;
+  const canDock = wide && inLib;
+  const bulk = lib.sel.size > 0 || lib.selectMode;
+
+  // Keep the docked panel's content while the column collapses.
+  const [dockImg, setDockImg] = React.useState(null);
+  React.useEffect(() => {
+    if (active) return setDockImg(active);
+    const t = setTimeout(() => setDockImg(null), DOCK_MS);
+    return () => clearTimeout(t);
+  }, [active]);
+
+  return (
+    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="console">
+      {!mobile && (
+        <aside className="sidenav" aria-label="主导航">
+          <Brand />
+          <nav>
+            <NavList route={route} go={go} images={images} status={status} />
           </nav>
+          {!rail && <DiskMeter status={status} />}
+        </aside>
+      )}
+      <div className="main">
+        <header className="topbar">
+          {mobile ? (
+            <Brand />
+          ) : (
+            <nav className="crumbs" aria-label="位置">
+              <span>PicBerth</span>
+              <Icon name="chevron-right" size={12} />
+              {cur.group !== '图片' && (
+                <>
+                  <span>{cur.group}</span>
+                  <Icon name="chevron-right" size={12} />
+                </>
+              )}
+              <strong>{cur.label}</strong>
+            </nav>
+          )}
           <span className="grow" />
-          <ThemeButton theme={theme} setTheme={setTheme} />
+          {!mobile && <ThemeButton theme={theme} setTheme={setTheme} />}
           <AccountMenu toast={toast} />
         </header>
-        <main>
-          {page ?? (
-            <div className="page">
-              <LibraryHead lib={lib} route={route} onUpload={() => setUploadOpen(true)} />
-              <LibraryToolbar lib={lib} searchRef={searchRef} onOpenFilters={openFilters} />
-              <ImageCollection lib={lib} />
-            </div>
+        <div className={`workspace ${canDock && active ? 'docked' : ''}`}>
+          <main className="workspace-main">
+            {page ?? (
+              <div className="page lib-page" ref={measure}>
+                <LibraryHead lib={lib} route={route} onUpload={() => setUploadOpen(true)} />
+                {bulk && !mobile ? <BulkBar lib={lib} /> : <LibraryToolbar lib={lib} searchRef={searchRef} onOpenFilters={openFilters} width={width} />}
+                <ImageCollection lib={lib} />
+              </div>
+            )}
+          </main>
+          {canDock && (
+            <aside className="dock" aria-label="图片详情" aria-hidden={!active}>
+              <div className="dock-inner">{(active || dockImg) && <DetailPanel lib={lib} image={active ?? dockImg} onClose={closeDetail} mode="dock" />}</div>
+            </aside>
           )}
-        </main>
+        </div>
       </div>
-      {navOpen && (
-        <Drawer side="left" width="272px" onClose={() => setNavOpen(false)} label="导航">
-          <div className="sidenav in-drawer">
-            <Brand />
-            <nav>
-              <NavList route={route} go={go} images={images} status={status} />
-            </nav>
-            <UsageMeter images={images} status={status} />
-          </div>
+
+      {mobile && bulk && inLib && <BulkBar lib={lib} />}
+      {mobile && inLib && route === 'images' && !bulk && lib.dataState === 'ok' && lib.base.length > 0 && (
+        <button type="button" className="fab" aria-label="上传" onClick={lib.pick}>
+          <Icon name="upload" size={22} />
+        </button>
+      )}
+      {mobile && <TabBar route={route} go={go} status={status} moreOpen={moreOpen} onMore={() => setMoreOpen(true)} />}
+      {mobile && moreOpen && <MoreSheet route={route} go={go} status={status} theme={theme} setTheme={setTheme} onClose={() => setMoreOpen(false)} />}
+
+      {active && !canDock && !mobile && (
+        <Drawer onClose={closeDetail} width="420px" label="图片详情">
+          {(close) => <DetailPanel lib={lib} image={active} onClose={close} mode="drawer" />}
         </Drawer>
       )}
-      {active && (
-        <Drawer onClose={closeDetail} width="440px" label="图片详情">
-          <DetailPanel lib={lib} image={active} onClose={closeDetail} />
-        </Drawer>
+      {active && mobile && (
+        <Sheet onClose={closeDetail} label="图片详情" full>
+          {(close) => <DetailPanel lib={lib} image={active} onClose={close} mode="sheet" />}
+        </Sheet>
       )}
       {uploadOpen && <UploadDialog lib={lib} onClose={() => setUploadOpen(false)} />}
     </div>
   );
 }
 
-// ================================================================ B — facets, list, inspector
-
-function ShellB({ lib, route, go, theme, setTheme, toast, status, images, page, searchRef, navOpen, setNavOpen, openFilters, active, closeDetail, wideB, isMobile }) {
-  const [trayHidden, setTrayHidden] = React.useState(false);
-  React.useEffect(() => {
-    if (lib.uploads.some((u) => u.status === 'queued')) setTrayHidden(false);
-  }, [lib.uploads]);
-  const showInspector = !page;
-  const n = activeFilterCount({ ...lib.filters, q: '' }, lib.ext);
-  const narrow = useMedia('(max-width: 860px)');
-  const multi = lib.sel.size > 0;
-  const navTop = (
-    <nav className="b-nav" aria-label="主导航">
-      {NAV.slice(0, 2).map((x) => (
-        <button key={x.key} type="button" className="nav-item" aria-current={route === x.key ? 'page' : undefined} onClick={() => go(x.key)}>
-          <Icon name={x.icon} />
-          {x.label}
-          <span className="count">{navCount(images, x.key)}</span>
-        </button>
-      ))}
-    </nav>
-  );
-  const navFoot = (
-    <nav className="nav-foot" aria-label="管理">
-      {NAV.slice(2).map((x) => (
-        <button key={x.key} type="button" className="nav-item" aria-current={route === x.key ? 'page' : undefined} onClick={() => go(x.key)}>
-          <Icon name={x.icon} />
-          {x.label}
-          {x.key === 'status' && status.warnings.length > 0 && (
-            <span className="count">
-              <span className="dot" style={{ color: 'var(--warning)' }} />
-            </span>
-          )}
-        </button>
-      ))}
-    </nav>
-  );
-  return (
-    <div className="shell-b" data-screen-label="direction-b">
-      <header className="header-b">
-        {narrow && (
-          <button type="button" className="btn btn-ghost btn-icon" aria-label="打开导航" onClick={() => setNavOpen(true)}>
-            <Icon name="menu" />
-          </button>
-        )}
-        <Brand />
-        {page ? <span className="grow" /> : <SearchBox lib={lib} inputRef={searchRef} placeholder={isMobile ? '搜索图片' : '搜索文件名、ID 或 SHA-256'} />}
-        <button type="button" className={`btn btn-primary ${isMobile ? 'btn-icon' : ''}`} aria-label={isMobile ? '上传' : undefined} onClick={lib.pick}>
-          <Icon name="upload" />
-          {!isMobile && '上传'}
-        </button>
-        {!isMobile && <ThemeButton theme={theme} setTheme={setTheme} />}
-        <AccountMenu toast={toast} />
-      </header>
-      <div className={`body-b ${showInspector ? '' : 'no-inspector'}`}>
-        <aside className="facets">
-          {navTop}
-          {!page && <FacetPanel lib={lib} />}
-          {navFoot}
-        </aside>
-        <main className="center-b">
-          {page ?? (
-            <>
-              <div className="listhead">
-                {lib.dataState === 'ok' && lib.items.length > 0 && !isMobile && (
-                  <input
-                    type="checkbox"
-                    className="check"
-                    aria-label="全选"
-                    checked={multi && lib.sel.size === lib.items.length}
-                    ref={(el) => el && (el.indeterminate = multi && lib.sel.size < lib.items.length)}
-                    onChange={() => (lib.sel.size === lib.items.length ? lib.clearSel() : lib.selectAll())}
-                  />
-                )}
-                <h1>{route === 'trash' ? '回收站' : '全部图片'}</h1>
-                <span className="subtle num">
-                  {lib.items.length < lib.base.length ? `${lib.items.length} / ${lib.base.length}` : lib.base.length} 张
-                </span>
-                {route === 'trash' && lib.base.length > 0 && !multi && (
-                  <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => lib.act.purge(lib.base.map((i) => i.id))}>
-                    清空回收站
-                  </button>
-                )}
-                <span className="grow" />
-                {narrow && (
-                  <button type="button" className={`btn btn-secondary filter-btn ${n ? 'active' : ''}`} onClick={openFilters}>
-                    <Icon name="filter" />
-                    筛选
-                    {n ? <span className="filter-n">{n}</span> : null}
-                  </button>
-                )}
-                {!narrow && <SortMenu lib={lib} iconOnly />}
-                <ViewToggle lib={lib} />
-              </div>
-              {(multi || lib.selectMode) && !wideB && <BulkBar lib={lib} />}
-              <FilterChips lib={lib} />
-              <ImageCollection lib={lib} tile="160px" compact />
-              {route === 'trash' && lib.base.length > 0 && <p className="hint" style={{ marginTop: 8 }}>回收站中的图片保留 {lib.settings.trashRetentionDays} 天后自动永久删除。</p>}
-            </>
-          )}
-        </main>
-        {showInspector && (
-          <aside className="inspector" aria-label="图片详情">
-            {multi ? (
-              <BatchPanel lib={lib} />
-            ) : active ? (
-              <DetailPanel lib={lib} image={active} onClose={closeDetail} />
-            ) : (
-              <div className="inspector-empty">
-                <div>
-                  <Icon name="image" size={28} />
-                  <p style={{ marginTop: 8 }}>选择图片查看链接和详情</p>
-                  <p className="hint" style={{ marginTop: 4 }}>
-                    按住 Shift 或 Ctrl 可选择多张
-                  </p>
-                </div>
-              </div>
-            )}
-          </aside>
-        )}
-      </div>
-      {active && !wideB && !page && (
-        <Drawer onClose={closeDetail} width="420px" label="图片详情">
-          <DetailPanel lib={lib} image={active} onClose={closeDetail} />
-        </Drawer>
-      )}
-      {navOpen && (
-        <Drawer side="left" width="272px" onClose={() => setNavOpen(false)} label="导航">
-          <div className="sidenav in-drawer">
-            <Brand />
-            <nav>
-              <NavList route={route} go={go} images={images} status={status} />
-            </nav>
-            <div className="drawer-theme">
-              <ThemeButton theme={theme} setTheme={setTheme} />
-            </div>
-          </div>
-        </Drawer>
-      )}
-      {!trayHidden && <UploadTray lib={lib} onClose={() => (setTrayHidden(true), lib.clearFinished())} />}
-    </div>
-  );
-}
-
-// ================================================================ C — top tabs, upload first
-
-function ShellC({ lib, route, go, theme, setTheme, toast, status, images, page, searchRef, openFilters, active, closeDetail, isMobile }) {
-  const tabs = (cls) => (
-    <nav className={cls} aria-label="主导航">
-      {NAV.map((n) => (
-        <button key={n.key} type="button" aria-current={route === n.key ? 'page' : undefined} onClick={() => go(n.key)}>
-          {n.short}
-          {n.key === 'trash' && navCount(images, 'trash') > 0 && <span className="tab-count">{navCount(images, 'trash')}</span>}
-          {n.key === 'status' && status.warnings.length > 0 && <span className="dot tab-dot" aria-label="有警告" />}
-        </button>
-      ))}
-    </nav>
-  );
-  const groupDays = route === 'images' && lib.view === 'grid' && (lib.sort === 'new' || lib.sort === 'old');
-  return (
-    <div className="shell-c" data-screen-label="direction-c">
-      <header className="header-c">
-        <div className="bar">
-          <Brand />
-          {tabs('tabs')}
-          <span className="grow" />
-          <ThemeButton theme={theme} setTheme={setTheme} />
-          <AccountMenu toast={toast} />
-        </div>
-        {tabs('tabs tabs-row')}
-      </header>
-      <main>
-        {page ?? (
-          <div className="page">
-            {route === 'images' && <QuickUpload lib={lib} />}
-            <LibraryHead lib={lib} route={route} compact />
-            <LibraryToolbar lib={lib} searchRef={searchRef} onOpenFilters={openFilters} />
-            <ImageCollection lib={lib} groupDays={groupDays} />
-          </div>
-        )}
-      </main>
-      {route === 'images' && !page && !lib.sel.size && (
-        <div className="mobile-bar">
-          <button type="button" className="btn btn-primary" onClick={lib.pick}>
-            <Icon name="upload" />
-            上传图片
-          </button>
-        </div>
-      )}
-      {active && (
-        <Modal title={null} onClose={closeDetail} width="1040px" className="full-sm detail-modal">
-          <DetailPanel lib={lib} image={active} onClose={closeDetail} wide />
-        </Modal>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- prototype options (review chrome, not product UI)
 
-function ProtoPanel({ dir, setDir, theme, setTheme, ext, setExt, dataState, setDataState, simulate }) {
+function ProtoPanel({ theme, setTheme, dataState, setDataState, simulate }) {
   const [open, setOpen] = React.useState(false);
   const opt = (cur, key, label, set) => (
     <button key={key} type="button" aria-pressed={cur === key} onClick={() => set(key)}>
@@ -833,21 +732,10 @@ function ProtoPanel({ dir, setDir, theme, setTheme, ext, setExt, dataState, setD
       </button>
       {open && (
         <div className="proto-panel">
-          <label>方案</label>
-          <div className="opts">
-            {opt(dir, 'a', 'A 侧栏', setDir)}
-            {opt(dir, 'b', 'B 三栏', setDir)}
-            {opt(dir, 'c', 'C 上传优先', setDir)}
-          </div>
           <label>主题</label>
           <div className="opts">
             {opt(theme, 'light', '浅色', setTheme)}
             {opt(theme, 'dark', '深色', setTheme)}
-          </div>
-          <label>扩展功能（标签 / 重命名 / 时间与来源筛选，需后端支持）</label>
-          <div className="opts">
-            {opt(ext, true, '显示', setExt)}
-            {opt(ext, false, '隐藏', setExt)}
           </div>
           <label>数据状态</label>
           <div className="opts">
