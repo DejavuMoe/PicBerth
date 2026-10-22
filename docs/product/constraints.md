@@ -69,5 +69,7 @@
 
 ## Open decisions
 
-- Whether new management capabilities that need backend work (tags, rename, date-range and source filters)
-  are in scope. The current prototype round shows them as proposals that can be switched off.
+- Resolved: tags, rename, date-range and source filters are in scope and shipped (approved direction A with the
+  extension features on; backend in commit `75889c4`).
+- Still open: whether further backend-dependent capabilities (batch tagging / renaming, tag merge, size-range
+  filter, albums, notes, statistics) are in scope. None is in scope until the user says so.

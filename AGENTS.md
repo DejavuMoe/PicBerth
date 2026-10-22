@@ -17,8 +17,8 @@
 - Build: `mise run build` (→ `dist/picberth`, SPA embedded)
 - Lint/typecheck: `go vet ./...` and `mise run web:check`
 - Test: `mise run test`
-- Preview design prototypes: `python -m http.server 4311 --directory designs` then
-  `http://localhost:4311/picberth/index.html`
+- Preview design prototypes: `python -m http.server 4321 --directory designs` then
+  `http://localhost:4321/picberth/index.html`
 
 ## Prototype-first gate
 
