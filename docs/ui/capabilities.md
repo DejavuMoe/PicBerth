@@ -2,8 +2,8 @@
 
 Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
 `internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
-The production SPA implements the approved prototype in `designs/picberth/` (console: direction A; auth and
-not-found screens). The earlier 「暗房」 design was **rejected** by the user on 2026-10-21 and no longer exists in
+The production SPA implements the approved prototype in `designs/picberth/` (console: single shell, revised and
+approved 2026-10-22; auth and not-found screens). The earlier 「暗房」 design was **rejected** by the user on 2026-10-21 and no longer exists in
 the code; it has no authority.
 
 ## Users and primary jobs
@@ -23,7 +23,7 @@ the code; it has no authority.
 | login | `/login` | sign in | username + password | `POST /api/v1/session`, `screens/Login.svelte` |
 | not-found | any unknown path | tell the user the page does not exist | go back to the library | `screens/NotFound.svelte` |
 | library | `/`, `/library` | browse/search active images, upload queue | upload, search, filter, sort, select, batch, open detail | `screens/Library.svelte`, `components/library/` |
-| image-detail | drawer over library/trash | one image | copy link (4 formats), visibility toggle, rename, edit tags, download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
+| image-detail | docked column / drawer / sheet over library/trash | one image | copy link (4 formats), visibility toggle, rename, edit tags, download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
 | trash | `/trash` | trashed images | restore, purge (confirm), batch | `screens/Library.svelte` (trash mode) |
 | tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke | `screens/Tokens.svelte`, `TokenDialog.svelte` |
 | settings | `/settings` | business settings | edit, save / discard, leave guard | `screens/Settings.svelte` |
@@ -78,18 +78,26 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
 ## Interaction and accessibility behavior
 
 - Keyboard: `U` opens file picker, `/` focuses search, arrows move between images, Space selects, Enter opens,
-  `C` copies link, Esc clears selection / closes detail, ←/→ in detail.
+  Esc clears selection / closes detail, ←/→ in detail.
 - Pointer: window-wide drag & drop and paste; Ctrl/⌘-click toggle, Shift-click range; touch long-press select,
-  swipe in detail.
+  swipe in detail. Phones: 选择 toggle starts selection mode; a floating upload button sits above the tab bar.
+- Table row actions show on hover or focus and always on touch. Default library view is the table on every
+  width; the choice is remembered (`picberth.view`).
+- Tag editor: up to 20 tags, 32 characters each (server limit); a leading `#` is stripped.
+- Status figures are one card; the settings unsaved bar floats at the bottom (above the tab bar on phones).
 - Live region announces upload completions/errors; icon buttons have labels.
-- Reduced motion honoured; zh-CN only; light/dark with manual override.
+- Overlays (modal, drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced-motion`.
+- zh-CN only; light/dark with manual override.
 
 ## Platform, viewport, and runtime constraints
 
 - SPA embedded in a Go binary; strict CSP (`script-src 'self'`, images from self/blob/data/image origin).
 - Svelte 5 + Vite, no UI libraries. Target Chrome/Edge 111+, Firefox 114+, Safari 16.4+.
-- Desktop and mobile both supported: the sidebar becomes a drawer at ≤ 900 px, the library switches to phone
-  rows at ≤ 720 px.
+- Desktop and mobile both supported: full sidebar from 1100 px, icon rail 721–1099 px, no sidebar at ≤ 720 px
+  (bottom tab bar). Library phone rows at ≤ 720 px; image detail docked column ≥ 1280 px, right drawer 721–1279 px,
+  bottom sheet on phones. The toolbar adapts to the width of the page content, not the viewport.
+- The server serves the SPA only for its known routes: an unknown URL requested directly gets a plain 404; unknown
+  in-app paths show the not-found screen.
 
 ## Content authority currently evidenced
 
