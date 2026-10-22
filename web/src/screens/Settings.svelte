@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import AdmRow from '../components/AdmRow.svelte';
+  import AdmSection from '../components/AdmSection.svelte';
   import Icon from '../components/Icon.svelte';
   import Modal from '../components/Modal.svelte';
+  import PanelHeader from '../components/PanelHeader.svelte';
   import Seg from '../components/Seg.svelte';
   import Switch from '../components/Switch.svelte';
   import { api, errorMessage } from '../lib/api';
-  import { FORMAT_NAMES, formatLimit } from '../lib/format';
+  import { FORMAT_NAMES } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
   import { addGuard } from '../lib/router.svelte';
+  import { phone } from '../lib/media.svelte';
   import { refreshSession } from '../lib/session.svelte';
-  import { toast } from '../lib/toast.svelte';
+  import { bottomBar, toast } from '../lib/toast.svelte';
   import type { ImageFormat, Settings, Visibility, WritableSettings } from '../lib/types';
 
   const ALL_FORMATS: ImageFormat[] = ['jpeg', 'png', 'gif', 'webp', 'avif'];
@@ -159,6 +162,12 @@
     leaveResolve?.(ok);
     leaveResolve = null;
   }
+  // On phones the bar is fixed above the tab bar, so toasts have to clear it.
+  (() => {
+    bottomBar.active = phone.matches && dirty;
+  });
+  onDestroy(() => (bottomBar.active = false));
+
   const removeGuard = addGuard(async () => (dirty ? await askLeave() : true));
   onDestroy(removeGuard);
 
@@ -174,40 +183,34 @@
 </script>
 
 {#snippet numberField(key: NumberKey, id: string, unit: string)}
-  <div class="adm-inline">
+  <div class="input-unit" class:invalid={!!errors[key]}>
     <input
       {id}
-      class="input num"
-      class:adm-invalid={!!errors[key]}
-      style="width: 112px"
+      class="num"
       inputmode={key === 'maxMB' || key === 'maxMP' ? 'decimal' : 'numeric'}
       aria-invalid={errors[key] ? 'true' : undefined}
       bind:value={form[key]}
     />
-    <span class="subtle">{unit}</span>
+    <span class="unit">{unit}</span>
   </div>
   {#if errors[key]}<span class="error-text">{errors[key]}</span>{/if}
 {/snippet}
 
-<div class="page" style="--page-w: 1040px">
-  <div class="page-head">
-    <div><h1>设置</h1></div>
-  </div>
-
-  {#if phase === 'loading'}
-    <p class="subtle">加载中…</p>
-  {:else if phase === 'error' || !baseline}
-    <div class="alert danger" role="alert">
-      <Icon name="alert" />
-      <div class="grow">加载失败：{loadError}</div>
-      <button type="button" class="btn btn-secondary btn-sm" onclick={() => void load()}>重试</button>
-    </div>
-  {:else}
-    <div class="adm-stack">
-      <section class="card">
-        <div class="card-head"><h2>上传</h2></div>
-        <div>
-          <AdmRow label="单文件上限" hint={`不超过 ${formatLimit(baseline.hardMaxUploadBytes)}`} htmlFor="adm-max-mb">
+<div class="page">
+  <PanelHeader title="设置" />
+  <div class="page-body">
+    <div class="adm-col">
+      {#if phase === 'loading'}
+        <p class="subtle">加载中…</p>
+      {:else if phase === 'error' || !baseline}
+        <div class="alert danger" role="alert">
+          <Icon name="alert" />
+          <div class="grow">加载失败：{loadError}</div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick={() => void load()}>重试</button>
+        </div>
+      {:else}
+        <AdmSection title="上传">
+          <AdmRow label="单文件上限" htmlFor="adm-max-mb">
             {@render numberField('maxMB', 'adm-max-mb', 'MB')}
           </AdmRow>
           <AdmRow label="像素上限" htmlFor="adm-max-px">
@@ -230,74 +233,61 @@
               value={form.defaultVisibility}
               onchange={(v: Visibility) => (form.defaultVisibility = v)}
               options={[
-                { key: 'public', label: '公开' },
-                { key: 'private', label: '私有' },
+                { key: 'public', label: '公开', icon: 'globe' },
+                { key: 'private', label: '私有', icon: 'lock' },
               ]}
             />
           </AdmRow>
-          <AdmRow label="重复检测" hint="相同内容的图片只保存一份，再次上传时返回原链接">
+          <AdmRow label="重复检测">
             <div class="adm-value">
               <Switch checked={form.dedupe} label="重复检测" onchange={(v) => (form.dedupe = v)} />
             </div>
           </AdmRow>
-        </div>
-      </section>
+        </AdmSection>
 
-      <section class="card">
-        <div class="card-head"><h2>回收站</h2></div>
-        <div>
-          <AdmRow label="保留天数" hint="0 表示删除后立即永久清除" htmlFor="adm-trash-days">
+        <AdmSection title="回收站">
+          <AdmRow label="保留天数" htmlFor="adm-trash-days">
             {@render numberField('retention', 'adm-trash-days', '天')}
           </AdmRow>
-        </div>
-      </section>
+        </AdmSection>
 
-      <section class="card">
-        <div class="card-head"><h2>频率限制</h2></div>
-        <div>
+        <AdmSection title="频率限制">
           <AdmRow label="每分钟上传次数" htmlFor="adm-rate">
             {@render numberField('perMinute', 'adm-rate', '次')}
           </AdmRow>
-        </div>
-      </section>
+        </AdmSection>
 
-      <section class="card">
-        <div class="card-head"><h2>会话</h2></div>
-        <div>
+        <AdmSection title="会话">
           <AdmRow label="空闲超时" htmlFor="adm-idle">
             {@render numberField('idle', 'adm-idle', '分钟')}
           </AdmRow>
           <AdmRow label="最长有效" htmlFor="adm-abs">
             {@render numberField('absolute', 'adm-abs', '小时')}
           </AdmRow>
-        </div>
-      </section>
+        </AdmSection>
 
-      <section class="card">
-        <div class="card-head"><h2>地址</h2></div>
-        <div>
-          <AdmRow label="公开地址" hint="在配置文件或环境变量中修改">
+        <AdmSection title="地址">
+          <AdmRow label="公开地址">
             <div class="adm-value mono">{baseline.publicUrl || '—'}</div>
           </AdmRow>
-          <AdmRow label="图片地址" hint="在配置文件或环境变量中修改">
+          <AdmRow label="图片地址">
             <div class="adm-value mono">{baseline.imageUrl || '—'}</div>
           </AdmRow>
-        </div>
-      </section>
+        </AdmSection>
+
+        {#if dirty}
+          <div class="adm-sticky" role="region" aria-label="未保存的更改">
+            <span class="grow" aria-live="polite">
+              有 {changed.length} 项未保存的更改{#if saveError}<span class="error-text"> · {saveError}</span>{/if}
+            </span>
+            <button type="button" class="btn btn-secondary" disabled={saving} onclick={discard}>放弃</button>
+            <button type="button" class="btn btn-primary" disabled={saving || invalid} onclick={save}>保存</button>
+          </div>
+        {/if}
+      {/if}
     </div>
-
-    {#if dirty}
-      <div class="adm-sticky" role="region" aria-label="未保存的更改">
-        <span class="grow" aria-live="polite">
-          有 {changed.length} 项未保存的更改{#if saveError}<span class="error-text"> · {saveError}</span>{/if}
-        </span>
-        <button type="button" class="btn btn-secondary" disabled={saving} onclick={discard}>放弃</button>
-        <button type="button" class="btn btn-primary" disabled={saving || invalid} onclick={save}>保存</button>
-      </div>
-    {/if}
-  {/if}
+  </div>
 </div>
-
 {#if leaveOpen}
   <Modal title="离开此页？" width="400px" onclose={() => answer(false)}>
     <p>有未保存的更改，离开后将丢失。</p>

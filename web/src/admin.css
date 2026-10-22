@@ -1,0 +1,463 @@
+/* Admin screens (设置 / 状态 / 令牌): one centred column of hairline rows, the stat strip, grid tables and the token dialogs.
+   Tokens and primitives (.input-unit, .check, .alert, .badge, .progress, .seg, .field) live in app.css. */
+
+.adm-col {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+.adm-col > .alert {
+  margin-bottom: 16px;
+}
+.adm-sec {
+  margin-top: 28px;
+}
+.adm-sec:first-child {
+  margin-top: 0;
+}
+.adm-sec h2 {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 510;
+  letter-spacing: 0;
+}
+.adm-rows {
+  box-shadow: inset 0 1px 0 var(--hairline);
+}
+.adm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 24px;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 0;
+  box-shadow: inset 0 -1px 0 var(--hairline);
+}
+.adm-row > .label {
+  color: var(--body);
+  font-size: 13px;
+}
+.adm-compact .adm-row {
+  min-height: 40px;
+}
+.adm-ctl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+.adm-ctl .error-text {
+  text-align: right;
+}
+.adm-value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--body);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.adm-value.mono {
+  font-size: 12px;
+}
+.adm-opts-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 16px;
+}
+.adm-opt-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Unsaved-changes bar: sticks to the bottom of the scrolling page; phones lift it above the tab bar. */
+.adm-sticky {
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--r-md);
+  background: var(--elev);
+  box-shadow: var(--shadow-float);
+  animation: bar-in var(--d2) var(--ease-out);
+}
+.adm-sticky .grow {
+  flex: 1;
+  min-width: 140px;
+  color: var(--text);
+  font-size: 13px;
+}
+.adm-sticky .grow::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 8px 2px 0;
+  border-radius: 50%;
+  background: var(--warning);
+  vertical-align: middle;
+}
+
+/* ---------------------------------------------------------------- status */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 28px;
+  box-shadow:
+    inset 0 1px 0 var(--hairline),
+    inset 0 -1px 0 var(--hairline);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 12px 12px 16px;
+  box-shadow: inset 1px 0 0 var(--hairline);
+}
+.stat:first-child {
+  padding-left: 0;
+  box-shadow: none;
+}
+.stat .k {
+  color: var(--muted);
+  font-size: 12px;
+}
+.stat .v {
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 510;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+}
+.stat .s {
+  color: var(--danger-text);
+  font-size: 12px;
+}
+.stat .progress {
+  margin-top: 6px;
+}
+
+.adm-run {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.adm-run-bar {
+  width: 120px;
+}
+.adm-result {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.adm-result.subtle {
+  color: var(--muted);
+}
+
+/* Header row + hairline rows shared by the check issues, the audit log and the token list. */
+.adm-grid {
+  display: grid;
+  align-items: center;
+  column-gap: 16px;
+  min-height: 40px;
+  box-shadow: inset 0 -1px 0 var(--hairline-soft);
+  font-size: 13px;
+}
+.adm-grid.head {
+  min-height: 32px;
+  color: var(--muted);
+  font-size: 12px;
+  box-shadow: inset 0 -1px 0 var(--hairline);
+}
+.adm-grid .end {
+  display: flex;
+  justify-content: flex-end;
+}
+.adm-audit .adm-grid {
+  grid-template-columns: 124px 120px 76px minmax(0, 1fr);
+}
+.adm-audit .adm-grid:not(.head) {
+  padding: 6px 0;
+}
+.adm-grid > [role='cell'] {
+  min-width: 0;
+}
+.adm-audit [role='cell'] > span {
+  display: block;
+}
+.adm-audit .sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+.adm-issues {
+  margin-bottom: 8px;
+}
+.adm-issues .adm-grid {
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, 2fr) 56px;
+  min-height: 36px;
+  font-size: 12px;
+}
+.adm-issues .adm-grid.head {
+  min-height: 28px;
+}
+.adm-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 0;
+}
+.adm-audit-list {
+  box-shadow: inset 0 1px 0 var(--hairline);
+}
+.adm-audit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  box-shadow: inset 0 -1px 0 var(--hairline-soft);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- tokens */
+
+.adm-tokens .adm-grid {
+  grid-template-columns: minmax(0, 1fr) 132px 88px 88px 52px;
+}
+.adm-tokens .adm-grid:not(.head):hover {
+  background: var(--hover);
+}
+.adm-revoked,
+.adm-revoked .tk-name .name {
+  color: var(--muted);
+}
+.tk-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.tk-name .name {
+  color: var(--text);
+}
+.tk-name .mono {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.adm-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.adm-revoke {
+  opacity: 0;
+  transition:
+    opacity var(--d1) var(--ease-out),
+    background-color var(--d1) var(--ease-out);
+}
+.adm-grid:hover .adm-revoke,
+.adm-grid:focus-within .adm-revoke,
+.adm-revoke:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .adm-revoke {
+    opacity: 1;
+  }
+}
+.adm-trows {
+  box-shadow: inset 0 1px 0 var(--hairline);
+}
+.adm-trow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  box-shadow: inset 0 -1px 0 var(--hairline-soft);
+}
+.adm-trow-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-trow-meta {
+  display: flex;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- token dialogs */
+
+.adm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.adm-fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.adm-fieldset legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+.adm-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background-color var(--d1) var(--ease-out);
+}
+.adm-opt:hover {
+  background: var(--hover);
+}
+.adm-opt .check {
+  flex: none;
+  margin-top: 2px;
+}
+.adm-opt strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+}
+.adm-pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  color: var(--body);
+  font-family: var(--mono);
+  font-feature-settings: 'zero';
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.adm-secret {
+  display: flex;
+  gap: 6px;
+}
+.adm-secret .input {
+  flex: 1;
+  font-family: var(--mono);
+  font-feature-settings: 'zero';
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------- phone */
+
+@media (max-width: 720px) {
+  .adm-col {
+    padding: 16px 16px 24px;
+  }
+  .adm-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px 0;
+  }
+  .adm-ctl {
+    align-items: flex-start;
+  }
+  .adm-ctl .error-text {
+    text-align: left;
+  }
+  .adm-opts-row {
+    justify-content: flex-start;
+  }
+  .adm-value,
+  .adm-result {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .adm-run {
+    justify-content: space-between;
+  }
+  .adm-sticky {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--bottom-ui) + 8px);
+    margin-top: 0;
+  }
+  .adm-sticky .btn {
+    height: var(--h-touch);
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    box-shadow: inset 0 -1px 0 var(--hairline);
+  }
+  .stat,
+  .stat:first-child {
+    box-shadow: inset 0 1px 0 var(--hairline);
+  }
+  .stat:nth-child(odd) {
+    padding-left: 0;
+  }
+  .stat:last-child {
+    grid-column: 1 / -1;
+    padding-left: 0;
+  }
+  .adm-issues .adm-grid.head {
+    display: none;
+  }
+  .adm-issues .adm-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+    padding: 6px 0;
+  }
+  .adm-issues .adm-grid > :nth-child(1) {
+    grid-area: 1 / 1;
+  }
+  .adm-issues .adm-grid > :nth-child(4) {
+    grid-area: 1 / 2;
+  }
+  .adm-issues .adm-grid > :nth-child(2) {
+    grid-area: 2 / 1 / auto / -1;
+  }
+  .adm-issues .adm-grid > :nth-child(3) {
+    grid-area: 3 / 1 / auto / -1;
+  }
+}

@@ -36,10 +36,9 @@ export interface Filters {
   date: '' | DateKey;
   sources: string[];
   tags: string[];
-  gps: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { q: '', formats: [], vis: '', date: '', sources: [], tags: [], gps: false };
+export const EMPTY_FILTERS: Filters = { q: '', formats: [], vis: '', date: '', sources: [], tags: [] };
 
 function parseFilters(p: URLSearchParams): Filters {
   const vis = p.get('visibility');
@@ -51,7 +50,6 @@ function parseFilters(p: URLSearchParams): Filters {
     date: DATE_RANGES.find((d) => d.key === date)?.key ?? '',
     sources: [...new Set(p.getAll('source').filter(Boolean))],
     tags: [...new Set(p.getAll('tag').filter(Boolean))],
-    gps: p.get('gps') === 'true',
   };
 }
 
@@ -62,7 +60,7 @@ function parseSort(p: URLSearchParams): ImageSort {
 
 /** Number of active filters, not counting the search text. */
 export function filterCount(f: Filters): number {
-  return f.formats.length + (f.vis ? 1 : 0) + (f.gps ? 1 : 0) + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
+  return f.formats.length + (f.vis ? 1 : 0) + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
 }
 
 function dateRange(key: DateKey, now = Date.now()): { since?: string; until?: string } {
@@ -164,11 +162,10 @@ export class Library {
   setFilters(patch: Partial<Filters>) {
     const f = { ...this.filters, ...patch };
     updateQuery((p) => {
-      for (const k of ['q', 'format', 'visibility', 'gps', 'date', 'source', 'tag']) p.delete(k);
+      for (const k of ['q', 'format', 'visibility', 'date', 'source', 'tag']) p.delete(k);
       if (f.q) p.set('q', f.q);
       for (const x of f.formats) p.append('format', x);
       if (f.vis) p.set('visibility', f.vis);
-      if (f.gps) p.set('gps', 'true');
       if (f.date) p.set('date', f.date);
       for (const x of f.sources) p.append('source', x);
       for (const x of f.tags) p.append('tag', x);
@@ -200,7 +197,6 @@ export class Library {
       q: f.q || undefined,
       format: f.formats.length ? f.formats : undefined,
       visibility: f.vis || undefined,
-      gps: f.gps || undefined,
       tag: f.tags.length ? f.tags : undefined,
       source: f.sources.length ? f.sources : undefined,
       ...range,

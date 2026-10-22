@@ -1,6 +1,5 @@
 <script lang="ts">
   import AuthCard from '../components/AuthCard.svelte';
-  import Icon from '../components/Icon.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -78,7 +77,7 @@
 </script>
 
 <AuthCard title="初始化">
-  <form onsubmit={submit} novalidate>
+  <form class="auth-form" onsubmit={submit} novalidate>
     <div class="field">
       <label for="setup-code">初始化代码</label>
       <!-- svelte-ignore a11y_autofocus -->
@@ -105,7 +104,6 @@
     <div class="field">
       <label for="setup-pass">密码</label>
       <input id="setup-pass" class="input" type="password" bind:value={password} autocomplete="new-password" aria-invalid={submitted && errors.password ? 'true' : undefined} />
-      <span class="hint">至少 10 个字符</span>
       {#if submitted && errors.password}<span class="error-text">{errors.password}</span>{/if}
     </div>
     <div class="field">
@@ -113,7 +111,7 @@
       <input id="setup-confirm" class="input" type="password" bind:value={confirm} autocomplete="new-password" aria-invalid={submitted && errors.confirm ? 'true' : undefined} />
       {#if submitted && errors.confirm}<span class="error-text">{errors.confirm}</span>{/if}
     </div>
-    {#if formError}<div class="alert danger" role="alert"><Icon name="alert" /><span>{formError}</span></div>{/if}
+    {#if formError}<p class="error-text" role="alert">{formError}</p>{/if}
     <button type="submit" class="btn btn-primary btn-block" disabled={busy}>{busy ? '正在创建…' : '创建管理员'}</button>
   </form>
 </AuthCard>

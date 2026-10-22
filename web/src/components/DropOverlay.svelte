@@ -8,7 +8,6 @@
     <div>
       <span class="dz-icon"><Icon name="upload" size={22} /></span>
       <strong>松开以上传</strong>
-      <span class="hint">可以一次放入多张图片</span>
     </div>
   </div>
 {/if}

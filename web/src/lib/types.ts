@@ -55,7 +55,6 @@ export interface ImageQuery {
   /** Any-of. */
   format?: ImageFormat[];
   visibility?: Visibility;
-  gps?: boolean;
   /** All-of. */
   tag?: string[];
   /** web, cli or 	oken:<id>; any-of. */
@@ -87,7 +86,6 @@ export interface Facets {
   bytes: number;
   formats: Record<ImageFormat, number>;
   visibility: Record<Visibility, number>;
-  gps: number;
   sources: FacetSource[];
   tags: { tag: string; count: number }[];
 }
@@ -158,7 +156,7 @@ export interface Status {
   sqliteVersion: string;
   startedAt: string;
   uptimeSeconds: number;
-  images: { active: number; trashed: number; bytes: number; withGps: number; broken: number };
+  images: { active: number; trashed: number; bytes: number; broken: number };
   database: { bytes: number; walBytes: number };
   disk: { freeBytes: number; totalBytes: number; watermarkBytes: number };
   dataDir: string;

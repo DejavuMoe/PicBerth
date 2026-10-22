@@ -9,7 +9,7 @@
     end?: string | number;
     /** Multi-select row with a checkbox. */
     checked?: boolean;
-    /** Single-select row with a tick. */
+    /** Single-select (radio) row with a tick. */
     selected?: boolean;
     onclick: () => void;
     children: Snippet;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { rawUrl } from '../lib/api';
-  import { hasAlpha, thumbSrc } from '../lib/image';
+  import { thumbSrc } from '../lib/image';
   import type { Image } from '../lib/types';
   import Icon from './Icon.svelte';
 
@@ -8,11 +8,10 @@
     /** A library image, or a bare `src` (upload previews). */
     image?: Pick<Image, 'id' | 'hasThumb' | 'mime' | 'broken'>;
     src?: string;
-    alpha?: boolean;
-    cover?: boolean;
+    /** 28px, for list rows. */
     size?: 'sm';
   }
-  let { image, src, alpha, cover = false, size }: Props = $props();
+  let { image, src, size }: Props = $props();
 
   const url = $derived(src ?? (image ? thumbSrc(image) : ''));
   // Without a thumbnail the server answers 404; fall back to the original once, then to a placeholder.
@@ -22,10 +21,9 @@
     step = 0;
   });
   const shown = $derived(step === 0 ? url : step === 1 && image ? rawUrl(image.id) : '');
-  const checker = $derived(alpha ?? (image ? hasAlpha(image) : false));
 </script>
 
-<span class="thumb" class:checker class:cover class:thumb-sm={size === 'sm'}>
+<span class="thumb" class:thumb-sm={size === 'sm'}>
   {#if shown && !image?.broken}
     <img src={shown} alt="" loading="lazy" draggable="false" onerror={() => (step += 1)} />
   {:else}

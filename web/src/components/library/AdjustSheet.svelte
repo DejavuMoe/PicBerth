@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { filterCount, SORTS, type Library } from '../../lib/library.svelte';
+  import { filterCount, SORTS, type Library, type ViewMode } from '../../lib/library.svelte';
+  import Seg from '../Seg.svelte';
   import Sheet from '../Sheet.svelte';
   import FacetPanel from './FacetPanel.svelte';
 
+  /** Phone adjustments: sort, view and the same facets as the popover, applied live. */
   let { lib, onclose }: { lib: Library; onclose: () => void } = $props();
 </script>
 
@@ -23,6 +25,21 @@
             {s.label}
           </button>
         {/each}
+      </div>
+      <div class="facet">
+        <h3>视图</h3>
+        <div class="facet-seg">
+          <Seg
+            fill
+            label="视图"
+            value={lib.view}
+            onchange={(v: ViewMode) => lib.setView(v)}
+            options={[
+              { key: 'table', icon: 'list', label: '列表' },
+              { key: 'grid', icon: 'grid', label: '网格' },
+            ]}
+          />
+        </div>
       </div>
       <FacetPanel {lib} />
     </div>

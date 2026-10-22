@@ -1,15 +1,13 @@
 <script lang="ts">
-  import { formatBytes, formatLimit, formatNames } from '../lib/format';
+  import { formatBytes } from '../lib/format';
   import { copyLinks } from '../lib/library.svelte';
   import { openPicker } from '../lib/picker';
   import { toast } from '../lib/toast.svelte';
   import type { Visibility } from '../lib/types';
   import {
-    allowedFormats,
     clearFinished,
     currentVisibility,
     LINK_FORMATS,
-    maxUploadBytes,
     removeItem,
     retry,
     uploadDialog,
@@ -52,25 +50,9 @@
 
 <Modal title="上传图片" width="560px" fullOnPhone blocksDrop={false} onclose={close}>
   <button type="button" class="dropzone" onclick={openPicker}>
-    <span class="dz-icon"><Icon name="upload" size={20} /></span>
-    <span class="dz-text">
-      <span class="dz-main">拖放或粘贴图片，或 <span class="dz-link">选择文件</span></span>
-      <span class="hint">{formatNames(allowedFormats()).join(' · ')}，单个不超过 {formatLimit(maxUploadBytes())}</span>
-    </span>
+    <span class="dz-icon"><Icon name="upload" size={22} /></span>
+    <span class="dz-main">拖放或粘贴图片，或 <span class="dz-link">选择文件</span></span>
   </button>
-
-  <div class="setting-row up-opts">
-    <span class="label">上传后可见性</span>
-    <Seg
-      label="上传后可见性"
-      value={currentVisibility()}
-      onchange={(v: Visibility) => (uploads.visibilityChoice = v)}
-      options={[
-        { key: 'public', label: '公开' },
-        { key: 'private', label: '私有' },
-      ]}
-    />
-  </div>
 
   {#if items.length > 0}
     <div class="up-summary">
@@ -84,9 +66,9 @@
         {#each items as u (u.id)}
           <li class="up-row up-{u.status}">
             {#if u.image}
-              <Thumb image={u.image} cover />
+              <Thumb image={u.image} />
             {:else}
-              <Thumb src={u.previewUrl ?? ''} alpha cover />
+              <Thumb src={u.previewUrl ?? ''} />
             {/if}
             <div class="up-info">
               <span class="name truncate" title={u.name}>{u.name}</span>
@@ -141,8 +123,18 @@
   {/if}
 
   {#snippet footer(closeAnimated)}
+    <Seg
+      class="foot-start"
+      label="上传后可见性"
+      value={currentVisibility()}
+      onchange={(v: Visibility) => (uploads.visibilityChoice = v)}
+      options={[
+        { key: 'public', label: '公开' },
+        { key: 'private', label: '私有' },
+      ]}
+    />
     {#if done > 0}
-      <button type="button" class="btn btn-ghost" style="margin-right: auto" onclick={clearFinished}>清除已完成</button>
+      <button type="button" class="btn btn-ghost" onclick={clearFinished}>清除已完成</button>
     {/if}
     {#if done > 1}
       <button type="button" class="btn btn-secondary" onclick={copyAll}>

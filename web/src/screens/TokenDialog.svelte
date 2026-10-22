@@ -2,6 +2,7 @@
   import CopyButton from '../components/CopyButton.svelte';
   import Icon from '../components/Icon.svelte';
   import Modal from '../components/Modal.svelte';
+  import Select from '../components/Select.svelte';
   import Seg from '../components/Seg.svelte';
   import { api, errorMessage } from '../lib/api';
   import { toast } from '../lib/toast.svelte';
@@ -108,7 +109,7 @@
           <CopyButton text={created.secret} />
         </div>
       </div>
-      <div class="adm-form" style="gap: 10px">
+      <div class="adm-form">
         <div>
           <Seg
             label="使用方式"
@@ -152,7 +153,6 @@
         <input
           id="adm-tk-name"
           class="input"
-          class:adm-invalid={tried && nameErr}
           aria-invalid={tried && nameErr ? 'true' : undefined}
           bind:value={name}
           maxlength={120}
@@ -161,8 +161,8 @@
         />
         {#if tried && nameErr}<span class="error-text">{nameErr}</span>{/if}
       </div>
-      <fieldset class="field" style="border: 0; padding: 0; min-width: 0">
-        <legend style="font-size: 13px; font-weight: 500; padding: 0; margin-bottom: 6px">权限</legend>
+      <fieldset class="field adm-fieldset">
+        <legend>权限</legend>
         <div class="adm-opts">
           {#each SCOPES as o (o.key)}
             <label class="adm-opt">
@@ -178,11 +178,7 @@
       </fieldset>
       <div class="field">
         <label for="adm-tk-exp">有效期</label>
-        <select id="adm-tk-exp" class="select" bind:value={days}>
-          {#each EXPIRY as o (o.value)}
-            <option value={o.value}>{o.label}</option>
-          {/each}
-        </select>
+        <Select id="adm-tk-exp" value={days} options={EXPIRY} onchange={(v) => (days = v)} />
       </div>
       {#if formError}<span class="error-text" role="alert">{formError}</span>{/if}
     </form>

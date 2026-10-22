@@ -1,4 +1,4 @@
-// Stroke icons on a 24 px grid (1.7 px stroke, round caps), drawn as plain paths in currentColor.
+// Stroke icons on a 24 px grid (1.5 px stroke, round caps), drawn as plain paths in currentColor.
 
 export const ICONS = {
   upload: ['M12 15V4', 'M7.5 8.5 12 4l4.5 4.5', 'M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
@@ -34,7 +34,6 @@ export const ICONS = {
   activity: ['M3 12h4l2.5-6 5 12 2.5-6h4'],
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
   external: ['M14 4h6v6', 'm20 4-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'],
-  pin: ['M12 21s6.5-6 6.5-11a6.5 6.5 0 0 0-13 0c0 5 6.5 11 6.5 11z', 'M12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
   sort: ['M7 4v16', 'm4 7 3-3 3 3', 'M17 20V4', 'm14 17 3 3 3-3'],
   plus: ['M12 5v14', 'M5 12h14'],
   alert: ['M12 3.5 21 19.5H3z', 'M12 10v4', 'M12 17h.01'],
@@ -55,4 +54,4 @@ export const ICONS = {
 export type IconName = keyof typeof ICONS;
 
 /** Dot glyphs need a heavier stroke to carry the same visual weight as line icons. */
-export const ICON_STROKE: Partial<Record<IconName, number>> = { more: 3.2 };
+export const ICON_STROKE: Partial<Record<IconName, number>> = { more: 3 };

@@ -1,24 +1,24 @@
 <script lang="ts">
+  import type { Facets } from '../../lib/types';
+  import Combobox from '../Combobox.svelte';
   import Icon from '../Icon.svelte';
 
   interface Props {
-    id: string;
     tags: string[];
-    known: string[];
+    /** Tags in use elsewhere, with how many images carry each. */
+    known: Facets['tags'];
     onchange: (tags: string[]) => void;
   }
-  let { id, tags, known, onchange }: Props = $props();
+  let { tags, known, onchange }: Props = $props();
 
   // Same limits as the server: 20 tags per image, 32 characters each.
   const MAX_TAGS = 20;
+  const MAX_LEN = 32;
 
-  let value = $state('');
+  const full = $derived(tags.length >= MAX_TAGS);
+  const options = $derived(known.filter((t) => !tags.includes(t.tag)).map((t) => ({ value: t.tag, label: t.tag, count: t.count })));
 
-  function add() {
-    const t = value.trim().replace(/^#/, '');
-    if (t && !tags.includes(t) && tags.length < MAX_TAGS) onchange([...tags, t]);
-    value = '';
-  }
+  const normalize = (s: string) => s.trim().replace(/^#+/, '').trim().slice(0, MAX_LEN);
 </script>
 
 <div class="tag-editor">
@@ -30,25 +30,24 @@
       </button>
     </span>
   {/each}
-  <input
-    class="input tag-input"
+  <Combobox
+    label="添加标签"
     placeholder="添加标签"
-    aria-label="添加标签"
-    list={`tags-${id}`}
-    maxlength={32}
-    bind:value
-    onkeydown={(e) => {
-      if (e.key === 'Enter' || e.key === ',') {
-        e.preventDefault();
-        add();
-      }
-      if (e.key === 'Backspace' && !value && tags.length) onchange(tags.slice(0, -1));
+    {options}
+    {normalize}
+    taken={(v) => tags.includes(v)}
+    maxlength={MAX_LEN + 8}
+    onpick={(v) => {
+      if (!tags.includes(v) && tags.length < MAX_TAGS) onchange([...tags, v]);
     }}
-    onblur={add}
-  />
-  <datalist id={`tags-${id}`}>
-    {#each known.filter((t) => !tags.includes(t)) as t (t)}
-      <option value={t}></option>
-    {/each}
-  </datalist>
+    onemptybackspace={() => {
+      if (tags.length) onchange(tags.slice(0, -1));
+    }}
+  >
+    {#snippet trigger(open, toggle)}
+      <button type="button" class="tag-add" aria-label="添加标签" aria-haspopup="listbox" aria-expanded={open} disabled={full} onclick={toggle}>
+        <Icon name="plus" size={12} />
+      </button>
+    {/snippet}
+  </Combobox>
 </div>

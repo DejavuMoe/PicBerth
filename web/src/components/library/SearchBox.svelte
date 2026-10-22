@@ -3,11 +3,17 @@
   import type { Library } from '../../lib/library.svelte';
   import Icon from '../Icon.svelte';
 
-  let {
-    lib,
-    el = $bindable(null),
-    placeholder = '搜索文件名、标签、ID 或 SHA-256',
-  }: { lib: Library; el?: HTMLInputElement | null; placeholder?: string } = $props();
+  interface Props {
+    lib: Library;
+    el?: HTMLInputElement | null;
+    /** Tablet and phone headers: an icon button that expands into the field. */
+    collapsed?: boolean;
+    /** Whether the collapsed field is expanded (owned by the header, so the `/` shortcut can open it). */
+    open?: boolean;
+    /** Phones keep the field open until 取消 is pressed. */
+    keepOpen?: boolean;
+  }
+  let { lib, el = $bindable(null), collapsed = false, open = $bindable(false), keepOpen = false }: Props = $props();
 
   // The box edits local text; the URL follows after a short pause. Enter applies at once.
   let value = $state(untrack(() => lib.filters.q));
@@ -23,29 +29,65 @@
       if (urlQ !== value.trim()) value = urlQ;
     });
   });
+
+  // Expanding from the icon moves focus into the field.
+  const shown = $derived(!collapsed || open || value !== '');
+  $effect(() => {
+    if (collapsed && open && el) el.focus();
+  });
+
+  function clear() {
+    value = '';
+    lib.setFilters({ q: '' });
+  }
 </script>
 
-<label class="search">
-  <Icon name="search" />
-  <input
-    bind:this={el}
-    class="input"
-    type="search"
-    {placeholder}
-    aria-label="搜索图片"
-    autocomplete="off"
-    spellcheck="false"
-    bind:value
-    onkeydown={(e) => {
-      if (e.key === 'Enter') lib.setFilters({ q: value.trim() });
-      if (e.key === 'Escape') {
-        if (value) {
-          value = '';
-          lib.setFilters({ q: '' });
+{#if !shown}
+  <button type="button" class="btn btn-ghost btn-icon" aria-label="搜索" title="搜索 (/)" onclick={() => (open = true)}>
+    <Icon name="search" />
+  </button>
+{:else}
+  <label class="search">
+    <Icon name="search" />
+    <input
+      bind:this={el}
+      class="input"
+      type="text"
+      role="searchbox"
+      placeholder="搜索"
+      aria-label="搜索图片"
+      autocomplete="off"
+      spellcheck="false"
+      bind:value
+      onblur={() => {
+        if (collapsed && !value.trim() && !keepOpen) open = false;
+      }}
+      onkeydown={(e) => {
+        if (e.key === 'Enter') lib.setFilters({ q: value.trim() });
+        if (e.key === 'Escape') {
+          // Leave the field without closing the detail behind it.
+          e.stopPropagation();
+          if (value) clear();
+          open = false;
+          e.currentTarget.blur();
         }
-        e.currentTarget.blur();
-      }
-    }}
-  />
-  {#if !value}<kbd class="hide-touch">/</kbd>{/if}
-</label>
+      }}
+    />
+    {#if value}
+      <button
+        type="button"
+        class="search-clear"
+        aria-label="清除"
+        onmousedown={(e) => e.preventDefault()}
+        onclick={() => {
+          clear();
+          el?.focus();
+        }}
+      >
+        <Icon name="x" size={12} />
+      </button>
+    {:else if !collapsed}
+      <kbd class="hide-touch">/</kbd>
+    {/if}
+  </label>
+{/if}
