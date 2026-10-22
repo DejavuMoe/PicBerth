@@ -1,9 +1,10 @@
 # Current UI capabilities and states
 
-Evidence-based inventory of PicBerth as of 2026-10-21. Sources: `internal/httpapi/api.go` (routes),
+Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
 `internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
-The production SPA currently ships the 「暗房」 design, which was **rejected** by the user on 2026-10-21; it is
-not an approved design and is listed here only as the current runtime.
+The production SPA implements the approved prototype in `designs/picberth/` (console: direction A; auth and
+not-found screens). The earlier 「暗房」 design was **rejected** by the user on 2026-10-21 and no longer exists in
+the code; it has no authority.
 
 ## Users and primary jobs
 
@@ -20,9 +21,10 @@ not an approved design and is listed here only as the current runtime.
 |---|---|---|---|---|
 | setup | `/setup` | create first admin | enter setup code, username, password | `POST /api/v1/setup`, `screens/Setup.svelte` |
 | login | `/login` | sign in | username + password | `POST /api/v1/session`, `screens/Login.svelte` |
-| library | `/`, `/library` | browse/search active images, upload queue | upload, search, filter, sort, select, batch, open detail | `screens/Sheet.svelte` (mode library) |
-| image-detail | modal over library/trash | one image | copy link (4 formats), visibility toggle, download, trash / restore / purge, prev/next | `screens/Lightbox.svelte` |
-| trash | `/trash` | trashed images | restore, purge (confirm), batch | `screens/Sheet.svelte` (mode trash) |
+| not-found | any unknown path | tell the user the page does not exist | go back to the library | `screens/NotFound.svelte` |
+| library | `/`, `/library` | browse/search active images, upload queue | upload, search, filter, sort, select, batch, open detail | `screens/Library.svelte`, `components/library/` |
+| image-detail | drawer over library/trash | one image | copy link (4 formats), visibility toggle, rename, edit tags, download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
+| trash | `/trash` | trashed images | restore, purge (confirm), batch | `screens/Library.svelte` (trash mode) |
 | tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke | `screens/Tokens.svelte`, `TokenDialog.svelte` |
 | settings | `/settings` | business settings | edit, save / discard, leave guard | `screens/Settings.svelte` |
 | status | `/status` | health | quick / full check, snapshot, view warnings, figures, audit log | `screens/Status.svelte` |
@@ -86,7 +88,8 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
 
 - SPA embedded in a Go binary; strict CSP (`script-src 'self'`, images from self/blob/data/image origin).
 - Svelte 5 + Vite, no UI libraries. Target Chrome/Edge 111+, Firefox 114+, Safari 16.4+.
-- Desktop and mobile (≤ 760 px layout) both supported.
+- Desktop and mobile both supported: the sidebar becomes a drawer at ≤ 900 px, the library switches to phone
+  rows at ≤ 720 px.
 
 ## Content authority currently evidenced
 
@@ -98,5 +101,5 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
 
 ## Known unknowns
 
-- Which management capabilities the user expects beyond the current API (albums, notes, batch tagging, statistics …).
-- Preferred default library view (dense list/table vs grid) and reference products.
+- Which management capabilities the user expects beyond the current API (albums, notes, batch tagging and
+  renaming, tag merge, size-range filter, statistics …).
