@@ -22,7 +22,8 @@
         {
           "path": "directions.html",
           "createdAt": "2026-10-21T12:27:29.953Z",
-          "status": "needs-review",
+          "status": "rejected",
+          "subtitle": "B 三栏 / C 上传优先 已否决，A 侧栏已采用",
           "viewport": {
             "width": 1440,
             "height": 900
