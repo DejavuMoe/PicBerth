@@ -33,7 +33,6 @@ type StatusImages struct {
 	Active  int64 `json:"active"`
 	Trashed int64 `json:"trashed"`
 	Bytes   int64 `json:"bytes"`
-	WithGPS int64 `json:"withGps"`
 	Broken  int64 `json:"broken"`
 }
 
@@ -84,7 +83,7 @@ func (s *Service) Status(ctx context.Context, p Principal) (*Status, error) {
 	st := &Status{
 		Version: buildinfo.Version, Commit: buildinfo.Commit, GoVersion: runtime.Version(), SQLiteVersion: s.db.SQLiteVersion(),
 		StartedAt: s.startedAt.UTC().Format(time.RFC3339), UptimeSeconds: int64(now.Sub(s.startedAt).Seconds()),
-		Images:   StatusImages{Active: stats.Active, Trashed: stats.Trashed, Bytes: stats.Bytes, WithGPS: stats.WithGPS, Broken: stats.Broken},
+		Images:   StatusImages{Active: stats.Active, Trashed: stats.Trashed, Bytes: stats.Bytes, Broken: stats.Broken},
 		DataDir:  s.dir.Path(),
 		Warnings: []StatusWarning{},
 	}

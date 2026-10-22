@@ -113,11 +113,11 @@ type TagCount struct {
 
 // Facets are the counts over a state's visible set.
 type Facets struct {
-	Total, Bytes, GPS int64
-	Exts              map[string]int64 // stored extension -> count
-	Visibility        map[string]int64
-	Sources           []SourceCount
-	Tags              []TagCount // count desc, tag asc
+	Total, Bytes int64
+	Exts         map[string]int64 // stored extension -> count
+	Visibility   map[string]int64
+	Sources      []SourceCount
+	Tags         []TagCount // count desc, tag asc
 }
 
 // FacetQuery selects the set Facets counts over.
@@ -142,7 +142,7 @@ func (db *DB) ImageFacets(ctx context.Context, q FacetQuery) (Facets, error) {
 	f := Facets{Exts: map[string]int64{}, Visibility: map[string]int64{}}
 
 	rows, err := db.r.QueryContext(ctx, `SELECT i.ext, i.visibility, i.source, i.token_id, COALESCE(t.name, ''),
-		COUNT(*), COALESCE(SUM(i.size), 0), COALESCE(SUM(i.has_gps), 0)`+imageFrom+` WHERE `+where+
+		COUNT(*), COALESCE(SUM(i.size), 0)`+imageFrom+` WHERE `+where+
 		` GROUP BY i.ext, i.visibility, i.source, i.token_id, t.name`, args...)
 	if err != nil {
 		return f, err
@@ -155,14 +155,13 @@ func (db *DB) ImageFacets(ctx context.Context, q FacetQuery) (Facets, error) {
 	for rows.Next() {
 		var ext, vis, source, tname string
 		var tid *int64
-		var n, size, gps int64
-		if err := rows.Scan(&ext, &vis, &source, &tid, &tname, &n, &size, &gps); err != nil {
+		var n, size int64
+		if err := rows.Scan(&ext, &vis, &source, &tid, &tname, &n, &size); err != nil {
 			rows.Close()
 			return f, err
 		}
 		f.Total += n
 		f.Bytes += size
-		f.GPS += gps
 		f.Exts[ext] += n
 		f.Visibility[vis] += n
 		k := srcKey{source: source}

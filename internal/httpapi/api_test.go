@@ -1069,7 +1069,7 @@ func TestListFiltersAndPagination(t *testing.T) {
 	if len(seen) != 5 {
 		t.Fatalf("paged %d items", len(seen))
 	}
-	for _, bad := range []string{"limit=0", "limit=500", "limit=x", "sort=sideways", "state=purged", "format=bmp", "visibility=maybe", "gps=false", "tokenId=x", "cursor=%25%25"} {
+	for _, bad := range []string{"limit=0", "limit=500", "limit=x", "sort=sideways", "state=purged", "format=bmp", "visibility=maybe", "tokenId=x", "cursor=%25%25"} {
 		resp, body := h.web("GET", "/api/v1/images?"+bad, nil)
 		wantProblem(t, resp, body, 400, "validation")
 	}
@@ -1078,9 +1078,13 @@ func TestListFiltersAndPagination(t *testing.T) {
 	if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 1 || l.Items[0].ID != ids[2] {
 		t.Fatalf("filtered: %s", body)
 	}
-	resp, body = h.web("GET", "/api/v1/images?gps=true", nil)
-	if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 0 {
-		t.Fatalf("gps filter: %s", body)
+	// The removed gps parameter is an unknown parameter: ignored like any other, never filtering.
+	for _, gps := range []string{"gps=true", "gps=false"} {
+		resp, body = h.web("GET", "/api/v1/images?limit=100&"+gps, nil)
+		wantStatus(t, resp, body, 200)
+		if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 5 {
+			t.Fatalf("%s should be ignored, got %d items: %s", gps, len(l.Items), body)
+		}
 	}
 }
 
