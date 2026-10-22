@@ -10,7 +10,7 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width={ICON_STROKE[name] ?? 1.7}
+  stroke-width={ICON_STROKE[name] ?? 1.5}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"

@@ -15,11 +15,12 @@
     label: string;
     icons?: boolean;
     fill?: boolean;
+    class?: string;
   }
-  let { options, value, onchange, label, icons = false, fill = false }: Props = $props();
+  let { options, value, onchange, label, icons = false, fill = false, class: className = '' }: Props = $props();
 </script>
 
-<div class="seg" class:seg-icons={icons} class:fill role="group" aria-label={label}>
+<div class="seg {className}" class:seg-icons={icons} class:fill role="group" aria-label={label}>
   {#each options as o (o.key)}
     <button
       type="button"
@@ -28,7 +29,7 @@
       aria-label={icons ? o.title : undefined}
       onclick={() => onchange(o.key)}
     >
-      {#if icons && o.icon}<Icon name={o.icon} />{:else}{o.label}{/if}
+      {#if o.icon}<Icon name={o.icon} />{/if}{#if !icons}{o.label}{/if}
     </button>
   {/each}
 </div>

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import AdmRow from '../components/AdmRow.svelte';
+  import AdmSection from '../components/AdmSection.svelte';
   import Icon from '../components/Icon.svelte';
+  import PanelHeader from '../components/PanelHeader.svelte';
   import { api, errorMessage } from '../lib/api';
-  import { formatAbsolute, formatBytes, formatInt, formatLimit, formatRelative } from '../lib/format';
+  import { formatAbsolute, formatBytes, formatInt, formatRelative } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
   import { phone } from '../lib/media.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -221,193 +223,179 @@
   });
 </script>
 
-{#snippet metric(label: string, value: string, sub?: string)}
-  <div class="adm-metric">
-    <span class="k">{label}</span>
-    <span class="v">{value}</span>
-    {#if sub}<span class="s">{sub}</span>{/if}
-  </div>
-{/snippet}
-
-{#snippet runRow(key: Key, label: string, hint: string, idle: string, busy: string, run: () => void)}
+{#snippet runRow(key: Key, label: string, idle: string, busy: string, run: () => void)}
   {@const r = result(key)}
-  <AdmRow {label} {hint}>
-    <button type="button" class="btn btn-secondary" disabled={running !== null} onclick={run}>
-      {running === key ? busy : idle}
-    </button>
-    {#if running === key}
-      <div class="progress indeterminate adm-run" role="progressbar" aria-label={label}><span></span></div>
-    {:else if r}
-      <div class="adm-result" class:subtle={r.subtle}>
-        {#if r.badge}<span class="badge {r.tone ?? 'badge-success'}">{r.badge}</span>{/if}
-        {#if r.text}<span>{r.text}</span>{/if}
-        {#if r.path}<span class="mono">{r.path}</span>{/if}
+  <div>
+    <div class="adm-row">
+      <span class="label">{label}</span>
+      <div class="adm-run">
+        {#if running === key}
+          <div class="progress indeterminate adm-run-bar" role="progressbar" aria-label={label}><span></span></div>
+        {:else if r}
+          <div class="adm-result" class:subtle={r.subtle}>
+            {#if r.badge}<span class="badge {r.tone ?? 'badge-success'}">{r.badge}</span>{/if}
+            {#if r.text}<span>{r.text}</span>{/if}
+            {#if r.path}<span class="mono">{r.path}</span>{/if}
+          </div>
+        {/if}
+        <button type="button" class="btn btn-secondary" disabled={running !== null} onclick={run}>
+          {running === key ? busy : idle}
+        </button>
       </div>
-      {#if r.issues && r.issues.length > 0}
-        <div class="adm-issues">
-          <table class="table adm-table">
-            <thead>
-              <tr><th>类型</th><th>图片</th><th>路径</th><th>状态</th></tr>
-            </thead>
-            <tbody>
-              {#each r.issues as issue, i (i)}
-                <tr>
-                  <td class="nowrap">{KIND[issue.kind] ?? issue.kind}</td>
-                  <td class="mono">{issue.imageId ?? '—'}</td>
-                  <td class="mono">{issue.path ?? '—'}</td>
-                  <td>{#if issue.repaired}<span class="badge badge-success">已修复</span>{:else}<span class="badge badge-warning">未修复</span>{/if}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+    </div>
+    {#if running !== key && r?.issues && r.issues.length > 0}
+      <div class="adm-issues" role="table" aria-label="检查结果">
+        <div class="adm-grid head" role="row">
+          <span role="columnheader">类型</span>
+          <span role="columnheader">图片</span>
+          <span role="columnheader">路径</span>
+          <span role="columnheader">状态</span>
         </div>
-      {/if}
+        {#each r.issues as issue, i (i)}
+          <div class="adm-grid" role="row">
+            <span role="cell" class="nowrap">{KIND[issue.kind] ?? issue.kind}</span>
+            <span role="cell" class="mono truncate" title={issue.imageId ?? undefined}>{issue.imageId ?? '—'}</span>
+            <span role="cell" class="mono truncate" title={issue.path ?? undefined}>{issue.path ?? '—'}</span>
+            <span role="cell">
+              {#if issue.repaired}<span class="badge badge-success">已修复</span>{:else}<span class="badge badge-warning">未修复</span>{/if}
+            </span>
+          </div>
+        {/each}
+      </div>
     {/if}
-  </AdmRow>
+  </div>
 {/snippet}
 
-<div class="page" style="--page-w: 1040px">
-  <div class="page-head">
-    <div>
-      <h1>状态</h1>
-      {#if status}<p>版本 {status.version} · 已运行 {uptime}</p>{/if}
-    </div>
-    <div class="page-actions">
-      <button type="button" class="btn btn-secondary" disabled={refreshing || phase === 'loading'} onclick={() => void refresh()}>
-        <Icon name="refresh" />
-        刷新
-      </button>
-    </div>
-  </div>
-
-  {#if phase === 'loading'}
-    <p class="subtle">加载中…</p>
-  {:else if phase === 'error' || !status}
-    <div class="alert danger" role="alert">
-      <Icon name="alert" />
-      <div class="grow">加载失败：{loadError}</div>
-      <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadStatus()}>重试</button>
-    </div>
-  {:else}
-    <div class="adm-stack">
-      {#if status.warnings.length > 0}
-        <div class="adm-stack" style="gap: 8px">
-          {#each status.warnings as w (w.code)}
-            <div class="alert warning">
-              <Icon name="alert" />
-              <div class="grow">
-                <strong>{HEADLINE[w.code] ?? w.message}</strong>
-                {#if REMEDY[w.code]}<div>{REMEDY[w.code]}</div>{/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="card adm-metrics">
-        {@render metric('图片', formatInt(status.images.active), status.images.broken > 0 ? `${formatInt(status.images.broken)} 张异常` : undefined)}
-        {@render metric('占用空间', formatBytes(status.images.bytes))}
-        {@render metric('回收站', formatInt(status.images.trashed))}
-        {@render metric('含位置信息', formatInt(status.images.withGps))}
-        {@render metric('数据库', formatBytes(status.database.bytes), `WAL ${formatBytes(status.database.walBytes)}`)}
-        <div class="adm-metric">
-          <span class="k">磁盘剩余</span>
-          <span class="v">{formatBytes(status.disk.freeBytes)}</span>
-          <div class="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedShare}>
-            <span style:width="{usedShare}%"></span>
-          </div>
-          <span class="s">共 {formatBytes(status.disk.totalBytes)}，已用 {usedShare}%</span>
-          {#if status.disk.watermarkBytes > 0}
-            <span class="s">低于 {formatLimit(status.disk.watermarkBytes)} 时拒绝上传</span>
-          {/if}
-        </div>
-      </div>
-
-      <section class="card">
-        <div class="card-head"><h2>维护</h2></div>
-        <div>
-          {@render runRow('quick', '快速检查', '确认每张图片的文件存在且大小一致', '开始检查', '检查中…', () => void runCheck('quick'))}
-          {@render runRow('full', '完整检查', '重新计算每个文件的哈希，并查找没有记录的文件', '开始检查', '检查中…', () => void runCheck('full'))}
-          {@render runRow('snapshot', '创建快照', '把数据库和图片复制到快照目录，用于备份', '创建快照', '创建中…', () => void createSnapshot())}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head"><h2>运行信息</h2></div>
-        <div class="card-body">
-          <dl class="props" style="grid-template-columns: 96px minmax(0, 1fr)">
-            <dt>版本</dt>
-            <dd>{status.version}</dd>
-            <dt>提交</dt>
-            <dd class="mono">{status.commit || '—'}</dd>
-            <dt>Go</dt>
-            <dd>{status.goVersion}</dd>
-            <dt>SQLite</dt>
-            <dd>{status.sqliteVersion}</dd>
-            <dt>数据目录</dt>
-            <dd class="mono" style="overflow-wrap: anywhere">{status.dataDir}</dd>
-          </dl>
-        </div>
-      </section>
-    </div>
-  {/if}
-
-  <section class="card" style="overflow: hidden; margin-top: 16px">
-    <div class="card-head"><h2>操作记录</h2></div>
-    {#if auditPhase === 'loading'}
-      <p class="subtle" style="padding: 16px">加载中…</p>
-    {:else if auditPhase === 'error'}
-      <div class="alert danger" role="alert" style="margin: 12px">
-        <Icon name="alert" />
-        <div class="grow">加载失败：{auditError}</div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadAudit()}>重试</button>
-      </div>
-    {:else if audit.length === 0}
-      <p class="subtle" style="padding: 16px">暂无记录</p>
-    {:else}
-      {#if phone.matches}
-        <div class="adm-audit-list">
-          {#each audit as a (a.id)}
-            <div class="adm-audit-item">
-              <span class="mono subtle" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
-              <span>{actorLabel(a.actor)} · {ACTION[a.action] ?? a.action}</span>
-              {#if a.target}<span class="truncate subtle">{a.target}</span>{/if}
-              {#if a.detail || a.ip}<span class="subtle">{[a.detail, a.ip].filter(Boolean).join(' · ')}</span>{/if}
-            </div>
-          {/each}
+<div class="page">
+  <PanelHeader title="状态">
+    <button type="button" class="btn btn-ghost" disabled={refreshing || phase === 'loading'} onclick={() => void refresh()}>
+      <Icon name="refresh" />
+      刷新
+    </button>
+  </PanelHeader>
+  <div class="page-body">
+    <div class="adm-col">
+      {#if phase === 'loading'}
+        <p class="subtle">加载中…</p>
+      {:else if phase === 'error' || !status}
+        <div class="alert danger" role="alert">
+          <Icon name="alert" />
+          <div class="grow">加载失败：{loadError}</div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadStatus()}>重试</button>
         </div>
       {:else}
-        <table class="table adm-table">
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>操作者</th>
-              <th>操作</th>
-              <th>对象</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each audit as a (a.id)}
-              <tr>
-                <td class="mono subtle nowrap" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</td>
-                <td title={a.actor}>{actorLabel(a.actor)}</td>
-                <td class="nowrap">{ACTION[a.action] ?? a.action}</td>
-                <td>
-                  <div class="truncate" style="max-width: 360px" title={a.target ?? undefined}>{a.target ?? ''}</div>
-                  {#if a.detail || a.ip}<div class="subtle" style="font-size: 12px">{[a.detail, a.ip].filter(Boolean).join(' · ')}</div>{/if}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-      {#if auditCursor}
-        <div class="adm-more">
-          <button type="button" class="btn btn-secondary" disabled={auditMore} onclick={() => void loadAudit(true)}>
-            {auditMore ? '加载中…' : '加载更多'}
-          </button>
+        {#each status.warnings as w (w.code)}
+          <div class="alert warning">
+            <Icon name="alert" />
+            <div class="grow">
+              <strong>{HEADLINE[w.code] ?? w.message}</strong>
+              {#if w.code !== 'snapshot-stale' && REMEDY[w.code]}<div>{REMEDY[w.code]}</div>{/if}
+            </div>
+            {#if w.code === 'snapshot-stale'}
+              <button type="button" class="btn btn-secondary btn-sm" disabled={running !== null} onclick={() => void createSnapshot()}>
+                {running === 'snapshot' ? '创建中…' : '创建快照'}
+              </button>
+            {/if}
+          </div>
+        {/each}
+
+        <div class="stats">
+          <div class="stat">
+            <span class="k">图片</span>
+            <span class="v">{formatInt(status.images.active)}</span>
+            {#if status.images.broken > 0}<span class="s">{formatInt(status.images.broken)} 张异常</span>{/if}
+          </div>
+          <div class="stat">
+            <span class="k">占用空间</span>
+            <span class="v">{formatBytes(status.images.bytes)}</span>
+          </div>
+          <div class="stat">
+            <span class="k">回收站</span>
+            <span class="v">{formatInt(status.images.trashed)}</span>
+          </div>
+          <div class="stat">
+            <span class="k">数据库</span>
+            <span class="v">{formatBytes(status.database.bytes)}</span>
+          </div>
+          <div class="stat">
+            <span class="k">磁盘剩余</span>
+            <span class="v">{formatBytes(status.disk.freeBytes)}</span>
+            <div class="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedShare}>
+              <span style:width="{usedShare}%"></span>
+            </div>
+          </div>
         </div>
+
+        <AdmSection title="维护">
+          {@render runRow('quick', '快速检查', '开始检查', '检查中…', () => void runCheck('quick'))}
+          {@render runRow('full', '完整检查', '开始检查', '检查中…', () => void runCheck('full'))}
+          {@render runRow('snapshot', '创建快照', '创建快照', '创建中…', () => void createSnapshot())}
+        </AdmSection>
+
+        <AdmSection title="运行信息" compact>
+          <AdmRow label="版本"><div class="adm-value">{status.version}</div></AdmRow>
+          <AdmRow label="已运行"><div class="adm-value">{uptime}</div></AdmRow>
+          <AdmRow label="提交"><div class="adm-value mono">{status.commit || '—'}</div></AdmRow>
+          <AdmRow label="Go"><div class="adm-value">{status.goVersion}</div></AdmRow>
+          <AdmRow label="SQLite"><div class="adm-value">{status.sqliteVersion}</div></AdmRow>
+          <AdmRow label="数据目录"><div class="adm-value mono">{status.dataDir}</div></AdmRow>
+        </AdmSection>
       {/if}
-    {/if}
-  </section>
+
+      <section class="adm-sec">
+        <h2>操作记录</h2>
+        {#if auditPhase === 'loading'}
+          <p class="subtle">加载中…</p>
+        {:else if auditPhase === 'error'}
+          <div class="alert danger" role="alert">
+            <Icon name="alert" />
+            <div class="grow">加载失败：{auditError}</div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadAudit()}>重试</button>
+          </div>
+        {:else if audit.length === 0}
+          <p class="subtle">暂无记录</p>
+        {:else}
+          {#if phone.matches}
+            <div class="adm-audit-list">
+              {#each audit as a (a.id)}
+                <div class="adm-audit-item">
+                  <span class="mono subtle" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
+                  <span>{actorLabel(a.actor)} · {ACTION[a.action] ?? a.action}</span>
+                  {#if a.target}<span class="truncate subtle">{a.target}</span>{/if}
+                  {#if a.detail || a.ip}<span class="subtle">{[a.detail, a.ip].filter(Boolean).join(' · ')}</span>{/if}
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="adm-audit" role="table" aria-label="操作记录">
+              <div class="adm-grid head" role="row">
+                <span role="columnheader">时间</span>
+                <span role="columnheader">操作者</span>
+                <span role="columnheader">操作</span>
+                <span role="columnheader">对象</span>
+              </div>
+              {#each audit as a (a.id)}
+                <div class="adm-grid" role="row">
+                  <span role="cell" class="mono subtle nowrap" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
+                  <span role="cell" class="truncate" title={a.actor}>{actorLabel(a.actor)}</span>
+                  <span role="cell" class="nowrap">{ACTION[a.action] ?? a.action}</span>
+                  <span role="cell">
+                    <span class="truncate" title={a.target ?? undefined}>{a.target ?? ''}</span>
+                    {#if a.detail || a.ip}<span class="truncate sub">{[a.detail, a.ip].filter(Boolean).join(' · ')}</span>{/if}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+          {#if auditCursor}
+            <div class="adm-more">
+              <button type="button" class="btn btn-secondary" disabled={auditMore} onclick={() => void loadAudit(true)}>
+                {auditMore ? '加载中…' : '加载更多'}
+              </button>
+            </div>
+          {/if}
+        {/if}
+      </section>
+    </div>
+  </div>
 </div>

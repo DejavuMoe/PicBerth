@@ -1,18 +1,24 @@
 <script lang="ts">
   import { filterCount, type Library } from '../../lib/library.svelte';
+  import Icon from '../Icon.svelte';
   import Menu from '../Menu.svelte';
   import FacetPanel from './FacetPanel.svelte';
-  import FilterButton from './FilterButton.svelte';
 
   let { lib }: { lib: Library } = $props();
+
+  const n = $derived(filterCount(lib.filters));
 </script>
 
-<!-- One 筛选 button with every facet in a popover, for toolbars too narrow for a menu per facet. -->
-<Menu class="menu-facets" width={300}>
+<!-- The single 筛选 button: every facet lives in one popover. -->
+<Menu align="right" class="menu-facets" width={300} label="筛选">
   {#snippet trigger(open, toggle)}
-    <FilterButton label="筛选" icon="filter" n={filterCount(lib.filters)} {open} {toggle} />
+    <button type="button" class="btn btn-ghost filter-btn" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
+      <Icon name="filter" />
+      <span>筛选</span>
+      {#if n > 0}<span class="filter-n">{n}</span>{/if}
+    </button>
   {/snippet}
   {#snippet children()}
-    <FacetPanel {lib} />
+    <FacetPanel {lib} menu />
   {/snippet}
 </Menu>

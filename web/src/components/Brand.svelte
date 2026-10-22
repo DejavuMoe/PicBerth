@@ -1,10 +1,10 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
+  import BrandMark from './BrandMark.svelte';
 
   let { href = '/library' }: { href?: string } = $props();
 </script>
 
 <a class="brand" {href} aria-label="PicBerth">
-  <span class="brand-mark"><Icon name="image" size={14} /></span>
+  <BrandMark />
   <span class="brand-name">PicBerth</span>
 </a>

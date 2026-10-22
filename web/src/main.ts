@@ -1,5 +1,7 @@
 import { mount } from 'svelte';
 import './app.css';
+import './admin.css';
+import './library.css';
 import App from './App.svelte';
 import { initRouter } from './lib/router.svelte';
 import { applyTheme } from './lib/theme.svelte';

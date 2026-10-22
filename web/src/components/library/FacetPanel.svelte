@@ -4,7 +4,8 @@
   import { DATE_RANGES, FORMATS, type Library } from '../../lib/library.svelte';
   import Icon from '../Icon.svelte';
 
-  let { lib }: { lib: Library } = $props();
+  /** `menu`: inside the filter popover, where the options are menu items the arrow keys can walk through. */
+  let { lib, menu = false }: { lib: Library; menu?: boolean } = $props();
 
   const f = $derived(lib.filters);
   const facets = $derived(lib.facets);
@@ -15,12 +16,20 @@
 {#snippet head(title: string, active: boolean, clear: () => void)}
   <h3>
     {title}
-    {#if active}<button type="button" onclick={clear}>清除</button>{/if}
+    {#if active}<button type="button" role={menu ? 'menuitem' : undefined} onclick={clear}>清除</button>{/if}
   </h3>
 {/snippet}
 
 {#snippet option(on: boolean, label: string, count: number | undefined, multi: boolean, onclick: () => void)}
-  <button type="button" class="facet-opt" class:on aria-pressed={on} {onclick}>
+  <button
+    type="button"
+    class="facet-opt"
+    class:on
+    role={menu ? (multi ? 'menuitemcheckbox' : 'menuitemradio') : undefined}
+    aria-checked={menu ? on : undefined}
+    aria-pressed={menu ? undefined : on}
+    {onclick}
+  >
     {#if multi}
       <span class="menu-check" class:on aria-hidden="true">{#if on}<Icon name="check" size={12} />{/if}</span>
     {:else}
@@ -31,7 +40,7 @@
   </button>
 {/snippet}
 
-<div class="facet-list">
+<div>
   <div class="facet">
     {@render head('格式', f.formats.length > 0, () => lib.setFilters({ formats: [] }))}
     {#each FORMATS as k (k)}
@@ -71,9 +80,4 @@
       {/each}
     </div>
   {/if}
-
-  <div class="facet">
-    {@render head('位置信息', f.gps, () => lib.setFilters({ gps: false }))}
-    {@render option(f.gps, '含位置', facets?.gps, true, () => lib.setFilters({ gps: !f.gps }))}
-  </div>
 </div>

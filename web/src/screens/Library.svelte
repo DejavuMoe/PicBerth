@@ -1,22 +1,23 @@
 <script lang="ts">
-  import { onDestroy, onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import Drawer from '../components/Drawer.svelte';
   import Icon from '../components/Icon.svelte';
+  import AdjustSheet from '../components/library/AdjustSheet.svelte';
+  import BulkBar from '../components/library/BulkBar.svelte';
   import DetailPanel from '../components/library/DetailPanel.svelte';
-  import FilterSheet from '../components/library/FilterSheet.svelte';
+  import FilterChips from '../components/library/FilterChips.svelte';
   import ImageCollection from '../components/library/ImageCollection.svelte';
+  import LibraryHead from '../components/library/LibraryHead.svelte';
   import PurgeConfirm from '../components/library/PurgeConfirm.svelte';
-  import Toolbar from '../components/library/Toolbar.svelte';
   import Sheet from '../components/Sheet.svelte';
   import { refreshFacets } from '../lib/facets.svelte';
-  import { formatBytes } from '../lib/format';
   import { Library } from '../lib/library.svelte';
   import { phone, wide } from '../lib/media.svelte';
   import { isTypingTarget } from '../lib/modal';
   import { openPicker } from '../lib/picker';
   import { bottomBar } from '../lib/toast.svelte';
   import type { Image } from '../lib/types';
-  import { onUploaded, uploadDialog } from '../lib/upload.svelte';
+  import { onUploaded } from '../lib/upload.svelte';
 
   let { mode }: { mode: 'library' | 'trash' } = $props();
 
@@ -28,18 +29,16 @@
   const DOCK_MS = 260;
 
   let searchEl = $state<HTMLInputElement | null>(null);
-  let filterSheet = $state(false);
+  let searchOpen = $state(false);
+  let adjust = $state(false);
 
-  // The toolbar lays out by the width the page content gets, not by the viewport.
+  // The header lays out by the width the list column gets, not by the viewport.
   let pageEl = $state<HTMLElement | null>(null);
-  let pageWidth = $state(0);
+  let pageWidth = $state(1200);
   $effect(() => {
     const el = pageEl;
     if (!el) return;
-    const measure = () => {
-      const cs = getComputedStyle(el);
-      pageWidth = Math.round(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-    };
+    const measure = () => (pageWidth = Math.round(el.clientWidth));
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -69,7 +68,7 @@
     bottomBar.active = phone.matches && lib.selecting;
   });
   $effect(() => {
-    if (!phone.matches) filterSheet = false;
+    if (!phone.matches) adjust = false;
   });
 
   // Wide screens dock the detail beside the list; narrower ones use a drawer, phones a full sheet.
@@ -89,6 +88,12 @@
   const bare = $derived(lib.phase === 'ready' && lib.items.length === 0 && !lib.filtered);
   const showFab = $derived(phone.matches && !trash && lib.phase === 'ready' && !bare && !lib.selecting);
 
+  async function focusSearch() {
+    searchOpen = true;
+    await tick();
+    searchEl?.focus();
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
     const overlays = document.querySelectorAll('[data-overlay]').length;
@@ -106,48 +111,21 @@
     if (overlays > 0) return;
     if (e.key === '/') {
       e.preventDefault();
-      searchEl?.focus();
+      void focusSearch();
     } else if (e.key === 'Escape') {
       if (lib.selecting) lib.clearSel();
       else if (canDock && lib.active) lib.close();
     }
   }
-
-  const head = $derived(lib.facets);
-  const retention = $derived(lib.retention);
 </script>
 
 <svelte:window {onkeydown} />
 
-<div class="workspace" class:docked>
-  <div class="workspace-main">
-    <div class="page lib-page" bind:this={pageEl}>
-      <div class="page-head">
-        <div>
-          <h1>{trash ? '回收站' : '全部图片'}</h1>
-          {#if head}
-            <p class="num">
-              {head.total} 张 · {formatBytes(head.bytes)}{#if trash && retention !== null}{` · 保留 ${retention} 天后自动永久删除`}{/if}
-            </p>
-          {/if}
-        </div>
-        {#if trash}
-          {#if (head?.total ?? lib.items.length) > 0}
-            <div class="page-actions">
-              <button type="button" class="btn btn-danger" onclick={() => lib.emptyTrash()}>清空回收站</button>
-            </div>
-          {/if}
-        {:else if !phone.matches}
-          <div class="page-actions">
-            <button type="button" class="btn btn-primary" title="上传 (U)" onclick={() => (uploadDialog.open = true)}>
-              <Icon name="upload" />
-              上传
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <Toolbar {lib} width={pageWidth} bind:searchEl onopenfilters={() => (filterSheet = true)} />
+<div class="lib" class:docked>
+  <div class="page" bind:this={pageEl}>
+    <LibraryHead {lib} width={pageWidth} bind:searchEl bind:searchOpen onadjust={() => (adjust = true)} />
+    {#if !bare}<FilterChips {lib} />{/if}
+    <div class="page-body">
       <ImageCollection {lib} />
     </div>
   </div>
@@ -162,6 +140,10 @@
     </aside>
   {/if}
 </div>
+
+{#if phone.matches && lib.selecting}
+  <BulkBar {lib} compact floating />
+{/if}
 
 {#if showFab}
   <button type="button" class="fab" aria-label="上传" onclick={openPicker}>
@@ -185,8 +167,8 @@
   {/if}
 {/if}
 
-{#if filterSheet}
-  <FilterSheet {lib} onclose={() => (filterSheet = false)} />
+{#if adjust}
+  <AdjustSheet {lib} onclose={() => (adjust = false)} />
 {/if}
 
 {#if lib.purgeIds}

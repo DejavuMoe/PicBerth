@@ -23,7 +23,6 @@
     for (const t of f.tags) {
       out.push({ key: `t${t}`, label: `#${t}`, remove: () => lib.setFilters({ tags: f.tags.filter((x) => x !== t) }) });
     }
-    if (f.gps) out.push({ key: 'gps', label: '含位置', remove: () => lib.setFilters({ gps: false }) });
     return out;
   });
 </script>

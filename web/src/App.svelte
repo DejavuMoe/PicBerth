@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Brand from './components/Brand.svelte';
+  import BrandMark from './components/BrandMark.svelte';
   import DropOverlay from './components/DropOverlay.svelte';
   import Shell from './components/Shell.svelte';
   import Toasts from './components/Toasts.svelte';
@@ -134,13 +134,13 @@
   <Setup />
 {:else if view === 'error'}
   <div class="boot">
-    <Brand href="/" />
+    <span role="img" aria-label="PicBerth"><BrandMark large /></span>
     <p><strong>无法连接到 PicBerth</strong></p>
     <p class="subtle">{session.failure ? errorMessage(session.failure) : ''}</p>
     <button type="button" class="btn btn-primary" onclick={retryBoot}>重试</button>
   </div>
 {:else}
-  <div class="boot" aria-busy="true"><span class="pulse"><Brand href="/" /></span></div>
+  <div class="boot" aria-busy="true"><span class="pulse" role="img" aria-label="PicBerth"><BrandMark large /></span></div>
 {/if}
 
 <Toasts />

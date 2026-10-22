@@ -1,6 +1,5 @@
 <script lang="ts">
   import AuthCard from '../components/AuthCard.svelte';
-  import Icon from '../components/Icon.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
 
@@ -34,7 +33,7 @@
 </script>
 
 <AuthCard title="登录">
-  <form onsubmit={submit} novalidate>
+  <form class="auth-form" onsubmit={submit} novalidate>
     <div class="field">
       <label for="login-user">用户名</label>
       <!-- svelte-ignore a11y_autofocus -->
@@ -44,7 +43,7 @@
       <label for="login-pass">密码</label>
       <input id="login-pass" class="input" type="password" bind:value={password} autocomplete="current-password" required />
     </div>
-    {#if error}<div class="alert danger" role="alert"><Icon name="alert" /><span>{error}</span></div>{/if}
+    {#if error}<p class="error-text" role="alert">{error}</p>{/if}
     <button type="submit" class="btn btn-primary btn-block" disabled={busy || !username || !password}>{busy ? '正在登录…' : '登录'}</button>
   </form>
 </AuthCard>
