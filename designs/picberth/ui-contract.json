@@ -85,7 +85,14 @@
           "web/src/components/Drawer.svelte",
           "web/src/components/Sheet.svelte",
           "web/src/components/Menu.svelte",
-          "web/src/components/VisLabel.svelte",
+          "web/src/components/Select.svelte",
+          "web/src/components/Combobox.svelte",
+          "web/src/components/Floating.svelte",
+          "web/src/components/PanelHeader.svelte",
+          "web/src/lib/floating.ts",
+          "web/src/lib/theme.svelte.ts",
+          "web/src/library.css",
+          "web/src/admin.css",
           "web/src/screens/Library.svelte",
           "web/src/components/library",
           "web/src/components/UploadDialog.svelte",
@@ -118,7 +125,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "approved"
+      "status": "implemented"
     },
     {
       "id": "auth",
@@ -170,7 +177,7 @@
         ],
         "tests": []
       },
-      "status": "approved"
+      "status": "implemented"
     }
   ]
 }
