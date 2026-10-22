@@ -118,7 +118,7 @@ function FilterPopover({ lib }) {
       className="menu-facets"
       width={300}
       trigger={(open, toggle) => (
-        <button type="button" className={`btn btn-secondary filter-btn ${n ? 'active' : ''}`} aria-expanded={open} onClick={toggle}>
+        <button type="button" className="btn btn-ghost filter-btn" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
           <Icon name="filter" />
           <span>筛选</span>
           {n > 0 && <span className="filter-n">{n}</span>}
@@ -190,7 +190,7 @@ function SortMenu({ lib }) {
       align="right"
       width={160}
       trigger={(open, toggle) => (
-        <button type="button" className="btn btn-secondary btn-icon" aria-expanded={open} aria-label={`排序：${cur.label}`} title={`排序：${cur.label}`} onClick={toggle}>
+        <button type="button" className="btn btn-ghost btn-icon" aria-haspopup="menu" aria-expanded={open} aria-label={`排序：${cur.label}`} title={`排序：${cur.label}`} onClick={toggle}>
           <Icon name="sort" />
         </button>
       )}
@@ -236,7 +236,10 @@ function SearchBox({ lib, inputRef, collapsed }) {
       <input
         ref={inputRef}
         className="input"
-        type="search"
+        type="text"
+        role="searchbox"
+        autoComplete="off"
+        spellCheck="false"
         placeholder="搜索"
         aria-label="搜索图片"
         autoFocus={collapsed}
@@ -252,7 +255,22 @@ function SearchBox({ lib, inputRef, collapsed }) {
           e.currentTarget.blur();
         }}
       />
-      {!q && !collapsed && <kbd className="hide-touch">/</kbd>}
+      {q ? (
+        <button
+          type="button"
+          className="search-clear"
+          aria-label="清除"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            lib.setFilters({ ...lib.filters, q: '' });
+            inputRef.current?.focus();
+          }}
+        >
+          <Icon name="x" size={12} />
+        </button>
+      ) : (
+        !collapsed && <kbd className="hide-touch">/</kbd>
+      )}
     </label>
   );
 }
@@ -304,11 +322,11 @@ function LibraryHead({ lib, width, onUpload, onAdjust }) {
   }
 
   const w = width || 1200;
-  const collapsed = lib.rail || w < (trash ? 860 : 800);
+  const collapsed = lib.rail || w < (trash ? 660 : 640);
   return (
     <PageHead title={title}>
       {selecting ? (
-        <BulkBar lib={lib} compact={w < 760} />
+        <BulkBar lib={lib} compact={w < 620} />
       ) : (
         <>
           {hasTools && (
@@ -326,10 +344,12 @@ function LibraryHead({ lib, width, onUpload, onAdjust }) {
               </button>
             )
           ) : (
-            <button type="button" className="btn btn-primary" onClick={onUpload} title="上传 (U)">
-              <Icon name="upload" />
-              上传
-            </button>
+            hasTools && (
+              <button type="button" className="btn btn-primary" onClick={onUpload} title="上传 (U)">
+                <Icon name="upload" />
+                上传
+              </button>
+            )
           )}
         </>
       )}
@@ -364,7 +384,7 @@ function BulkBar({ lib, compact, floating }) {
       {ids.length > 0 &&
         (trash ? (
           <>
-            <button type="button" className={`btn btn-secondary ${sm}`} onClick={() => lib.act.restore(ids)}>
+            <button type="button" className={`btn btn-ghost ${sm}`} onClick={() => lib.act.restore(ids)}>
               <Icon name="restore" />
               恢复
             </button>
@@ -374,7 +394,7 @@ function BulkBar({ lib, compact, floating }) {
           </>
         ) : (
           <>
-            <button type="button" className={`btn btn-secondary ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('复制链接')} onClick={() => copyMany(lib, imgs)}>
+            <button type="button" className={`btn btn-ghost ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('复制链接')} onClick={() => copyMany(lib, imgs)}>
               <Icon name="copy" />
               {!compact && '复制链接'}
             </button>
@@ -382,7 +402,7 @@ function BulkBar({ lib, compact, floating }) {
               align="right"
               up={floating}
               trigger={(open, toggle) => (
-                <button type="button" className={`btn btn-secondary ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('可见性', { 'aria-expanded': open })} onClick={toggle}>
+                <button type="button" className={`btn btn-ghost ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('可见性', { 'aria-expanded': open, 'aria-haspopup': 'menu' })} onClick={toggle}>
                   <Icon name="lock" />
                   {!compact && '可见性'}
                   {!compact && <Icon name="chevron-down" size={14} />}
@@ -502,150 +522,101 @@ function LockMark({ image }) {
   ) : null;
 }
 
-// ---------------------------------------------------------------- table (desktop and tablet)
+// ---------------------------------------------------------------- list (desktop and tablet)
 
-function SortHead({ lib, label, desc, asc, numeric, className = '' }) {
-  const on = lib.sort === desc || lib.sort === asc;
-  const dir = lib.sort === asc ? 'ascending' : 'descending';
-  return (
-    <th className={`${numeric ? 'c-num' : ''} ${className}`} aria-sort={on ? dir : 'none'}>
-      <button type="button" className={on ? 'sorted' : ''} onClick={() => lib.setSort(lib.sort === desc ? asc : desc)}>
-        {label}
-        <span className="sort-ind">
-          <Icon name={on && lib.sort === asc ? 'chevron-up' : 'chevron-down'} size={12} />
-        </span>
-      </button>
-    </th>
-  );
-}
-
-function ImageTable({ lib, items }) {
+function ImageList({ lib, items }) {
   const trash = lib.route === 'trash';
-  const allOn = items.length > 0 && items.every((i) => lib.sel.has(i.id));
-  const someOn = !allOn && items.some((i) => lib.sel.has(i.id));
-  const headRef = React.useRef(null);
-  React.useEffect(() => {
-    if (headRef.current) headRef.current.indeterminate = someOn;
-  }, [someOn]);
   return (
-    <div className="table-wrap">
-      <table className={`table ${lib.sel.size ? 'selecting' : ''}`}>
-        <thead>
-          <tr>
-            <th className="c-check">
-              <input ref={headRef} type="checkbox" className="check" checked={allOn} onChange={() => (allOn ? lib.clearSel() : lib.selectAll())} aria-label="全选" />
-            </th>
-            <th className="c-thumb">
-              <span className="sr-only">预览</span>
-            </th>
-            <SortHead lib={lib} label="文件名" desc="name" asc="name" className="c-name" />
-            {!trash && <th className="c-num c-dim">尺寸</th>}
-            <SortHead lib={lib} label="大小" desc="large" asc="small" numeric />
-            {trash ? (
-              <>
-                <th className="c-num c-date">删除时间</th>
-                <th className="c-left">
-                  <span className="sr-only">自动清除</span>
-                </th>
-              </>
-            ) : (
-              <SortHead lib={lib} label="上传时间" desc="new" asc="old" numeric className="c-date" />
-            )}
-            <th className="c-actions">
-              <span className="sr-only">操作</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((im, idx) => {
-            const on = lib.sel.has(im.id);
-            return (
-              <tr
-                key={im.id}
-                className={`${on ? 'selected' : ''} ${lib.activeId === im.id ? 'active' : ''}`}
-                onClick={(e) => lib.clickItem(im.id, e)}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === 'Enter') lib.open(im.id);
-                  if (e.key === ' ') {
-                    e.preventDefault();
-                    lib.toggle(im.id);
-                  }
-                }}
-                aria-selected={on}
-              >
-                <td className="c-check" onClick={stop}>
-                  <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
-                </td>
-                <td className="c-thumb">
-                  <Thumb image={im} className="thumb-sm" />
-                </td>
-                <td className="c-name">
-                  <span className="cell-name">
-                    <span className="name truncate" title={im.filename}>
-                      {im.filename}
-                    </span>
-                    <LockMark image={im} />
-                    {im.tags.length > 0 && (
-                      <span className="tags">
-                        {im.tags.map((t) => (
-                          <span key={t} className="tag">
-                            {t}
-                          </span>
-                        ))}
+    <div className="list-wrap">
+      <div className={`list ${isSelecting(lib) ? 'selecting' : ''}`} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '全部图片'}>
+        {items.map((im, idx) => {
+          const on = lib.sel.has(im.id);
+          return (
+            <div
+              key={im.id}
+              className={`lrow ${trash ? 'trash' : ''} ${on ? 'selected' : ''} ${lib.activeId === im.id ? 'active' : ''}`}
+              role="row"
+              aria-selected={on}
+              tabIndex={0}
+              onClick={(e) => lib.clickItem(im.id, e)}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter') lib.open(im.id);
+                if (e.key === ' ') {
+                  e.preventDefault();
+                  lib.toggle(im.id);
+                }
+              }}
+            >
+              <span role="gridcell" className="l-check" onClick={stop}>
+                <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
+              </span>
+              <span role="gridcell" className="l-thumb">
+                <Thumb image={im} className="thumb-sm" />
+              </span>
+              <span role="gridcell" className="l-name">
+                <span className="name truncate" title={im.filename}>
+                  {im.filename}
+                </span>
+                <LockMark image={im} />
+                {im.tags.length > 0 && (
+                  <span className="tags">
+                    {im.tags.map((t) => (
+                      <span key={t} className="tag">
+                        {t}
                       </span>
-                    )}
+                    ))}
                   </span>
-                </td>
-                {!trash && (
-                  <td className="c-num c-dim subtle">
-                    {im.width} × {im.height}
-                  </td>
                 )}
-                <td className="c-num">{fmtBytes(im.size)}</td>
+              </span>
+              {!trash && (
+                <span role="gridcell" className="l-dim">
+                  {im.width}
+                  {' × '}
+                  {im.height}
+                </span>
+              )}
+              <span role="gridcell" className="l-size">
+                {fmtBytes(im.size)}
+              </span>
+              {trash ? (
+                <>
+                  <span role="gridcell" className="l-time" title={fmtDate(im.trashedAt)}>
+                    {fmtRel(im.trashedAt)}
+                  </span>
+                  <span role="gridcell" className="l-time l-last">
+                    {daysLeft(im, lib.settings.trashRetentionDays)}
+                  </span>
+                </>
+              ) : (
+                <span role="gridcell" className="l-time l-last" title={fmtDate(im.createdAt)}>
+                  {fmtRel(im.createdAt)}
+                </span>
+              )}
+              <span role="gridcell" className="l-actions">
                 {trash ? (
-                  <>
-                    <td className="c-num c-date subtle" title={fmtDate(im.trashedAt)}>
-                      {fmtRel(im.trashedAt)}
-                    </td>
-                    <td className="nowrap">
-                      <span className="badge">{daysLeft(im, lib.settings.trashRetentionDays)}</span>
-                    </td>
-                  </>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      lib.act.restore([im.id]);
+                    }}
+                  >
+                    恢复
+                  </button>
                 ) : (
-                  <td className="c-num c-date subtle" title={fmtDate(im.createdAt)}>
-                    {fmtRel(im.createdAt)}
-                  </td>
+                  <CopyLink lib={lib} image={im} />
                 )}
-                <td className="c-actions">
-                  <span className="row-actions">
-                    {trash ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          lib.act.restore([im.id]);
-                        }}
-                      >
-                        恢复
-                      </button>
-                    ) : (
-                      <CopyLink lib={lib} image={im} />
-                    )}
-                    <RowMenu lib={lib} image={im} up={items.length > 5 && idx >= items.length - 3} />
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                <RowMenu lib={lib} image={im} up={items.length > 5 && idx >= items.length - 3} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
-
 // ---------------------------------------------------------------- grid
 
 function Tile({ lib, image }) {
@@ -741,7 +712,7 @@ function ImageRows({ lib, items }) {
             </span>
             <button type="button" className="row-btn" onClick={(e) => lib.clickItem(im.id, e)}>
               <Thumb image={im} />
-              <span className="cell-name">
+              <span className="l-name">
                 <span className="name truncate">{im.filename}</span>
                 <LockMark image={im} />
               </span>
@@ -763,17 +734,17 @@ function LoadingList({ grid, mobile }) {
       <div className="grid" aria-busy="true" aria-label="正在加载">
         {Array.from({ length: 12 }, (_, i) => (
           <div key={i} className="tile is-skeleton">
-            <div className="skeleton" style={{ aspectRatio: '4 / 3', borderRadius: 'var(--r-lg)' }} />
-            <div className="skeleton" style={{ height: 12, width: '70%' }} />
+            <div className="skeleton" style={{ aspectRatio: '4 / 3', borderRadius: 0 }} />
+            <div className="skeleton" style={{ height: 12, width: '70%', margin: 8 }} />
           </div>
         ))}
       </div>
     );
   return (
-    <div className="rows rows-skeleton" aria-busy="true" aria-label="正在加载">
+    <div className={`rows rows-skeleton ${mobile ? '' : 'desk'}`} aria-busy="true" aria-label="正在加载">
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="row">
-          <div className="skeleton" style={{ width: mobile ? 40 : 36, height: mobile ? 40 : 36, flex: 'none', borderRadius: 'var(--r)' }} />
+          <div className="skeleton" style={{ width: mobile ? 36 : 28, height: mobile ? 36 : 28, flex: 'none', borderRadius: 'var(--r-xs)' }} />
           <div className="skeleton" style={{ height: 12, width: `${30 + ((i * 17) % 35)}%` }} />
         </div>
       ))}
@@ -785,13 +756,13 @@ function EmptyState({ lib }) {
   if (lib.route === 'trash')
     return (
       <div className="empty">
-        <Icon name="trash" size={28} />
+        <Icon name="trash" size={32} />
         <strong>回收站是空的</strong>
       </div>
     );
   return (
     <div className="empty">
-      <Icon name="upload" size={28} />
+      <Icon name="upload" size={32} />
       <strong>还没有图片</strong>
       <div className="actions">
         <button type="button" className="btn btn-primary" onClick={lib.pick}>
@@ -812,7 +783,7 @@ function ImageCollection({ lib }) {
   if (lib.dataState === 'loading') return <LoadingList grid={grid} mobile={lib.isMobile} />;
   if (lib.dataState === 'error')
     return (
-      <div className="alert danger" role="alert">
+      <div className="alert danger" role="alert" style={{ margin: 16 }}>
         <Icon name="alert" />
         <div className="grow">
           <strong>无法加载图片列表</strong>
@@ -828,7 +799,7 @@ function ImageCollection({ lib }) {
   if (!lib.items.length)
     return (
       <div className="empty">
-        <Icon name="search" size={28} />
+        <Icon name="search" size={32} />
         <strong>没有符合条件的图片</strong>
         <div className="actions">
           <button type="button" className="btn btn-secondary" onClick={() => lib.setFilters(EMPTY_FILTERS)}>
@@ -837,7 +808,7 @@ function ImageCollection({ lib }) {
         </div>
       </div>
     );
-  return grid ? <ImageGrid lib={lib} items={lib.items} /> : lib.isMobile ? <ImageRows lib={lib} items={lib.items} /> : <ImageTable lib={lib} items={lib.items} />;
+  return grid ? <ImageGrid lib={lib} items={lib.items} /> : lib.isMobile ? <ImageRows lib={lib} items={lib.items} /> : <ImageList lib={lib} items={lib.items} />;
 }
 
 // ---------------------------------------------------------------- detail
@@ -913,57 +884,46 @@ function DetailName({ image, editable, onSave }) {
   );
 }
 
+const normalizeTag = (s) => s.trim().replace(/^#+/, '').trim().slice(0, 32);
+
+/** Tag chips plus a `+` chip that opens the product combobox (existing tags with counts, or the typed text as a new tag). */
 function TagEditor({ image, onChange, known }) {
-  const [v, setV] = React.useState('');
-  const add = () => {
-    const t = v.trim().replace(/^#/, '');
-    if (t && !image.tags.includes(t) && image.tags.length < 20) onChange([...image.tags, t]);
-    setV('');
-  };
-  const listId = `tags-${image.id}`;
+  const tags = image.tags;
+  const full = tags.length >= 20;
+  const options = known.filter(([t]) => !tags.includes(t)).map(([t, n]) => ({ value: t, label: t, count: n }));
   return (
     <div className="tag-editor">
-      {image.tags.map((t) => (
+      {tags.map((t) => (
         <span key={t} className="tag tag-edit">
           {t}
-          <button type="button" aria-label={`移除标签 ${t}`} onClick={() => onChange(image.tags.filter((x) => x !== t))}>
+          <button type="button" aria-label={`移除标签 ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
             <Icon name="x" size={12} />
           </button>
         </span>
       ))}
-      <input
-        className="input tag-input"
+      <Combobox
+        label="添加标签"
         placeholder="添加标签"
-        aria-label="添加标签"
-        list={listId}
-        value={v}
-        maxLength={32}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            add();
-          }
-          if (e.key === 'Backspace' && !v && image.tags.length) onChange(image.tags.slice(0, -1));
-        }}
-        onBlur={add}
+        options={options}
+        normalize={normalizeTag}
+        taken={(v) => tags.includes(v)}
+        onPick={(v) => !tags.includes(v) && tags.length < 20 && onChange([...tags, v])}
+        onEmptyBackspace={() => tags.length && onChange(tags.slice(0, -1))}
+        trigger={(open, toggle) => (
+          <button type="button" className="tag-add" aria-label="添加标签" aria-haspopup="listbox" aria-expanded={open} disabled={full} onClick={toggle}>
+            <Icon name="plus" size={12} />
+          </button>
+        )}
       />
-      <datalist id={listId}>
-        {known
-          .filter((t) => !image.tags.includes(t))
-          .map((t) => (
-            <option key={t} value={t} />
-          ))}
-      </datalist>
     </div>
   );
 }
 
-function KeyValue({ k, children }) {
+function KeyValue({ k, children, top }) {
   return (
     <>
-      <dt>{k}</dt>
-      <dd>{children}</dd>
+      <dt className={top ? 'top' : ''}>{k}</dt>
+      <dd className={top ? 'top' : ''}>{children}</dd>
     </>
   );
 }
@@ -976,6 +936,18 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
   const fmt = lib.linkFormat;
   return (
     <div className={`detail detail-${mode}`}>
+      <div className="d-top">
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="上一张" title="上一张 (←)" disabled={!prev} onClick={() => prev && lib.open(prev.id)}>
+          <Icon name="chevron-left" />
+        </button>
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="下一张" title="下一张 (→)" disabled={!next} onClick={() => next && lib.open(next.id)}>
+          <Icon name="chevron-right" />
+        </button>
+        <span className="sp" />
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="关闭" title="关闭 (Esc)" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      </div>
       <div className="detail-scroll">
         <div className={`preview ${hasAlpha(image) ? 'checker' : ''}`}>
           <a
@@ -992,17 +964,6 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
           >
             <img key={image.id} src={image.thumb} alt={image.filename} />
           </a>
-          <div className="preview-ctl">
-            <button type="button" className="btn btn-overlay btn-icon btn-sm" aria-label="上一张" title="上一张 (←)" disabled={!prev} onClick={() => prev && lib.open(prev.id)}>
-              <Icon name="chevron-left" />
-            </button>
-            <button type="button" className="btn btn-overlay btn-icon btn-sm" aria-label="下一张" title="下一张 (→)" disabled={!next} onClick={() => next && lib.open(next.id)}>
-              <Icon name="chevron-right" />
-            </button>
-            <button type="button" className="btn btn-overlay btn-icon btn-sm" aria-label="关闭" title="关闭 (Esc)" onClick={onClose}>
-              <Icon name="x" />
-            </button>
-          </div>
           <a
             className="preview-open"
             href={image.url}
@@ -1032,24 +993,25 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
 
           {!trash && (
             <div className="d-link">
-              <Seg label="链接格式" value={fmt} onChange={lib.setLinkFormat} options={LINK_FORMATS} fill />
+              <Tabs label="链接格式" value={fmt} onChange={lib.setLinkFormat} options={LINK_FORMATS} />
               <div className="link-box">
                 <input className="input mono" readOnly value={image.links[fmt]} aria-label={`${fmtLabel(fmt)} 链接`} onFocus={(e) => e.target.select()} />
-                <CopyButton text={image.links[fmt]} className="btn-primary" />
+                <CopyButton iconOnly className="btn-ghost" text={image.links[fmt]} label={`复制 ${fmtLabel(fmt)}`} />
               </div>
             </div>
           )}
 
-          {!trash && (
-            <div className="setting-row">
-              <span className="label">公开</span>
-              <Switch checked={pub} label="公开" onChange={(v) => lib.act.setVis([image.id], v ? 'public' : 'private')} />
-            </div>
-          )}
-
-          {!trash && <TagEditor image={image} known={lib.knownTags} onChange={(tags) => lib.act.setTags(image.id, tags)} />}
-
           <dl className="kv">
+            {!trash && (
+              <KeyValue k="公开">
+                <Switch checked={pub} label="公开" onChange={(v) => lib.act.setVis([image.id], v ? 'public' : 'private')} />
+              </KeyValue>
+            )}
+            {!trash && (
+              <KeyValue k="标签" top>
+                <TagEditor image={image} known={lib.knownTags} onChange={(tags) => lib.act.setTags(image.id, tags)} />
+              </KeyValue>
+            )}
             <KeyValue k="来源">{sourceLabel(image.source)}</KeyValue>
             <KeyValue k="上传时间">
               <span className="num">{fmtDate(image.createdAt)}</span>
@@ -1076,7 +1038,7 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
       <div className="detail-foot">
         {trash ? (
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => lib.act.restore([image.id])}>
+            <button type="button" className="btn btn-ghost" onClick={() => lib.act.restore([image.id])}>
               <Icon name="restore" />
               恢复
             </button>
@@ -1100,7 +1062,6 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
     </div>
   );
 }
-
 // ---------------------------------------------------------------- upload
 
 function Dropzone({ lib }) {

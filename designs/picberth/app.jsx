@@ -62,7 +62,7 @@ const isTyping = (e) => !!e.target.closest?.('input, textarea, select, [contente
 const isActiveUpload = (u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing';
 
 function App() {
-  const [theme, setTheme] = React.useState(PARAMS.get('theme') || 'light');
+  const [theme, setTheme] = React.useState(PARAMS.get('theme') || 'system');
   const [dataState, setDataStateRaw] = React.useState(PARAMS.get('state') || 'ok');
   const [route, setRoute] = React.useState(PARAMS.get('r') || 'images');
   const [images, setImages] = React.useState(() => (PARAMS.get('state') === 'empty' ? [] : initialImages()));
@@ -103,7 +103,7 @@ function App() {
   const inLibrary = route === 'images' || route === 'trash';
   const base = React.useMemo(() => images.filter((i) => i.state === (route === 'trash' ? 'trashed' : 'active')), [images, route]);
   const items = React.useMemo(() => applyFilters(base, filters, sort, true), [base, filters, sort]);
-  const knownTags = React.useMemo(() => allTags(images).map(([t]) => t), [images]);
+  const knownTags = React.useMemo(() => allTags(images), [images]);
   const active = activeId ? byId[activeId] : null;
 
   // ---------------------------------------------------------------- toasts
@@ -349,6 +349,7 @@ function App() {
     setActiveId(null);
     setSearchOpen(false);
     window.scrollTo(0, 0);
+    document.querySelector('.page-body')?.scrollTo(0, 0);
   };
   const setDataState = (s) => {
     setDataStateRaw(s);
@@ -440,15 +441,6 @@ function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen,
   const canDock = wide && inLib;
   const bulk = lib.sel.size > 0 || lib.selectMode;
 
-  // The page header gains a hairline once content scrolls beneath it.
-  const [scrolled, setScrolled] = React.useState(false);
-  React.useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 0);
-    on();
-    window.addEventListener('scroll', on, { passive: true });
-    return () => window.removeEventListener('scroll', on);
-  }, []);
-
   // Keep the docked panel's content while the column collapses.
   const [dockImg, setDockImg] = React.useState(null);
   React.useEffect(() => {
@@ -458,15 +450,15 @@ function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen,
   }, [active]);
 
   return (
-    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''} ${scrolled ? 'scrolled' : ''}`} data-screen-label="console">
+    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="console">
       {!mobile && <Sidebar route={route} go={go} status={status} theme={theme} setTheme={setTheme} toast={toast} />}
-      <div className={`workspace ${canDock && active ? 'docked' : ''}`}>
-        <main className="workspace-main">
+      <div className={`panel ${canDock && active ? 'docked' : ''}`}>
+        <main className="panel-main">
           {page ?? (
             <div className="page" ref={measure}>
               <LibraryHead lib={lib} width={width} onUpload={() => setUploadOpen(true)} onAdjust={openAdjust} />
+              <FilterChips lib={lib} />
               <div className="page-body">
-                <FilterChips lib={lib} />
                 <ImageCollection lib={lib} />
               </div>
             </div>
@@ -521,8 +513,7 @@ function ProtoPanel({ theme, setTheme, dataState, setDataState, simulate }) {
         <div className="proto-panel">
           <label>主题</label>
           <div className="opts">
-            {opt(theme, 'light', '浅色', setTheme)}
-            {opt(theme, 'dark', '深色', setTheme)}
+            {THEMES.map((t) => opt(theme, t.key, t.label, setTheme))}
           </div>
           <label>数据状态</label>
           <div className="opts">

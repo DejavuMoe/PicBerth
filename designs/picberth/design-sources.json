@@ -47,7 +47,58 @@
       ],
       "limitations": [
         "Kumo components are not used or imported; Cloudflare orange and logos are excluded.",
-        "Token values were approximated; no stylesheet was copied."
+        "Token values were approximated; no stylesheet was copied.",
+        "Superseded on 2026-10-22 by linear-style-reference at the user's request."
+      ]
+    },
+    {
+      "id": "linear-style-reference",
+      "type": "design-system",
+      "location": "Style reference text pasted by the user in chat on 2026-10-22 (Linear, 'midnight precision instrument')",
+      "roles": ["visual-reference"],
+      "trust": "user-provided-untrusted-content",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": true,
+      "containsSensitiveData": false,
+      "sanitization": null,
+      "licenseOrPermission": "user-provided reference; token values and principles only, no code, assets or brand marks copied",
+      "localCopies": [],
+      "observations": [
+        "Near-black surface ladder (#08090a, #0f1011, #161718, #23252a) with hairline borders instead of shadows.",
+        "One acid-lime accent #e4f222 reserved for the single primary action; everything else neutral greys.",
+        "Inter Variable at weights 400/510/590 with tight negative tracking; radii 4 (badges), 6 (controls), 12 (cards), pill.",
+        "Compact density on a 4px grid; quiet line icons; product UI is the only visual texture."
+      ],
+      "inferences": [
+        "Applied to an operational console, not to a marketing page: the hero, gradient floor, logo strip and large display type are not used.",
+        "A light theme is derived from the same structure because the user wants both themes polished equally."
+      ],
+      "limitations": [
+        "The reference describes Linear's marketing site; app-console patterns are adapted, not copied.",
+        "No Linear logo, wordmark, product screenshots or copy may appear in the product.",
+        "The reference's Tailwind snippet is ignored; production stays plain CSS in Svelte."
+      ]
+    },
+    {
+      "id": "inter-variable-font",
+      "type": "brand-asset",
+      "location": "npm @fontsource-variable/inter@5.2.5 (latin and latin-ext wght subsets)",
+      "roles": ["visual-reference"],
+      "trust": "external-untrusted",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": true,
+      "containsSensitiveData": false,
+      "sanitization": null,
+      "licenseOrPermission": "SIL Open Font License 1.1 (assets/fonts/Inter-OFL.txt)",
+      "localCopies": ["assets/fonts"],
+      "observations": [
+        "Two woff2 subsets (latin 48 KB, latin-ext 74 KB) cover all Latin UI text, numbers and identifiers."
+      ],
+      "inferences": [
+        "Chinese text falls back to system CJK fonts after Inter."
+      ],
+      "limitations": [
+        "Only the upright variable axis is shipped; no italics."
       ]
     },
     {

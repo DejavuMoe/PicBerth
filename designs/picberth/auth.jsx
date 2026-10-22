@@ -13,7 +13,7 @@ function AuthCard({ title, children }) {
     <main className="auth">
       <div className="auth-col">
         <span role="img" aria-label="PicBerth">
-          <BrandMark size={20} className="brand-mark-lg" />
+          <BrandMark size={18} className="brand-mark-lg" />
         </span>
         <h1>{title}</h1>
         {children}
@@ -75,10 +75,9 @@ function SetupScreen({ preset }) {
           {err('confirm') && <span className="error-text">{errors.confirm}</span>}
         </div>
         {formError && (
-          <div className="alert danger" role="alert">
-            <Icon name="alert" />
-            <span>{formError}</span>
-          </div>
+          <p className="error-text" role="alert">
+            {formError}
+          </p>
         )}
         <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
           {busy ? '正在创建…' : '创建管理员'}
@@ -116,10 +115,9 @@ function LoginScreen({ preset }) {
           <input id="login-pass" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </div>
         {error && (
-          <div className="alert danger" role="alert">
-            <Icon name="alert" />
-            <span>{error}</span>
-          </div>
+          <p className="error-text" role="alert">
+            {error}
+          </p>
         )}
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || !username || !password}>
           {busy ? '正在登录…' : '登录'}
@@ -137,14 +135,16 @@ function NotFoundScreen({ theme, setTheme, toast }) {
   return (
     <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="not-found">
       {!mobile && <Sidebar route={null} go={noop} status={STATUS} theme={theme} setTheme={setTheme} toast={toast} />}
-      <div className="workspace">
-        <main className="workspace-main">
+      <div className="panel">
+        <main className="panel-main">
           <div className="page">
-            <div className="empty not-found">
-              <h1>页面不存在</h1>
-              <a className="btn btn-secondary" href="#" onClick={(e) => e.preventDefault()}>
-                全部图片
-              </a>
+            <div className="page-body">
+              <div className="empty not-found">
+                <h1>页面不存在</h1>
+                <a className="btn btn-secondary" href="#" onClick={(e) => e.preventDefault()}>
+                  全部图片
+                </a>
+              </div>
             </div>
           </div>
         </main>
@@ -164,7 +164,7 @@ const SCREENS = {
 function AuthApp() {
   const [screen, setScreen] = React.useState(AUTH_PARAMS.get('s') || 'login');
   const [preset, setPreset] = React.useState(AUTH_PARAMS.get('p') || SCREENS[AUTH_PARAMS.get('s') || 'login'][0]);
-  const [theme, setTheme] = React.useState(AUTH_PARAMS.get('theme') || 'light');
+  const [theme, setTheme] = React.useState(AUTH_PARAMS.get('theme') || 'system');
   const [open, setOpen] = React.useState(false);
   const [toasts, setToasts] = React.useState([]);
   const toast = (text) => {
@@ -204,8 +204,7 @@ function AuthApp() {
               <div className="opts">{SCREENS[screen].map((p) => opt(preset, p, p, setPreset))}</div>
               <label>主题</label>
               <div className="opts">
-                {opt(theme, 'light', '浅色', setTheme)}
-                {opt(theme, 'dark', '深色', setTheme)}
+                {THEMES.map((t) => opt(theme, t.key, t.label, setTheme))}
               </div>
             </div>
           )}
