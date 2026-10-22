@@ -8,22 +8,8 @@
         {
           "path": "index.html",
           "createdAt": "2026-10-21T12:27:29.586Z",
-          "status": "approved",
-          "subtitle": "A 侧栏 / B 三栏 / C 上传优先",
-          "viewport": {
-            "width": 1440,
-            "height": 900
-          }
-        }
-      ]
-    },
-    "方案对比": {
-      "versions": [
-        {
-          "path": "directions.html",
-          "createdAt": "2026-10-21T12:27:29.953Z",
-          "status": "rejected",
-          "subtitle": "B 三栏 / C 上传优先 已否决，A 侧栏已采用",
+          "status": "needs-review",
+          "subtitle": "侧栏 / 图标栏 / 底部标签栏，宽屏停靠详情",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -36,7 +22,7 @@
         {
           "path": "auth.html",
           "createdAt": "2026-10-21T15:20:41.681Z",
-          "status": "approved",
+          "status": "needs-review",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -46,5 +32,5 @@
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-21T15:28:33.997Z"
+  "updatedAt": "2026-10-22T04:40:03.349Z"
 }

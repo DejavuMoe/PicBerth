@@ -25,20 +25,28 @@
           "ui.jsx",
           "library.jsx",
           "admin.jsx",
-          "app.jsx",
-          "directions.html"
+          "app.jsx"
         ],
         "states": [
-          "direction-a-sidebar",
+          "sidebar-desktop",
+          "icon-rail-tablet",
+          "tab-bar-mobile",
+          "more-sheet-mobile",
           "library-table",
+          "library-table-narrow-columns",
           "library-grid",
           "library-filtered",
           "library-filtered-empty",
           "library-empty",
           "library-loading",
           "library-error",
+          "toolbar-filter-menus",
+          "toolbar-filter-popover",
+          "row-menu-copy-as",
           "selection-bulk-actions",
-          "image-detail",
+          "image-detail-docked",
+          "image-detail-drawer",
+          "image-detail-sheet",
           "image-detail-trashed",
           "upload-progress-error-duplicate",
           "purge-confirm",
@@ -49,8 +57,9 @@
           "status",
           "light-dark",
           "desktop-1440",
+          "tablet-1024",
           "mobile-390",
-          "extension-features-on-off"
+          "reduced-motion"
         ],
         "stableIds": [
           "library",
@@ -97,8 +106,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "implemented",
-      "approvedVariant": "Direction A (index.html default, ?d=a) with extension features on. Directions B and C remain in the file only as rejected alternatives."
+      "status": "needs-review"
     },
     {
       "id": "auth",
@@ -124,6 +132,8 @@
           "login-offline",
           "login-busy",
           "not-found",
+          "not-found-tablet-rail",
+          "not-found-mobile-tab-bar",
           "light-dark",
           "mobile-390"
         ],
@@ -148,7 +158,7 @@
         ],
         "tests": []
       },
-      "status": "implemented"
+      "status": "needs-review"
     }
   ]
 }

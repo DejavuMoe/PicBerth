@@ -1,4 +1,4 @@
-// Icons and presentational primitives shared by all directions.
+// Icons, hooks and presentational primitives.
 
 const ICON_PATHS = {
   upload: ['M12 15V4', 'M7.5 8.5 12 4l4.5 4.5', 'M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
@@ -37,20 +37,25 @@ const ICON_PATHS = {
   logout: ['M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5', 'M10 8l-4 4 4 4', 'M6 12h10'],
   edit: ['M4 20h4L19 9l-4-4L4 16z', 'm13.5 6.5 4 4'],
   clipboard: ['M9 4h6v3H9z', 'M15 5.5h3v14.5H6V5.5h3'],
-  folder: ['M3.5 6.5h6l2 2h9v10h-17z'],
   refresh: ['M20 11a8 8 0 0 0-14.5-4.5', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.5 4.5', 'M20 20v-4h-4'],
+  'select': ['M4.5 4.5h15v15h-15z', 'm8.5 12 2.5 2.5 4.5-5'],
 };
+
+// Dot glyphs need a heavier stroke to carry the same visual weight as line icons.
+const ICON_STROKE = { more: 3.2 };
 
 function Icon({ name, size = 16 }) {
   const d = ICON_PATHS[name] || [];
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flex: 'none' }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={ICON_STROKE[name] ?? 1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flex: 'none' }}>
       {d.map((p, i) => (
         <path key={i} d={p} />
       ))}
     </svg>
   );
 }
+
+// ---------------------------------------------------------------- hooks
 
 function useMedia(query) {
   const [m, setM] = React.useState(() => window.matchMedia(query).matches);
@@ -63,24 +68,70 @@ function useMedia(query) {
   return m;
 }
 
+/** Content width of an element, for layouts that depend on the space a component gets rather than the viewport.
+ *  Returns [callbackRef, width]. */
+function useWidth() {
+  const [w, setW] = React.useState(0);
+  const ro = React.useRef(null);
+  const ref = React.useCallback((el) => {
+    ro.current?.disconnect();
+    ro.current = null;
+    if (!el) return;
+    ro.current = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
+    ro.current.observe(el);
+  }, []);
+  return [ref, w];
+}
+
 function useOutside(ref, onOut, active) {
   React.useEffect(() => {
     if (!active) return;
     const down = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onOut();
     };
-    const key = (e) => e.key === 'Escape' && onOut();
+    const key = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      onOut();
+    };
     document.addEventListener('pointerdown', down);
-    document.addEventListener('keydown', key);
+    document.addEventListener('keydown', key, true);
     return () => {
       document.removeEventListener('pointerdown', down);
-      document.removeEventListener('keydown', key);
+      document.removeEventListener('keydown', key, true);
     };
   }, [active]);
 }
 
+function useEsc(onEsc, active = true) {
+  React.useEffect(() => {
+    if (!active) return;
+    const k = (e) => e.key === 'Escape' && onEsc();
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }, [active, onEsc]);
+}
+
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Plays the exit animation of an overlay before it unmounts. */
+function useLeave(onClose, ms = 180) {
+  const [leaving, setLeaving] = React.useState(false);
+  const done = React.useRef(false);
+  const close = React.useCallback(() => {
+    if (done.current) return;
+    done.current = true;
+    if (REDUCED_MOTION.matches) return onClose();
+    setLeaving(true);
+    setTimeout(onClose, ms);
+  }, [onClose, ms]);
+  return [leaving, close];
+}
+
+// ---------------------------------------------------------------- menus
+
 /** Dropdown: `trigger(open, toggle)` renders the button; children receive `close`. */
-function Menu({ trigger, children, align = 'left', up = false, width }) {
+function Menu({ trigger, children, align = 'left', up = false, width, className = '' }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   useOutside(ref, () => setOpen(false), open);
@@ -88,7 +139,7 @@ function Menu({ trigger, children, align = 'left', up = false, width }) {
     <div className="menu-wrap" ref={ref}>
       {trigger(open, () => setOpen((o) => !o))}
       {open && (
-        <div className={`menu ${align === 'right' ? 'right' : ''} ${up ? 'up' : ''}`} role="menu" style={width ? { minWidth: width } : undefined}>
+        <div className={`menu ${align === 'right' ? 'right' : ''} ${up ? 'up' : ''} ${className}`} role="menu" style={width ? { minWidth: width } : undefined}>
           {typeof children === 'function' ? children(() => setOpen(false)) : children}
         </div>
       )}
@@ -99,12 +150,32 @@ function Menu({ trigger, children, align = 'left', up = false, width }) {
 function MenuItem({ icon, children, onClick, danger, end, checked }) {
   return (
     <button type="button" role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={checked} className={`menu-item ${danger ? 'danger' : ''}`} onClick={onClick}>
-      {checked !== undefined ? <input type="checkbox" className="check" checked={checked} readOnly tabIndex={-1} /> : icon ? <Icon name={icon} /> : null}
+      {checked !== undefined ? (
+        <span className={`menu-check ${checked ? 'on' : ''}`} aria-hidden="true">
+          {checked && <Icon name="check" size={12} />}
+        </span>
+      ) : icon ? (
+        <Icon name={icon} />
+      ) : (
+        <span className="menu-tick" />
+      )}
       <span className="truncate">{children}</span>
       {end !== undefined && <span className="end">{end}</span>}
     </button>
   );
 }
+
+function RadioItem({ on, children, end, onClick }) {
+  return (
+    <button type="button" role="menuitemradio" aria-checked={on} className="menu-item" onClick={onClick}>
+      <span className="menu-tick">{on && <Icon name="check" />}</span>
+      <span className="truncate">{children}</span>
+      {end !== undefined && <span className="end">{end}</span>}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------- controls
 
 function Switch({ checked, onChange, label, disabled }) {
   return <button type="button" role="switch" className="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)} />;
@@ -122,66 +193,66 @@ function Seg({ options, value, onChange, label, icons, className = '' }) {
   );
 }
 
-function useEsc(onEsc, active = true) {
-  React.useEffect(() => {
-    if (!active) return;
-    const k = (e) => e.key === 'Escape' && onEsc();
-    document.addEventListener('keydown', k);
-    return () => document.removeEventListener('keydown', k);
-  }, [active, onEsc]);
-}
+// ---------------------------------------------------------------- overlays
+
+const renderKids = (children, close) => (typeof children === 'function' ? children(close) : children);
 
 function Modal({ title, onClose, children, footer, width, className = '' }) {
-  useEsc(onClose);
+  const [leaving, close] = useLeave(onClose, 140);
+  useEsc(close);
   return (
     <>
-      <div className="scrim" onClick={onClose} />
-      <div className={`modal ${className}`} role="dialog" aria-modal="true" aria-label={title} style={width ? { '--w': width } : undefined}>
+      <div className={`scrim ${leaving ? 'leaving' : ''}`} onClick={close} />
+      <div className={`modal ${leaving ? 'leaving' : ''} ${className}`} role="dialog" aria-modal="true" aria-label={title || undefined} style={width ? { '--w': width } : undefined}>
         {title !== null && (
           <div className="modal-head">
             <h2>{title}</h2>
-            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="关闭">
+            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={close} aria-label="关闭">
               <Icon name="x" />
             </button>
           </div>
         )}
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
+        <div className="modal-body">{renderKids(children, close)}</div>
+        {footer && <div className="modal-foot">{renderKids(footer, close)}</div>}
       </div>
     </>
   );
 }
 
 function Drawer({ onClose, children, width, side = 'right', label }) {
-  useEsc(onClose);
+  const [leaving, close] = useLeave(onClose, 200);
+  useEsc(close);
   return (
     <>
-      <div className="scrim" onClick={onClose} />
-      <aside className={`drawer ${side === 'left' ? 'left' : ''}`} role="dialog" aria-modal="true" aria-label={label} style={width ? { '--w': width } : undefined}>
-        {children}
+      <div className={`scrim ${leaving ? 'leaving' : ''}`} onClick={close} />
+      <aside className={`drawer ${side === 'left' ? 'left' : ''} ${leaving ? 'leaving' : ''}`} role="dialog" aria-modal="true" aria-label={label} style={width ? { '--w': width } : undefined}>
+        {renderKids(children, close)}
       </aside>
     </>
   );
 }
 
-function Sheet({ onClose, children, label }) {
-  useEsc(onClose);
+function Sheet({ onClose, children, label, full }) {
+  const [leaving, close] = useLeave(onClose, 220);
+  useEsc(close);
   return (
     <>
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={label}>
+      <div className={`scrim ${leaving ? 'leaving' : ''}`} onClick={close} />
+      <div className={`sheet ${full ? 'sheet-full' : ''} ${leaving ? 'leaving' : ''}`} role="dialog" aria-modal="true" aria-label={label}>
         <div className="sheet-grip" />
-        {children}
+        {renderKids(children, close)}
       </div>
     </>
   );
 }
 
+// ---------------------------------------------------------------- content pieces
+
 function Thumb({ image, className = '', cover }) {
   const alpha = image.format === 'png' || image.format === 'webp' || image.format === 'gif';
   return (
     <span className={`thumb ${alpha ? 'checker' : ''} ${cover ? 'cover' : ''} ${className}`}>
-      <img src={image.thumb} alt="" loading="lazy" draggable="false" />
+      {image.thumb ? <img src={image.thumb} alt="" loading="lazy" draggable="false" /> : <Icon name="image" />}
     </span>
   );
 }
@@ -206,59 +277,28 @@ function CopyButton({ text, label = '复制', size, className = 'btn-secondary',
     onCopied?.();
   };
   return (
-    <button type="button" className={`btn ${className} ${size === 'sm' ? 'btn-sm' : ''} ${iconOnly ? 'btn-icon' : ''}`} onClick={run} aria-label={iconOnly ? (done ? '已复制' : label) : undefined} title={iconOnly ? (done ? '已复制' : label) : undefined}>
-      <Icon name={done ? 'check' : 'copy'} />
+    <button
+      type="button"
+      className={`btn ${className} ${size === 'sm' ? 'btn-sm' : ''} ${iconOnly ? 'btn-icon' : ''} ${done ? 'copied' : ''}`}
+      onClick={run}
+      aria-label={iconOnly ? (done ? '已复制' : label) : undefined}
+      title={iconOnly ? (done ? '已复制' : label) : undefined}
+    >
+      <Icon name={done ? 'check' : 'copy'} key={done ? 'done' : 'copy'} />
       {!iconOnly && <span>{done ? '已复制' : label}</span>}
     </button>
   );
 }
 
-/** Split button: copy in the current format, menu to pick another. */
-function CopyLinkSplit({ image, format, onFormat, size = 'sm' }) {
-  const label = LINK_FORMATS.find((f) => f.key === format)?.label;
-  return (
-    <div className="btn-group" onClick={(e) => e.stopPropagation()}>
-      <CopyButton text={image.links[format]} label={`复制 ${label}`} size={size} />
-      <Menu
-        align="right"
-        trigger={(open, toggle) => (
-          <button type="button" className={`btn btn-secondary btn-icon ${size === 'sm' ? 'btn-sm' : ''}`} aria-label="选择链接格式" aria-expanded={open} onClick={toggle}>
-            <Icon name="chevron-down" size={14} />
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
-            <div className="menu-label">复制为</div>
-            {LINK_FORMATS.map((f) => (
-              <MenuItem
-                key={f.key}
-                icon={f.key === format ? 'check' : undefined}
-                onClick={() => {
-                  writeClipboard(image.links[f.key]);
-                  onFormat(f.key);
-                  close();
-                }}
-              >
-                {f.label}
-              </MenuItem>
-            ))}
-          </>
-        )}
-      </Menu>
-    </div>
-  );
-}
-
-function VisBadge({ v }) {
+function VisLabel({ v }) {
   return v === 'public' ? (
-    <span className="badge badge-success">
-      <span className="dot" />
+    <span className="vis">
+      <Icon name="globe" size={13} />
       公开
     </span>
   ) : (
-    <span className="badge">
-      <Icon name="lock" size={12} />
+    <span className="vis vis-private">
+      <Icon name="lock" size={13} />
       私有
     </span>
   );
@@ -289,13 +329,16 @@ function Toasts({ toasts, dismiss }) {
 
 function Brand() {
   return (
-    <a className="brand" href="#" onClick={(e) => e.preventDefault()}>
+    <a className="brand" href="#" onClick={(e) => e.preventDefault()} aria-label="PicBerth">
       <span className="brand-mark">
         <Icon name="image" size={14} />
       </span>
-      <span>PicBerth</span>
+      <span className="brand-name">PicBerth</span>
     </a>
   );
 }
 
-Object.assign(window, { Icon, useMedia, useOutside, useEsc, Menu, MenuItem, Switch, Seg, Modal, Drawer, Sheet, Thumb, CopyButton, CopyLinkSplit, VisBadge, Toasts, Brand, writeClipboard });
+Object.assign(window, {
+  Icon, useMedia, useWidth, useOutside, useEsc, useLeave, Menu, MenuItem, RadioItem, Switch, Seg, Modal, Drawer, Sheet, Thumb,
+  CopyButton, VisLabel, Toasts, Brand, writeClipboard,
+});
