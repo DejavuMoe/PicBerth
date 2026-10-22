@@ -1,4 +1,4 @@
-// Icons, hooks and presentational primitives.
+// Icons, hooks, presentational primitives and the shared console chrome (sidebar, rail, tab bar).
 
 const ICON_PATHS = {
   upload: ['M12 15V4', 'M7.5 8.5 12 4l4.5 4.5', 'M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
@@ -24,21 +24,16 @@ const ICON_PATHS = {
   key: ['M8 11.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z', 'm10.5 12.5 8-8', 'm16 7 2.5 2.5'],
   gear: ['M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1'],
   activity: ['M3 12h4l2.5-6 5 12 2.5-6h4'],
-  menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
   external: ['M14 4h6v6', 'm20 4-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'],
-  tag: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5z', 'M8.5 8.5h.01'],
-  pin: ['M12 21s6.5-6 6.5-11a6.5 6.5 0 0 0-13 0c0 5 6.5 11 6.5 11z', 'M12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
   sort: ['M7 4v16', 'm4 7 3-3 3 3', 'M17 20V4', 'm14 17 3 3 3-3'],
   plus: ['M12 5v14', 'M5 12h14'],
   alert: ['M12 3.5 21 19.5H3z', 'M12 10v4', 'M12 17h.01'],
-  info: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z', 'M12 11v5', 'M12 8h.01'],
   sun: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4'],
   moon: ['M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z'],
   logout: ['M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5', 'M10 8l-4 4 4 4', 'M6 12h10'],
   edit: ['M4 20h4L19 9l-4-4L4 16z', 'm13.5 6.5 4 4'],
-  clipboard: ['M9 4h6v3H9z', 'M15 5.5h3v14.5H6V5.5h3'],
   refresh: ['M20 11a8 8 0 0 0-14.5-4.5', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.5 4.5', 'M20 20v-4h-4'],
-  'select': ['M4.5 4.5h15v15h-15z', 'm8.5 12 2.5 2.5 4.5-5'],
+  select: ['M4.5 4.5h15v15h-15z', 'm8.5 12 2.5 2.5 4.5-5'],
 };
 
 // Dot glyphs need a heavier stroke to carry the same visual weight as line icons.
@@ -131,12 +126,12 @@ function useLeave(onClose, ms = 180) {
 // ---------------------------------------------------------------- menus
 
 /** Dropdown: `trigger(open, toggle)` renders the button; children receive `close`. */
-function Menu({ trigger, children, align = 'left', up = false, width, className = '' }) {
+function Menu({ trigger, children, align = 'left', up = false, width, className = '', wrapClass = '' }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   useOutside(ref, () => setOpen(false), open);
   return (
-    <div className="menu-wrap" ref={ref}>
+    <div className={`menu-wrap ${wrapClass}`} ref={ref}>
       {trigger(open, () => setOpen((o) => !o))}
       {open && (
         <div className={`menu ${align === 'right' ? 'right' : ''} ${up ? 'up' : ''} ${className}`} role="menu" style={width ? { minWidth: width } : undefined}>
@@ -147,30 +142,20 @@ function Menu({ trigger, children, align = 'left', up = false, width, className 
   );
 }
 
-function MenuItem({ icon, children, onClick, danger, end, checked }) {
+function MenuItem({ icon, children, onClick, danger }) {
   return (
-    <button type="button" role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'} aria-checked={checked} className={`menu-item ${danger ? 'danger' : ''}`} onClick={onClick}>
-      {checked !== undefined ? (
-        <span className={`menu-check ${checked ? 'on' : ''}`} aria-hidden="true">
-          {checked && <Icon name="check" size={12} />}
-        </span>
-      ) : icon ? (
-        <Icon name={icon} />
-      ) : (
-        <span className="menu-tick" />
-      )}
+    <button type="button" role="menuitem" className={`menu-item ${danger ? 'danger' : ''}`} onClick={onClick}>
+      {icon ? <Icon name={icon} /> : <span className="menu-tick" />}
       <span className="truncate">{children}</span>
-      {end !== undefined && <span className="end">{end}</span>}
     </button>
   );
 }
 
-function RadioItem({ on, children, end, onClick }) {
+function RadioItem({ on, children, onClick }) {
   return (
     <button type="button" role="menuitemradio" aria-checked={on} className="menu-item" onClick={onClick}>
       <span className="menu-tick">{on && <Icon name="check" />}</span>
       <span className="truncate">{children}</span>
-      {end !== undefined && <span className="end">{end}</span>}
     </button>
   );
 }
@@ -181,12 +166,14 @@ function Switch({ checked, onChange, label, disabled }) {
   return <button type="button" role="switch" className="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)} />;
 }
 
-function Seg({ options, value, onChange, label, icons, className = '' }) {
+/** Segmented control. `icons`: icon-only buttons. An option with `icon` and a label shows both. */
+function Seg({ options, value, onChange, label, icons, fill, className = '' }) {
   return (
-    <div className={`seg ${icons ? 'seg-icons' : ''} ${className}`} role="group" aria-label={label}>
+    <div className={`seg ${icons ? 'seg-icons' : ''} ${fill ? 'fill' : ''} ${className}`} role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)} title={o.title} aria-label={icons ? o.title : undefined}>
-          {icons ? <Icon name={o.icon} /> : o.label}
+          {o.icon && <Icon name={o.icon} />}
+          {!icons && o.label}
         </button>
       ))}
     </div>
@@ -204,14 +191,12 @@ function Modal({ title, onClose, children, footer, width, className = '' }) {
     <>
       <div className={`scrim ${leaving ? 'leaving' : ''}`} onClick={close} />
       <div className={`modal ${leaving ? 'leaving' : ''} ${className}`} role="dialog" aria-modal="true" aria-label={title || undefined} style={width ? { '--w': width } : undefined}>
-        {title !== null && (
-          <div className="modal-head">
-            <h2>{title}</h2>
-            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={close} aria-label="关闭">
-              <Icon name="x" />
-            </button>
-          </div>
-        )}
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={close} aria-label="关闭">
+            <Icon name="x" />
+          </button>
+        </div>
         <div className="modal-body">{renderKids(children, close)}</div>
         {footer && <div className="modal-foot">{renderKids(footer, close)}</div>}
       </div>
@@ -219,13 +204,13 @@ function Modal({ title, onClose, children, footer, width, className = '' }) {
   );
 }
 
-function Drawer({ onClose, children, width, side = 'right', label }) {
+function Drawer({ onClose, children, width, label }) {
   const [leaving, close] = useLeave(onClose, 200);
   useEsc(close);
   return (
     <>
       <div className={`scrim ${leaving ? 'leaving' : ''}`} onClick={close} />
-      <aside className={`drawer ${side === 'left' ? 'left' : ''} ${leaving ? 'leaving' : ''}`} role="dialog" aria-modal="true" aria-label={label} style={width ? { '--w': width } : undefined}>
+      <aside className={`drawer ${leaving ? 'leaving' : ''}`} role="dialog" aria-modal="true" aria-label={label} style={width ? { '--w': width } : undefined}>
         {renderKids(children, close)}
       </aside>
     </>
@@ -248,10 +233,13 @@ function Sheet({ onClose, children, label, full }) {
 
 // ---------------------------------------------------------------- content pieces
 
-function Thumb({ image, className = '', cover }) {
-  const alpha = image.format === 'png' || image.format === 'webp' || image.format === 'gif';
+function hasAlpha(im) {
+  return im.format === 'png' || im.format === 'webp' || im.format === 'gif';
+}
+
+function Thumb({ image, className = '' }) {
   return (
-    <span className={`thumb ${alpha ? 'checker' : ''} ${cover ? 'cover' : ''} ${className}`}>
+    <span className={`thumb ${className}`}>
       {image.thumb ? <img src={image.thumb} alt="" loading="lazy" draggable="false" /> : <Icon name="image" />}
     </span>
   );
@@ -290,20 +278,6 @@ function CopyButton({ text, label = '复制', size, className = 'btn-secondary',
   );
 }
 
-function VisLabel({ v }) {
-  return v === 'public' ? (
-    <span className="vis">
-      <Icon name="globe" size={13} />
-      公开
-    </span>
-  ) : (
-    <span className="vis vis-private">
-      <Icon name="lock" size={13} />
-      私有
-    </span>
-  );
-}
-
 function Toasts({ toasts, dismiss }) {
   return (
     <div className="toasts" role="status" aria-live="polite">
@@ -327,18 +301,158 @@ function Toasts({ toasts, dismiss }) {
   );
 }
 
+function BrandMark({ size = 14, className = '' }) {
+  return (
+    <span className={`brand-mark ${className}`}>
+      <Icon name="image" size={size} />
+    </span>
+  );
+}
+
 function Brand() {
   return (
     <a className="brand" href="#" onClick={(e) => e.preventDefault()} aria-label="PicBerth">
-      <span className="brand-mark">
-        <Icon name="image" size={14} />
-      </span>
+      <BrandMark />
       <span className="brand-name">PicBerth</span>
     </a>
   );
 }
 
+// ---------------------------------------------------------------- console chrome
+
+const NAV = [
+  { key: 'images', label: '全部图片', short: '图片', icon: 'images', group: 0 },
+  { key: 'trash', label: '回收站', short: '回收站', icon: 'trash', group: 0 },
+  { key: 'tokens', label: '令牌', short: '令牌', icon: 'key', group: 1 },
+  { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: 2 },
+  { key: 'status', label: '状态', short: '状态', icon: 'activity', group: 2 },
+];
+const TAB_KEYS = ['images', 'trash', 'tokens'];
+
+function ThemeItem({ theme, setTheme, close }) {
+  const dark = theme === 'dark';
+  return (
+    <MenuItem icon={dark ? 'sun' : 'moon'} onClick={() => (setTheme(dark ? 'light' : 'dark'), close())}>
+      {dark ? '切换到浅色' : '切换到深色'}
+    </MenuItem>
+  );
+}
+
+function AccountMenu({ theme, setTheme, toast }) {
+  return (
+    <Menu
+      up
+      width={200}
+      wrapClass="account-wrap"
+      trigger={(open, toggle) => (
+        <button type="button" className="account" aria-label="账户" title="admin" aria-expanded={open} onClick={toggle}>
+          <span className="avatar">A</span>
+          <span className="account-name">admin</span>
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          <ThemeItem theme={theme} setTheme={setTheme} close={close} />
+          <MenuItem icon="logout" onClick={() => (close(), toast('已退出登录'))}>
+            退出登录
+          </MenuItem>
+        </>
+      )}
+    </Menu>
+  );
+}
+
+/** Desktop sidebar; becomes the icon rail through CSS on tablets. */
+function Sidebar({ route, go, status, theme, setTheme, toast }) {
+  const warn = status.warnings.length > 0;
+  return (
+    <aside className="sidenav" aria-label="主导航">
+      <Brand />
+      <nav>
+        {NAV.map((n, i) => (
+          <React.Fragment key={n.key}>
+            {i > 0 && NAV[i - 1].group !== n.group && <div className="nav-gap" />}
+            <button type="button" className="nav-item" aria-current={route === n.key ? 'page' : undefined} title={n.label} onClick={() => go(n.key)}>
+              <Icon name={n.icon} />
+              <span className="nav-label">{n.label}</span>
+              {n.key === 'status' && warn && <span className="warn-dot" role="img" aria-label="有警告" />}
+            </button>
+          </React.Fragment>
+        ))}
+      </nav>
+      <AccountMenu theme={theme} setTheme={setTheme} toast={toast} />
+    </aside>
+  );
+}
+
+function TabBar({ route, go, status, onMore, moreOpen }) {
+  const moreOn = moreOpen || (route && !TAB_KEYS.includes(route));
+  return (
+    <nav className="tabbar" aria-label="主导航">
+      {NAV.filter((n) => TAB_KEYS.includes(n.key)).map((n) => (
+        <button key={n.key} type="button" className="tab" aria-current={route === n.key && !moreOpen ? 'page' : undefined} onClick={() => go(n.key)}>
+          <Icon name={n.icon} size={20} />
+          <span>{n.short}</span>
+        </button>
+      ))}
+      <button type="button" className="tab" aria-current={moreOn ? 'page' : undefined} aria-expanded={moreOpen} onClick={onMore}>
+        <span className="tab-icon">
+          <Icon name="more" size={20} />
+          {status.warnings.length > 0 && <span className="warn-dot" aria-hidden="true" />}
+        </span>
+        <span>更多</span>
+      </button>
+    </nav>
+  );
+}
+
+function MoreSheet({ route, go, status, theme, setTheme, toast, onClose }) {
+  return (
+    <Sheet onClose={onClose} label="更多">
+      {(close) => (
+        <div className="sheet-body more-body">
+          {NAV.filter((n) => !TAB_KEYS.includes(n.key)).map((n) => (
+            <button
+              key={n.key}
+              type="button"
+              className="nav-item"
+              aria-current={route === n.key ? 'page' : undefined}
+              onClick={() => {
+                go(n.key);
+                close();
+              }}
+            >
+              <Icon name={n.icon} />
+              <span className="nav-label">{n.label}</span>
+              {n.key === 'status' && status.warnings.length > 0 && <span className="warn-dot" role="img" aria-label="有警告" />}
+            </button>
+          ))}
+          <div className="setting-row more-row">
+            <span className="label">深色模式</span>
+            <Switch checked={theme === 'dark'} label="深色模式" onChange={(v) => setTheme(v ? 'dark' : 'light')} />
+          </div>
+          <button type="button" className="nav-item" onClick={() => (close(), toast('已退出登录'))}>
+            <Icon name="logout" />
+            <span className="nav-label">退出登录</span>
+          </button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+/** Sticky page header: title on the left, page actions (children) on the right. */
+function PageHead({ title, children }) {
+  return (
+    <header className="page-head">
+      <h1>{title}</h1>
+      {children && <div className="page-actions">{children}</div>}
+    </header>
+  );
+}
+
 Object.assign(window, {
   Icon, useMedia, useWidth, useOutside, useEsc, useLeave, Menu, MenuItem, RadioItem, Switch, Seg, Modal, Drawer, Sheet, Thumb,
-  CopyButton, VisLabel, Toasts, Brand, writeClipboard,
+  CopyButton, Toasts, Brand, BrandMark, writeClipboard, hasAlpha, NAV, TAB_KEYS, Sidebar, TabBar, MoreSheet, PageHead,
 });
