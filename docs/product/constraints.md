@@ -54,9 +54,19 @@
 
 ## Visual and interaction constraints
 
-- Colour: Cloudflare R2 dashboard–like palette (neutral greys, blue primary actions), light and dark.
-  Cloudflare's Kumo component library must not be used or imported; no Cloudflare logos or brand marks.
-- Plain and restrained: system fonts, no decorative imagery, no gradients, no emoji.
+- Visual language (changed 2026-10-22 at the user's request): Linear-like precision console — near-black
+  canvas with an inset content panel, hairline borders instead of shadows, compact density, low font weights
+  (400–590), tight tracking. Dark and light themes follow the system setting and are polished equally; the
+  user can still override.
+- Colour: neutral grey scale plus one acid-lime accent `#e4f222` used only as the fill of the single primary
+  action per view (dark text on it); never as text, link, or decoration. Status colours (success, warning,
+  danger) only for state. No Linear logos, brand marks or marketing layouts; there is no landing page.
+- Type: self-hosted Inter Variable (OFL, Latin subsets embedded, no network requests) for UI, system CJK fonts
+  for Chinese, `ui-monospace` for IDs and hashes.
+- Plain and restrained: no decorative imagery, no gradients, no emoji.
+- Production stays lightweight: Svelte 5 + Vite only; no Next.js, no Tailwind or other CSS/UI frameworks.
+- Every control is drawn by the product (menus, selects, comboboxes, checkboxes, scrollbars styled); no
+  browser-native popups such as `datalist` or `select` dropdown lists.
 - Density/layout: management-first — tables/lists and grids with filters, selection and batch actions;
   responsive from phone to desktop.
 - Accessibility: WCAG AA contrast, visible focus, keyboard operation, labelled icon buttons.
