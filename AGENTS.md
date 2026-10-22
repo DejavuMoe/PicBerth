@@ -45,6 +45,7 @@
 
 ## Visual and interaction defaults
 
+- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 - Reuse the approved design and current product terminology.
 - Preserve keyboard, pointer, touch, drag/drop and paste conventions.
 
