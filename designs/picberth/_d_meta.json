@@ -8,8 +8,8 @@
         {
           "path": "index.html",
           "createdAt": "2026-10-21T12:27:29.586Z",
-          "status": "approved",
-          "subtitle": "侧栏 / 图标栏 / 底部标签栏，宽屏停靠详情",
+          "status": "needs-review",
+          "subtitle": "无顶栏 / 去卡片 / 页头即工具栏，宽屏停靠详情",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -22,7 +22,7 @@
         {
           "path": "auth.html",
           "createdAt": "2026-10-21T15:20:41.681Z",
-          "status": "approved",
+          "status": "needs-review",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -32,5 +32,5 @@
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-22T05:06:43.412Z"
+  "updatedAt": "2026-10-22T07:22:07.505Z"
 }

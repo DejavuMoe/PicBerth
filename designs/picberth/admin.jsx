@@ -1,64 +1,5 @@
 // Admin pages: tokens, settings, status. Page content only; the shell is provided elsewhere.
 
-(function admInjectStyle() {
-  if (document.getElementById('adm-style')) return;
-  const el = document.createElement('style');
-  el.id = 'adm-style';
-  el.textContent = `
-.adm-stack { display: flex; flex-direction: column; gap: 16px; }
-.adm-table tbody tr { cursor: default; }
-.adm-table td { height: 56px; }
-.adm-revoked td { color: var(--subtle); }
-.adm-revoked .cell-name .name { font-weight: 400; }
-.adm-tcards { display: flex; flex-direction: column; gap: 8px; }
-.adm-tcard { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
-.adm-tcard.adm-revoked { color: var(--subtle); }
-.adm-tcard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.adm-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
-.adm-kv > span:first-child { color: var(--subtle); }
-.adm-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-.adm-form { display: flex; flex-direction: column; gap: 18px; }
-.adm-opts { display: flex; flex-direction: column; gap: 4px; }
-.adm-opts-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.adm-opt { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin: 0 -10px; border-radius: var(--r); cursor: pointer; transition: background-color var(--d1) var(--ease-out); }
-.adm-opt:hover { background: var(--tint); }
-.adm-opt .check { margin-top: 2px; flex: none; }
-.adm-opt strong { display: block; font-size: 13px; font-weight: 500; }
-.adm-opt-inline { display: inline-flex; align-items: center; gap: 8px; min-height: var(--h); font-size: 13px; cursor: pointer; }
-.adm-invalid, .adm-invalid:hover { border-color: var(--danger); }
-.adm-invalid:focus { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
-.adm-pre { margin: 0; padding: 12px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--tint); font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.adm-secret { display: flex; gap: 6px; }
-.adm-secret .input { flex: 1; font-family: var(--mono); font-size: 12px; }
-.adm-row { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 8px 32px; align-items: start; padding: 16px 20px; border-bottom: 1px solid var(--hairline); }
-.adm-row:last-child { border-bottom: 0; }
-.adm-row > div:first-child { padding-top: calc((var(--h) - 20px) / 2); }
-.adm-row .label { display: block; font-size: 13px; font-weight: 500; line-height: 20px; }
-.adm-row .hint { margin-top: 2px; }
-.adm-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
-.adm-inline { display: flex; align-items: center; gap: 8px; }
-.adm-value { display: flex; align-items: center; min-height: var(--h); min-width: 0; overflow-wrap: anywhere; }
-.adm-sticky { position: sticky; bottom: calc(16px + var(--bottom-ui, 0px)); z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; padding: 10px 10px 10px 16px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--raised); box-shadow: var(--shadow-float); animation: bar-in var(--d2) var(--ease-out); }
-.adm-sticky .grow { flex: 1; min-width: 140px; font-size: 13px; color: var(--text); font-weight: 500; }
-.adm-sticky .grow::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 0; border-radius: 50%; background: var(--warning); vertical-align: middle; }
-.adm-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; }
-.adm-metric { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 16px 20px; box-shadow: -1px 0 0 var(--hairline), 0 -1px 0 var(--hairline); }
-.adm-metric .k { font-size: 12px; color: var(--subtle); }
-.adm-metric .v { font-size: 22px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; color: var(--strong); letter-spacing: -0.01em; }
-.adm-metric .s { font-size: 12px; color: var(--subtle); }
-.adm-metric .progress { margin: 6px 0 2px; }
-.adm-result { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; overflow-wrap: anywhere; }
-.adm-result.subtle { color: var(--subtle); }
-.adm-run { width: min(260px, 100%); }
-.adm-audit-list { display: flex; flex-direction: column; }
-.adm-audit-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border-bottom: 1px solid var(--hairline); font-size: 13px; }
-.adm-audit-item:last-child { border-bottom: 0; }
-@media (max-width: 900px) { .adm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .adm-row { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; } .adm-row > div:first-child { padding-top: 0; } .card-head { padding: 12px 16px; } .adm-sticky .btn { height: var(--h-touch); } .adm-metric { padding: 14px 16px; } .adm-metric .v { font-size: 20px; } }
-`;
-  document.head.appendChild(el);
-})();
-
 // ---------------------------------------------------------------- tokens
 
 const ADM_API_URL = 'https://pics.example.com/api/v1/images';
@@ -200,7 +141,7 @@ function AdmTokenModal({ onClose, onDone, toast }) {
           <label htmlFor="adm-tk-name">名称</label>
           <input
             id="adm-tk-name"
-            className={`input ${tried && nameErr ? 'adm-invalid' : ''}`}
+            className="input"
             aria-invalid={tried && nameErr ? 'true' : undefined}
             value={name}
             autoFocus
@@ -275,104 +216,85 @@ function TokensPage({ tokens, setTokens, toast }) {
     toast('令牌已创建');
   };
 
-  const lastUsed = (t) => (t.lastUsedAt ? fmtRel(t.lastUsedAt) : <span className="subtle">从未使用</span>);
+  const lastUsed = (t) => (t.lastUsedAt ? <span title={fmtDate(t.lastUsedAt)}>{fmtRel(t.lastUsedAt)}</span> : <span className="subtle">从未使用</span>);
   const newBtn = (
     <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
       <Icon name="plus" />
       新建令牌
     </button>
   );
+  const revokeBtn = (t) =>
+    !t.revokedAt && (
+      <button type="button" className="btn btn-danger-ghost btn-sm adm-revoke" onClick={() => setRevoking(t)}>
+        吊销
+      </button>
+    );
+  const nameCell = (t) => (
+    <span className="tk-name">
+      <span className="name truncate">{t.name}</span>
+      <span className="mono subtle">{t.prefix}…</span>
+    </span>
+  );
 
   return (
-    <div className="page" style={{ '--page-w': '1040px' }}>
-      <div className="page-head">
-        <div>
-          <h1>令牌</h1>
-          <p>用于 PicGo、ShareX 和脚本上传</p>
-        </div>
-        {tokens.length > 0 && <div className="page-actions">{newBtn}</div>}
-      </div>
-
-      {tokens.length === 0 ? (
-        <div className="empty">
-          <strong>还没有令牌</strong>
-          <p>新建令牌后，可以在 PicGo、ShareX 或脚本中上传图片。</p>
-          <div className="actions">{newBtn}</div>
-        </div>
-      ) : mobile ? (
-        <div className="adm-tcards">
-          {tokens.map((t) => (
-            <div key={t.id} className={`card adm-tcard ${t.revokedAt ? 'adm-revoked' : ''}`}>
-              <div className="adm-tcard-top">
-                <div className="cell-name">
-                  <span className="name truncate">{t.name}</span>
-                  <span className="sub mono">{t.prefix}…</span>
+    <div className="page adm-wide">
+      <PageHead title="令牌">{tokens.length > 0 && newBtn}</PageHead>
+      <div className="page-body">
+        {tokens.length === 0 ? (
+          <div className="empty">
+            <Icon name="key" size={28} />
+            <strong>还没有令牌</strong>
+            <div className="actions">{newBtn}</div>
+          </div>
+        ) : mobile ? (
+          <div className="adm-trows">
+            {tokens.map((t) => (
+              <div key={t.id} className={`adm-trow ${t.revokedAt ? 'adm-revoked' : ''}`}>
+                <div className="adm-trow-top">
+                  {nameCell(t)}
+                  {revokeBtn(t)}
                 </div>
-                {t.revokedAt ? (
-                  <span className="badge">已吊销</span>
-                ) : (
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => setRevoking(t)}>
-                    吊销
-                  </button>
-                )}
-              </div>
-              <AdmScopeBadges scopes={t.scopes} />
-              <div className="adm-kv">
-                <span>最近使用</span>
-                <span>{lastUsed(t)}</span>
-              </div>
-              {!t.revokedAt && (
-                <div className="adm-kv">
-                  <span>过期</span>
-                  <span>
-                    <AdmExpiry t={t} />
-                  </span>
+                <AdmScopeBadges scopes={t.scopes} />
+                <div className="adm-trow-meta">
+                  <span>{lastUsed(t)}</span>
+                  <AdmExpiry t={t} />
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="table-wrap">
-          <table className="table adm-table">
-            <thead>
-              <tr>
-                <th>名称</th>
-                <th>权限</th>
-                <th>最近使用</th>
-                <th>过期</th>
-                <th className="c-actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {tokens.map((t) => (
-                <tr key={t.id} className={t.revokedAt ? 'adm-revoked' : ''}>
-                  <td>
-                    <div className="cell-name">
-                      <span className="name truncate">{t.name}</span>
-                      <span className="sub mono">{t.prefix}…</span>
-                    </div>
-                  </td>
-                  <td>
-                    <AdmScopeBadges scopes={t.scopes} />
-                  </td>
-                  <td>{lastUsed(t)}</td>
-                  <td>
-                    <AdmExpiry t={t} />
-                  </td>
-                  <td className="c-actions">
-                    {!t.revokedAt && (
-                      <button type="button" className="btn btn-danger btn-sm" onClick={() => setRevoking(t)}>
-                        吊销
-                      </button>
-                    )}
-                  </td>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="table adm-table">
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>权限</th>
+                  <th>最近使用</th>
+                  <th>过期</th>
+                  <th className="c-actions">
+                    <span className="sr-only">操作</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {tokens.map((t) => (
+                  <tr key={t.id} className={t.revokedAt ? 'adm-revoked' : ''}>
+                    <td>{nameCell(t)}</td>
+                    <td>
+                      <AdmScopeBadges scopes={t.scopes} />
+                    </td>
+                    <td>{lastUsed(t)}</td>
+                    <td>
+                      <AdmExpiry t={t} />
+                    </td>
+                    <td className="c-actions">{revokeBtn(t)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {creating && <AdmTokenModal onClose={() => setCreating(false)} onDone={added} toast={toast} />}
       {revoking && (
@@ -438,31 +360,27 @@ function admValidate(d, hardMax) {
   return e;
 }
 
-function AdmRow({ label, hint, htmlFor, children }) {
+/** Hairline row: label on the left, control on the right. */
+function AdmRow({ label, htmlFor, children }) {
   return (
     <div className="adm-row">
-      <div>
-        {htmlFor ? (
-          <label className="label" htmlFor={htmlFor}>
-            {label}
-          </label>
-        ) : (
-          <span className="label">{label}</span>
-        )}
-        {hint && <div className="hint">{hint}</div>}
-      </div>
+      {htmlFor ? (
+        <label className="label" htmlFor={htmlFor}>
+          {label}
+        </label>
+      ) : (
+        <span className="label">{label}</span>
+      )}
       <div className="adm-ctl">{children}</div>
     </div>
   );
 }
 
-function AdmCard({ title, children }) {
+function AdmSection({ title, compact, children }) {
   return (
-    <section className="card">
-      <div className="card-head">
-        <h2>{title}</h2>
-      </div>
-      <div>{children}</div>
+    <section className={`adm-sec ${compact ? 'adm-compact' : ''}`}>
+      <h2>{title}</h2>
+      <div className="adm-rows">{children}</div>
     </section>
   );
 }
@@ -489,16 +407,15 @@ function SettingsPage({ settings, setSettings, toast }) {
   };
   const discard = () => setDraft(admToDraft(settings));
 
-  const num = (key, id, unit, ariaLabel) => (
+  const num = (key, id, unit) => (
     <>
       <div className="adm-inline">
         <input
           id={id}
-          className={`input num ${errors[key] ? 'adm-invalid' : ''}`}
+          className="input num"
           style={{ width: 112 }}
           inputMode="numeric"
           aria-invalid={errors[key] ? 'true' : undefined}
-          aria-label={ariaLabel}
           value={draft[key]}
           onChange={(e) => set(key, e.target.value)}
         />
@@ -509,16 +426,11 @@ function SettingsPage({ settings, setSettings, toast }) {
   );
 
   return (
-    <div className="page" style={{ '--page-w': '1040px' }}>
-      <div className="page-head">
-        <div>
-          <h1>设置</h1>
-        </div>
-      </div>
-
-      <div className="adm-stack">
-        <AdmCard title="上传">
-          <AdmRow label="单文件上限" hint={`不超过 ${hardMax} MB`} htmlFor="adm-max-mb">
+    <div className="page adm-narrow">
+      <PageHead title="设置" />
+      <div className="page-body">
+        <AdmSection title="上传">
+          <AdmRow label="单文件上限" htmlFor="adm-max-mb">
             {num('maxUploadMB', 'adm-max-mb', 'MB')}
           </AdmRow>
           <AdmRow label="像素上限" htmlFor="adm-max-px">
@@ -536,102 +448,95 @@ function SettingsPage({ settings, setSettings, toast }) {
             {errors.allowedFormats && <span className="error-text">{errors.allowedFormats}</span>}
           </AdmRow>
           <AdmRow label="默认可见性">
-            <Seg
-              label="默认可见性"
-              value={draft.defaultVisibility}
-              onChange={(v) => set('defaultVisibility', v)}
-              options={[
-                { key: 'public', label: '公开' },
-                { key: 'private', label: '私有' },
-              ]}
-            />
+            <Seg label="默认可见性" value={draft.defaultVisibility} onChange={(v) => set('defaultVisibility', v)} options={VIS_OPTS} />
           </AdmRow>
-          <AdmRow label="重复检测" hint="相同内容的图片只保存一份，再次上传时返回原链接">
+          <AdmRow label="重复检测">
             <div className="adm-value">
               <Switch checked={draft.dedupe} onChange={(v) => set('dedupe', v)} label="重复检测" />
             </div>
           </AdmRow>
-        </AdmCard>
+        </AdmSection>
 
-        <AdmCard title="回收站">
-          <AdmRow label="保留天数" hint="0 表示删除后立即永久清除" htmlFor="adm-trash-days">
+        <AdmSection title="回收站">
+          <AdmRow label="保留天数" htmlFor="adm-trash-days">
             {num('trashRetentionDays', 'adm-trash-days', '天')}
           </AdmRow>
-        </AdmCard>
+        </AdmSection>
 
-        <AdmCard title="频率限制">
+        <AdmSection title="频率限制">
           <AdmRow label="每分钟上传次数" htmlFor="adm-rate">
             {num('uploadsPerMinute', 'adm-rate', '次')}
           </AdmRow>
-        </AdmCard>
+        </AdmSection>
 
-        <AdmCard title="会话">
+        <AdmSection title="会话">
           <AdmRow label="空闲超时" htmlFor="adm-idle">
             {num('sessionIdleMinutes', 'adm-idle', '分钟')}
           </AdmRow>
           <AdmRow label="最长有效" htmlFor="adm-abs">
             {num('sessionAbsoluteHours', 'adm-abs', '小时')}
           </AdmRow>
-        </AdmCard>
+        </AdmSection>
 
-        <AdmCard title="地址">
-          <AdmRow label="公开地址" hint="在配置文件或环境变量中修改">
+        <AdmSection title="地址">
+          <AdmRow label="公开地址">
             <div className="adm-value mono">{settings.publicUrl}</div>
           </AdmRow>
-          <AdmRow label="图片地址" hint="在配置文件或环境变量中修改">
+          <AdmRow label="图片地址">
             <div className="adm-value mono">{settings.imageUrl}</div>
           </AdmRow>
-        </AdmCard>
-      </div>
+        </AdmSection>
 
-      {dirty && (
-        <div className="adm-sticky">
-          <span className="grow">有 {changed.length} 项未保存的更改</span>
-          <button type="button" className="btn btn-secondary" onClick={discard}>
-            放弃
-          </button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={invalid}>
-            保存
-          </button>
-        </div>
-      )}
+        {dirty && (
+          <div className="adm-sticky">
+            <span className="grow">有 {changed.length} 项未保存的更改</span>
+            <button type="button" className="btn btn-secondary" onClick={discard}>
+              放弃
+            </button>
+            <button type="button" className="btn btn-primary" onClick={save} disabled={invalid}>
+              保存
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- status
 
-const ADM_GB = 1073741824;
-
-function AdmMetric({ label, value, sub, children }) {
+function AdmStat({ label, value, children }) {
   return (
-    <div className="adm-metric">
+    <div className="stat">
       <span className="k">{label}</span>
       <span className="v">{value}</span>
       {children}
-      {sub && <span className="s">{sub}</span>}
     </div>
   );
 }
 
-function AdmRunRow({ label, hint, idleLabel, busyLabel, running, disabled, onRun, result }) {
+/** Maintenance row: name on the left, result and action on the right. */
+function AdmRunRow({ label, idleLabel, busyLabel, running, disabled, onRun, result }) {
   return (
-    <AdmRow label={label} hint={hint}>
-      <button type="button" className="btn btn-secondary" disabled={running || disabled} onClick={onRun}>
-        {running ? busyLabel : idleLabel}
-      </button>
-      {running && (
-        <div className="progress indeterminate adm-run" role="progressbar" aria-label={label}>
-          <span />
-        </div>
-      )}
-      {!running && result && (
-        <div className={`adm-result ${result.subtle ? 'subtle' : ''}`}>
-          {result.badge && <span className={`badge ${result.tone || 'badge-success'}`}>{result.badge}</span>}
-          {result.body}
-        </div>
-      )}
-    </AdmRow>
+    <div className="adm-row adm-run-row">
+      <span className="label">{label}</span>
+      <div className="adm-run">
+        {running && (
+          <div className="progress indeterminate adm-run-bar" role="progressbar" aria-label={label}>
+            <span />
+          </div>
+        )}
+        {!running && result && (
+          <div className={`adm-result ${result.subtle ? 'subtle' : ''}`}>
+            {result.badge && <span className={`badge ${result.tone || 'badge-success'}`}>{result.badge}</span>}
+            {result.body}
+          </div>
+        )}
+        <button type="button" className="btn btn-secondary" disabled={running || disabled} onClick={onRun}>
+          {running ? busyLabel : idleLabel}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -643,11 +548,8 @@ function StatusPage({ status, images, toast }) {
   const active = images.filter((i) => i.state === 'active');
   const trashed = images.filter((i) => i.state === 'trashed');
   const totalBytes = images.reduce((s, i) => s + i.size, 0);
-  const gpsCount = active.filter((i) => i.hasGps).length;
   const { disk, db } = status;
   const usedShare = disk.totalBytes ? Math.round(((disk.totalBytes - disk.freeBytes) / disk.totalBytes) * 100) : 0;
-  const days = Math.floor(status.uptimeSeconds / 86400);
-  const uptime = days > 0 ? `${days} 天` : `${Math.max(1, Math.floor(status.uptimeSeconds / 3600))} 小时`;
 
   const [running, setRunning] = React.useState(null);
   const [snapDone, setSnapDone] = React.useState(false);
@@ -719,57 +621,41 @@ function StatusPage({ status, images, toast }) {
   const audit = [...auditExtra, ...AUDIT];
 
   return (
-    <div className="page" style={{ '--page-w': '1040px' }}>
-      <div className="page-head">
-        <div>
-          <h1>状态</h1>
-          <p>
-            版本 {status.version} · 已运行 {uptime}
-          </p>
-        </div>
-        <div className="page-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => toast('状态已刷新')}>
-            <Icon name="refresh" />
-            刷新
-          </button>
-        </div>
-      </div>
-
-      <div className="adm-stack">
-        {warnings.length > 0 && (
-          <div className="adm-stack" style={{ gap: 8 }}>
-            {warnings.map((w) => (
-              <div key={w.code} className="alert warning">
-                <Icon name="alert" />
-                <div className="grow">
-                  <strong>{w.title}</strong>
-                  {w.detail && <div>{w.detail}</div>}
-                </div>
-              </div>
-            ))}
+    <div className="page adm-wide">
+      <PageHead title="状态">
+        <button type="button" className="btn btn-ghost" onClick={() => toast('状态已刷新')}>
+          <Icon name="refresh" />
+          刷新
+        </button>
+      </PageHead>
+      <div className="page-body">
+        {warnings.map((w) => (
+          <div key={w.code} className="alert warning">
+            <Icon name="alert" />
+            <strong className="grow">{w.title}</strong>
+            {w.code === 'snapshot-stale' && (
+              <button type="button" className="btn btn-secondary btn-sm" disabled={!!running} onClick={runSnapshot}>
+                {running === 'snapshot' ? '创建中…' : '创建快照'}
+              </button>
+            )}
           </div>
-        )}
+        ))}
 
-        <div className="card adm-metrics">
-          <AdmMetric label="图片" value={active.length.toLocaleString()} />
-          <AdmMetric label="占用空间" value={fmtBytes(totalBytes)} />
-          <AdmMetric label="回收站" value={trashed.length.toLocaleString()} />
-          <AdmMetric label="含位置信息" value={gpsCount.toLocaleString()} />
-          <AdmMetric label="数据库" value={fmtBytes(db.bytes)} sub={`WAL ${fmtBytes(db.walBytes)}`} />
-          <AdmMetric label="磁盘剩余" value={fmtBytes(disk.freeBytes)} sub={`低于 ${Math.round(disk.watermarkBytes / ADM_GB)} GB 时拒绝上传`}>
+        <div className="stats">
+          <AdmStat label="图片" value={active.length.toLocaleString()} />
+          <AdmStat label="占用空间" value={fmtBytes(totalBytes)} />
+          <AdmStat label="回收站" value={trashed.length.toLocaleString()} />
+          <AdmStat label="数据库" value={fmtBytes(db.bytes)} />
+          <AdmStat label="磁盘剩余" value={fmtBytes(disk.freeBytes)}>
             <div className="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin="0" aria-valuemax="100" aria-valuenow={usedShare}>
               <span style={{ width: `${usedShare}%` }} />
             </div>
-            <span className="s">
-              共 {fmtBytes(disk.totalBytes)}，已用 {usedShare}%
-            </span>
-          </AdmMetric>
+          </AdmStat>
         </div>
 
-        <AdmCard title="维护">
+        <AdmSection title="维护">
           <AdmRunRow
             label="快速检查"
-            hint="确认每张图片的文件存在且大小一致"
             idleLabel="开始检查"
             busyLabel="检查中…"
             running={running === 'quick'}
@@ -779,7 +665,6 @@ function StatusPage({ status, images, toast }) {
           />
           <AdmRunRow
             label="完整检查"
-            hint="重新计算每个文件的哈希，并查找没有记录的文件"
             idleLabel="开始检查"
             busyLabel="检查中…"
             running={running === 'full'}
@@ -789,7 +674,6 @@ function StatusPage({ status, images, toast }) {
           />
           <AdmRunRow
             label="创建快照"
-            hint="把数据库和图片复制到快照目录，用于备份"
             idleLabel="创建快照"
             busyLabel="创建中…"
             running={running === 'snapshot'}
@@ -797,34 +681,28 @@ function StatusPage({ status, images, toast }) {
             onRun={runSnapshot}
             result={results.snapshot}
           />
-        </AdmCard>
+        </AdmSection>
 
-        <section className="card">
-          <div className="card-head">
-            <h2>运行信息</h2>
-          </div>
-          <div className="card-body">
-            <dl className="props" style={{ gridTemplateColumns: '96px minmax(0, 1fr)' }}>
-              <dt>版本</dt>
-              <dd>{status.version}</dd>
-              <dt>提交</dt>
-              <dd className="mono">{status.commit}</dd>
-              <dt>Go</dt>
-              <dd>{status.goVersion}</dd>
-              <dt>SQLite</dt>
-              <dd>{status.sqliteVersion}</dd>
-              <dt>数据目录</dt>
-              <dd className="mono" style={{ overflowWrap: 'anywhere' }}>
-                {status.dataDir}
-              </dd>
-            </dl>
-          </div>
-        </section>
+        <AdmSection title="运行信息" compact>
+          <AdmRow label="版本">
+            <div className="adm-value">{status.version}</div>
+          </AdmRow>
+          <AdmRow label="提交">
+            <div className="adm-value mono">{status.commit}</div>
+          </AdmRow>
+          <AdmRow label="Go">
+            <div className="adm-value">{status.goVersion}</div>
+          </AdmRow>
+          <AdmRow label="SQLite">
+            <div className="adm-value">{status.sqliteVersion}</div>
+          </AdmRow>
+          <AdmRow label="数据目录">
+            <div className="adm-value mono">{status.dataDir}</div>
+          </AdmRow>
+        </AdmSection>
 
-        <section className="card" style={{ overflow: 'hidden' }}>
-          <div className="card-head">
-            <h2>操作记录</h2>
-          </div>
+        <section className="adm-sec">
+          <h2>操作记录</h2>
           {mobile ? (
             <div className="adm-audit-list">
               {audit.map((a, i) => (
@@ -838,32 +716,30 @@ function StatusPage({ status, images, toast }) {
               ))}
             </div>
           ) : (
-            <table className="table adm-table">
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>操作者</th>
-                  <th>操作</th>
-                  <th>对象</th>
-                </tr>
-              </thead>
-              <tbody>
-                {audit.map((a, i) => (
-                  <tr key={i}>
-                    <td className="mono subtle" style={{ whiteSpace: 'nowrap' }}>
-                      {fmtDate(a.at)}
-                    </td>
-                    <td>{a.actor}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{a.action}</td>
-                    <td>
-                      <div className="truncate" style={{ maxWidth: 360 }}>
-                        {a.target}
-                      </div>
-                    </td>
+            <div className="table-wrap">
+              <table className="table adm-table adm-audit">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>操作者</th>
+                    <th>操作</th>
+                    <th>对象</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {audit.map((a, i) => (
+                    <tr key={i}>
+                      <td className="mono subtle nowrap">{fmtDate(a.at)}</td>
+                      <td>{a.actor}</td>
+                      <td className="nowrap">{a.action}</td>
+                      <td className="c-name">
+                        <div className="truncate">{a.target}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>

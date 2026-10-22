@@ -1,4 +1,4 @@
-// Sanitized fixture data and pure helpers shared by all directions.
+// Sanitized fixture data and pure helpers.
 
 const NOW = new Date('2026-10-21T15:30:00+08:00').getTime();
 const DAY = 86400000;
@@ -110,7 +110,6 @@ function makeImage(row, i, trashed) {
     size,
     frames,
     visibility,
-    hasGps: gps,
     source,
     tags: [...tags],
     sha256: (id + id + id + id).slice(0, 64).replace(/[^0-9a-f]/g, (c) => B32.indexOf(c).toString(16).slice(-1)),
@@ -153,11 +152,11 @@ const STATUS = {
   sqliteVersion: '3.53.4',
   uptimeSeconds: 6 * 86400 + 4 * 3600,
   dataDir: '/var/lib/picberth',
-  db: { bytes: 1.4 * 1048576, walBytes: 220 * 1024 },
-  disk: { freeBytes: 182 * 1073741824, totalBytes: 250 * 1073741824, watermarkBytes: 5 * 1073741824 },
+  db: { bytes: 1.4 * 1048576 },
+  disk: { freeBytes: 182 * 1073741824, totalBytes: 250 * 1073741824 },
   lastSnapshot: { at: NOW - 9 * DAY, path: '/var/lib/picberth/snapshots/20261012T030000Z' },
   lastCheck: { at: NOW - 20 * 3600000, mode: 'quick', ok: true, issues: 0 },
-  warnings: [{ code: 'snapshot-stale', title: '超过 7 天没有创建快照', detail: '在下方创建一次快照，再用备份工具保存快照目录。' }],
+  warnings: [{ code: 'snapshot-stale', title: '超过 7 天没有创建快照' }],
 };
 
 const AUDIT = [
@@ -205,15 +204,6 @@ function startOfDay(t) {
   const d = new Date(t);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
-const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-function dayLabel(t) {
-  const days = Math.round((startOfDay(NOW) - startOfDay(t)) / DAY);
-  const d = new Date(t);
-  const date = `${d.getMonth() + 1}月${d.getDate()}日`;
-  if (days === 0) return ['今天', `${date} ${WEEK[d.getDay()]}`];
-  if (days === 1) return ['昨天', `${date} ${WEEK[d.getDay()]}`];
-  return [date, WEEK[d.getDay()]];
-}
 function sourceLabel(key) {
   return SOURCES.find((s) => s.key === key)?.label ?? key;
 }
@@ -231,7 +221,7 @@ const DATE_RANGES = [
   { key: 'older', label: '30 天以前', until: () => NOW - 30 * DAY },
 ];
 
-const EMPTY_FILTERS = { q: '', formats: [], vis: '', date: '', sources: [], tags: [], gps: false };
+const EMPTY_FILTERS = { q: '', formats: [], vis: '', date: '', sources: [], tags: [] };
 
 function applyFilters(list, f, sort, ext) {
   const q = f.q.trim().toLowerCase();
@@ -239,7 +229,6 @@ function applyFilters(list, f, sort, ext) {
     if (q && !(im.filename.toLowerCase().includes(q) || im.id.includes(q) || im.sha256.startsWith(q) || (ext && im.tags.some((t) => t.includes(q))))) return false;
     if (f.formats.length && !f.formats.includes(im.format)) return false;
     if (f.vis && im.visibility !== f.vis) return false;
-    if (f.gps && !im.hasGps) return false;
     if (ext) {
       if (f.date) {
         const r = DATE_RANGES.find((d) => d.key === f.date);
@@ -262,27 +251,13 @@ function applyFilters(list, f, sort, ext) {
 }
 
 function activeFilterCount(f, ext) {
-  return (f.q ? 1 : 0) + f.formats.length + (f.vis ? 1 : 0) + (f.gps ? 1 : 0) + (ext ? (f.date ? 1 : 0) + f.sources.length + f.tags.length : 0);
+  return (f.q ? 1 : 0) + f.formats.length + (f.vis ? 1 : 0) + (ext ? (f.date ? 1 : 0) + f.sources.length + f.tags.length : 0);
 }
 
 function allTags(list) {
   const m = new Map();
   for (const im of list) for (const t of im.tags) m.set(t, (m.get(t) ?? 0) + 1);
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
-}
-
-function groupByDay(list) {
-  const out = [];
-  for (const im of list) {
-    const key = startOfDay(im.createdAt);
-    let g = out[out.length - 1];
-    if (!g || g.key !== key) {
-      g = { key, label: dayLabel(im.createdAt), items: [] };
-      out.push(g);
-    }
-    g.items.push(im);
-  }
-  return out;
 }
 
 const LINK_FORMATS = [
@@ -301,6 +276,6 @@ const SORTS = [
 
 Object.assign(window, {
   NOW, DAY, TOKENS, SOURCES, SETTINGS, STATUS, AUDIT, FORMAT_LABEL, MIME, LINK_FORMATS, SORTS, DATE_RANGES,
-  EMPTY_FILTERS, initialImages, fmtBytes, fmtDate, fmtRel, dayLabel, sourceLabel, daysLeft, applyFilters,
-  activeFilterCount, allTags, groupByDay, fakeId,
+  EMPTY_FILTERS, initialImages, fmtBytes, fmtDate, fmtRel, sourceLabel, daysLeft, applyFilters,
+  activeFilterCount, allTags, fakeId,
 });

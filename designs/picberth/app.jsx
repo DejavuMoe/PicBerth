@@ -3,15 +3,6 @@
 const PARAMS = new URLSearchParams(location.search);
 const EMBED = PARAMS.has('embed');
 
-const NAV = [
-  { key: 'images', label: '全部图片', short: '图片', icon: 'images', group: '图片' },
-  { key: 'trash', label: '回收站', short: '回收站', icon: 'trash', group: '图片' },
-  { key: 'tokens', label: '令牌', short: '令牌', icon: 'key', group: '接入' },
-  { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: '系统' },
-  { key: 'status', label: '状态', short: '状态', icon: 'activity', group: '系统' },
-];
-const TAB_KEYS = ['images', 'trash', 'tokens'];
-
 const SAMPLE_UPLOADS = [
   { file: 'dashboard-light.png', name: 'screenshot-2026-10-21-153012.png', size: 418000, format: 'png', width: 1920, height: 1200 },
   { file: 'line-chart.png', name: 'latency-p99.png', size: 236000, format: 'png', width: 1600, height: 900 },
@@ -37,7 +28,6 @@ function buildImage(u) {
     size: u.size,
     frames: 1,
     visibility: u.vis,
-    hasGps: false,
     source: 'web',
     tags: [],
     sha256: (id + id + id + id).slice(0, 64).replace(/[^0-9a-f]/g, (c) => '0123456789abcdef'[c.charCodeAt(0) % 16]),
@@ -92,9 +82,11 @@ function App() {
   const [purgeIds, setPurgeIds] = React.useState(null);
   const [dragging, setDragging] = React.useState(false);
   const [moreOpen, setMoreOpen] = React.useState(false);
-  const [filterSheet, setFilterSheet] = React.useState(false);
+  const [adjustOpen, setAdjustOpen] = React.useState(false);
+  const [searchOpen, setSearchOpen] = React.useState(false);
 
   const isMobile = useMedia('(max-width: 720px)');
+  const rail = useMedia('(max-width: 1099px)') && !isMobile;
   const anchor = React.useRef(null);
   const suppress = React.useRef(false);
   const fileInput = React.useRef(null);
@@ -129,11 +121,12 @@ function App() {
     anchor.current = null;
   };
   const toggle = (id, shift) => {
+    const from = anchor.current;
     setSel((prev) => {
       const next = new Set(prev);
-      if (shift && anchor.current) {
+      if (shift && from) {
         const ids = items.map((i) => i.id);
-        const a = ids.indexOf(anchor.current);
+        const a = ids.indexOf(from);
         const b = ids.indexOf(id);
         if (a >= 0 && b >= 0) {
           for (let i = Math.min(a, b); i <= Math.max(a, b); i++) next.add(ids[i]);
@@ -321,13 +314,17 @@ function App() {
     };
   }, []);
 
+  const focusSearch = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchRef.current?.focus(), 0);
+  };
   const keyRef = React.useRef(null);
   keyRef.current = (e) => {
     if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.querySelector('.modal, .drawer, .sheet') && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if (e.key === '/' && inLibrary) {
       e.preventDefault();
-      searchRef.current?.focus();
+      focusSearch();
     } else if (e.key === 'u' || e.key === 'U') {
       pickFiles();
     } else if (e.key === 'Escape') {
@@ -350,6 +347,7 @@ function App() {
     setRoute(r);
     clearSel();
     setActiveId(null);
+    setSearchOpen(false);
     window.scrollTo(0, 0);
   };
   const setDataState = (s) => {
@@ -366,7 +364,7 @@ function App() {
     if (s) setSel(new Set(base.slice(0, s).map((i) => i.id)));
     if (PARAMS.get('up')) simulateUploads();
     if (PARAMS.get('upload')) setUploadOpen(true);
-    if (PARAMS.get('filters')) setFilterSheet(true);
+    if (PARAMS.get('filters')) setAdjustOpen(true);
     if (PARAMS.get('purge')) setPurgeIds(base.slice(0, 1).map((i) => i.id));
     if (PARAMS.get('more')) setMoreOpen(true);
     if (PARAMS.get('f')) setFilters({ ...EMPTY_FILTERS, formats: ['png'], vis: 'public', tags: ['博客'] });
@@ -376,7 +374,8 @@ function App() {
     images, base, items, byId, route, filters, setFilters, sort, setSort, view, setView, sel, selectMode, setSelectMode,
     activeId, open, clickItem, toggle, neighbors, selectAll: () => setSel(new Set(items.map((i) => i.id))), clearSel,
     suppressClick: () => (suppress.current = true), linkFormat, setLinkFormat, act, dataState,
-    retry: () => setDataState('ok'), settings, isMobile, toast, pick: pickFiles, go, knownTags,
+    retry: () => setDataState('ok'), settings, isMobile, rail, toast, pick: pickFiles, go, knownTags,
+    searchRef, searchOpen, setSearchOpen,
     uploads, uploadVis, setUploadVis, cancelUpload, retryUpload, removeUpload, clearFinished,
   };
 
@@ -399,18 +398,16 @@ function App() {
         setTheme={setTheme}
         toast={toast}
         status={STATUS}
-        images={images}
         page={page}
-        searchRef={searchRef}
         moreOpen={moreOpen}
         setMoreOpen={setMoreOpen}
-        openFilters={() => setFilterSheet(true)}
-        uploadOpen={uploadOpen}
+        openAdjust={() => setAdjustOpen(true)}
         setUploadOpen={setUploadOpen}
+        uploadOpen={uploadOpen}
         active={active}
         closeDetail={() => setActiveId(null)}
       />
-      {filterSheet && <FilterSheet lib={lib} onClose={() => setFilterSheet(false)} />}
+      {adjustOpen && <AdjustSheet lib={lib} onClose={() => setAdjustOpen(false)} />}
       {purgeIds && <PurgeConfirm count={purgeIds.length} onCancel={() => setPurgeIds(null)} onConfirm={confirmPurge} />}
       {dragging && <DropOverlay />}
       <input
@@ -430,209 +427,27 @@ function App() {
   );
 }
 
-// ---------------------------------------------------------------- shell pieces
-
-function ThemeButton({ theme, setTheme }) {
-  const dark = theme === 'dark';
-  return (
-    <button type="button" className="btn btn-ghost btn-icon" aria-label={dark ? '切换到浅色' : '切换到深色'} title={dark ? '切换到浅色' : '切换到深色'} onClick={() => setTheme(dark ? 'light' : 'dark')}>
-      <Icon name={dark ? 'sun' : 'moon'} />
-    </button>
-  );
-}
-
-function AccountMenu({ toast }) {
-  return (
-    <Menu
-      align="right"
-      width={180}
-      trigger={(open, toggle) => (
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="账户" aria-expanded={open} onClick={toggle}>
-          <span className="avatar">A</span>
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          <div className="menu-label">admin</div>
-          <div className="menu-sep" />
-          <MenuItem icon="logout" onClick={() => (close(), toast('已退出登录'))}>
-            退出登录
-          </MenuItem>
-        </>
-      )}
-    </Menu>
-  );
-}
-
-function navCount(images, key) {
-  if (key === 'images') return images.filter((i) => i.state === 'active').length;
-  if (key === 'trash') return images.filter((i) => i.state === 'trashed').length;
-  return undefined;
-}
-
-function NavList({ route, go, images, status }) {
-  let group = null;
-  return NAV.map((n) => {
-    const head = n.group !== group ? <div className="nav-group">{(group = n.group)}</div> : null;
-    const count = navCount(images, n.key);
-    const warn = n.key === 'status' && status.warnings.length > 0;
-    return (
-      <React.Fragment key={n.key}>
-        {head}
-        <button type="button" className="nav-item" aria-current={route === n.key ? 'page' : undefined} title={n.label} onClick={() => go(n.key)}>
-          <span className="nav-icon">
-            <Icon name={n.icon} />
-            {warn && <span className="nav-dot" aria-hidden="true" />}
-          </span>
-          <span className="nav-label">{n.label}</span>
-          {count !== undefined && <span className="count num">{count}</span>}
-          {warn && (
-            <span className="count" aria-label={`${status.warnings.length} 条警告`}>
-              <span className="badge badge-warning badge-xs">{status.warnings.length}</span>
-            </span>
-          )}
-        </button>
-      </React.Fragment>
-    );
-  });
-}
-
-function DiskMeter({ status }) {
-  const used = 1 - status.disk.freeBytes / status.disk.totalBytes;
-  return (
-    <div className="usage">
-      <div className="usage-row">
-        <span>磁盘剩余</span>
-        <span className="num">{fmtBytes(status.disk.freeBytes)}</span>
-      </div>
-      <div className="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(used * 100)}>
-        <span style={{ width: `${Math.round(used * 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function LibraryHead({ lib, route, onUpload }) {
-  const total = lib.base.reduce((s, i) => s + i.size, 0);
-  if (route === 'trash')
-    return (
-      <div className="page-head">
-        <div>
-          <h1>回收站</h1>
-          <p className="num">
-            {lib.base.length} 张 · {fmtBytes(total)} · 保留 {lib.settings.trashRetentionDays} 天后自动永久删除
-          </p>
-        </div>
-        {lib.base.length > 0 && (
-          <div className="page-actions">
-            <button type="button" className="btn btn-danger" onClick={() => lib.act.purge(lib.base.map((i) => i.id))}>
-              清空回收站
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  return (
-    <div className="page-head">
-      <div>
-        <h1>全部图片</h1>
-        <p className="num">
-          {lib.base.length} 张 · {fmtBytes(total)}
-        </p>
-      </div>
-      {!lib.isMobile && (
-        <div className="page-actions">
-          <button type="button" className="btn btn-primary" onClick={onUpload} title="上传 (U)">
-            <Icon name="upload" />
-            上传
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TabBar({ route, go, status, onMore, moreOpen }) {
-  const moreOn = moreOpen || !TAB_KEYS.includes(route);
-  return (
-    <nav className="tabbar" aria-label="主导航">
-      {NAV.filter((n) => TAB_KEYS.includes(n.key)).map((n) => (
-        <button key={n.key} type="button" className="tab" aria-current={route === n.key && !moreOpen ? 'page' : undefined} onClick={() => go(n.key)}>
-          <Icon name={n.icon} size={20} />
-          <span>{n.short}</span>
-        </button>
-      ))}
-      <button type="button" className="tab" aria-current={moreOn ? 'page' : undefined} aria-expanded={moreOpen} onClick={onMore}>
-        <span className="nav-icon">
-          <Icon name="more" size={20} />
-          {status.warnings.length > 0 && <span className="nav-dot" aria-hidden="true" />}
-        </span>
-        <span>更多</span>
-      </button>
-    </nav>
-  );
-}
-
-function MoreSheet({ route, go, status, theme, setTheme, onClose }) {
-  return (
-    <Sheet onClose={onClose} label="更多">
-      {(close) => (
-        <>
-          <div className="sheet-head">
-            <h2>更多</h2>
-          </div>
-          <div className="sheet-body more-body">
-            {NAV.filter((n) => !TAB_KEYS.includes(n.key)).map((n) => (
-              <button
-                key={n.key}
-                type="button"
-                className="nav-item"
-                aria-current={route === n.key ? 'page' : undefined}
-                onClick={() => {
-                  go(n.key);
-                  close();
-                }}
-              >
-                <span className="nav-icon">
-                  <Icon name={n.icon} />
-                </span>
-                <span className="nav-label">{n.label}</span>
-                {n.key === 'status' && status.warnings.length > 0 && (
-                  <span className="count">
-                    <span className="badge badge-warning">{status.warnings.length} 条警告</span>
-                  </span>
-                )}
-                <span className="count">
-                  <Icon name="chevron-right" />
-                </span>
-              </button>
-            ))}
-            <div className="menu-sep" />
-            <div className="setting-row more-row">
-              <span className="label">深色模式</span>
-              <Switch checked={theme === 'dark'} label="深色模式" onChange={(v) => setTheme(v ? 'dark' : 'light')} />
-            </div>
-          </div>
-        </>
-      )}
-    </Sheet>
-  );
-}
-
 // ---------------------------------------------------------------- shell
 
 const DOCK_MS = 260;
 
-function Shell({ lib, route, go, theme, setTheme, toast, status, images, page, searchRef, moreOpen, setMoreOpen, openFilters, uploadOpen, setUploadOpen, active, closeDetail }) {
+function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen, setMoreOpen, openAdjust, uploadOpen, setUploadOpen, active, closeDetail }) {
   const mobile = lib.isMobile;
-  const rail = useMedia('(max-width: 1099px)') && !mobile;
+  const rail = lib.rail;
   const wide = useMedia('(min-width: 1280px)');
   const [measure, width] = useWidth();
-  const cur = NAV.find((n) => n.key === route);
   const inLib = !page;
   const canDock = wide && inLib;
   const bulk = lib.sel.size > 0 || lib.selectMode;
+
+  // The page header gains a hairline once content scrolls beneath it.
+  const [scrolled, setScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 0);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
 
   // Keep the docked panel's content while the column collapses.
   const [dockImg, setDockImg] = React.useState(null);
@@ -643,63 +458,35 @@ function Shell({ lib, route, go, theme, setTheme, toast, status, images, page, s
   }, [active]);
 
   return (
-    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="console">
-      {!mobile && (
-        <aside className="sidenav" aria-label="主导航">
-          <Brand />
-          <nav>
-            <NavList route={route} go={go} images={images} status={status} />
-          </nav>
-          {!rail && <DiskMeter status={status} />}
-        </aside>
-      )}
-      <div className="main">
-        <header className="topbar">
-          {mobile ? (
-            <Brand />
-          ) : (
-            <nav className="crumbs" aria-label="位置">
-              <span>PicBerth</span>
-              <Icon name="chevron-right" size={12} />
-              {cur.group !== '图片' && (
-                <>
-                  <span>{cur.group}</span>
-                  <Icon name="chevron-right" size={12} />
-                </>
-              )}
-              <strong>{cur.label}</strong>
-            </nav>
-          )}
-          <span className="grow" />
-          {!mobile && <ThemeButton theme={theme} setTheme={setTheme} />}
-          <AccountMenu toast={toast} />
-        </header>
-        <div className={`workspace ${canDock && active ? 'docked' : ''}`}>
-          <main className="workspace-main">
-            {page ?? (
-              <div className="page lib-page" ref={measure}>
-                <LibraryHead lib={lib} route={route} onUpload={() => setUploadOpen(true)} />
-                {bulk && !mobile ? <BulkBar lib={lib} /> : <LibraryToolbar lib={lib} searchRef={searchRef} onOpenFilters={openFilters} width={width} />}
+    <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''} ${scrolled ? 'scrolled' : ''}`} data-screen-label="console">
+      {!mobile && <Sidebar route={route} go={go} status={status} theme={theme} setTheme={setTheme} toast={toast} />}
+      <div className={`workspace ${canDock && active ? 'docked' : ''}`}>
+        <main className="workspace-main">
+          {page ?? (
+            <div className="page" ref={measure}>
+              <LibraryHead lib={lib} width={width} onUpload={() => setUploadOpen(true)} onAdjust={openAdjust} />
+              <div className="page-body">
+                <FilterChips lib={lib} />
                 <ImageCollection lib={lib} />
               </div>
-            )}
-          </main>
-          {canDock && (
-            <aside className="dock" aria-label="图片详情" aria-hidden={!active}>
-              <div className="dock-inner">{(active || dockImg) && <DetailPanel lib={lib} image={active ?? dockImg} onClose={closeDetail} mode="dock" />}</div>
-            </aside>
+            </div>
           )}
-        </div>
+        </main>
+        {canDock && (
+          <aside className="dock" aria-label="图片详情" aria-hidden={!active}>
+            <div className="dock-inner">{(active || dockImg) && <DetailPanel lib={lib} image={active ?? dockImg} onClose={closeDetail} mode="dock" />}</div>
+          </aside>
+        )}
       </div>
 
-      {mobile && bulk && inLib && <BulkBar lib={lib} />}
+      {mobile && bulk && inLib && <BulkBar lib={lib} compact floating />}
       {mobile && inLib && route === 'images' && !bulk && lib.dataState === 'ok' && lib.base.length > 0 && (
         <button type="button" className="fab" aria-label="上传" onClick={lib.pick}>
           <Icon name="upload" size={22} />
         </button>
       )}
       {mobile && <TabBar route={route} go={go} status={status} moreOpen={moreOpen} onMore={() => setMoreOpen(true)} />}
-      {mobile && moreOpen && <MoreSheet route={route} go={go} status={status} theme={theme} setTheme={setTheme} onClose={() => setMoreOpen(false)} />}
+      {mobile && moreOpen && <MoreSheet route={route} go={go} status={status} theme={theme} setTheme={setTheme} toast={toast} onClose={() => setMoreOpen(false)} />}
 
       {active && !canDock && !mobile && (
         <Drawer onClose={closeDetail} width="420px" label="图片详情">

@@ -11,8 +11,10 @@ function formatSetupCode(raw) {
 function AuthCard({ title, children }) {
   return (
     <main className="auth">
-      <div className="auth-card">
-        <Brand />
+      <div className="auth-col">
+        <span role="img" aria-label="PicBerth">
+          <BrandMark size={20} className="brand-mark-lg" />
+        </span>
         <h1>{title}</h1>
         {children}
       </div>
@@ -65,7 +67,6 @@ function SetupScreen({ preset }) {
         <div className="field">
           <label htmlFor="setup-pass">密码</label>
           <input id="setup-pass" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" aria-invalid={err('password') ? 'true' : undefined} />
-          <span className="hint">至少 10 个字符</span>
           {err('password') && <span className="error-text">{errors.password}</span>}
         </div>
         <div className="field">
@@ -128,87 +129,31 @@ function LoginScreen({ preset }) {
   );
 }
 
-function NotFoundScreen() {
+function NotFoundScreen({ theme, setTheme, toast }) {
   const mobile = useMedia('(max-width: 720px)');
   const rail = useMedia('(max-width: 1099px)') && !mobile;
-  let group = null;
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const noop = () => {};
   return (
     <div className={`app ${rail ? 'rail' : ''} ${mobile ? 'mobile' : ''}`} data-screen-label="not-found">
-      {!mobile && (
-        <aside className="sidenav" aria-label="主导航">
-          <Brand />
-          <nav>
-            {NAV.map((n) => {
-              const head = n.group !== group ? <div className="nav-group">{(group = n.group)}</div> : null;
-              return (
-                <React.Fragment key={n.key}>
-                  {head}
-                  <button type="button" className="nav-item" title={n.label}>
-                    <span className="nav-icon">
-                      <Icon name={n.icon} />
-                    </span>
-                    <span className="nav-label">{n.label}</span>
-                  </button>
-                </React.Fragment>
-              );
-            })}
-          </nav>
-        </aside>
-      )}
-      <div className="main">
-        <header className="topbar">
-          {mobile ? (
-            <Brand />
-          ) : (
-            <nav className="crumbs" aria-label="位置">
-              <span>PicBerth</span>
-              <Icon name="chevron-right" size={12} />
-              <strong>页面不存在</strong>
-            </nav>
-          )}
-        </header>
-        <main>
-          <div className="page" style={{ '--page-w': '720px' }}>
-            <div className="empty">
-              <span className="empty-icon">
-                <Icon name="search" size={22} />
-              </span>
-              <strong>页面不存在</strong>
-              <p>这个地址没有对应的页面。</p>
-              <div className="actions">
-                <a className="btn btn-secondary" href="#" onClick={(e) => e.preventDefault()}>
-                  全部图片
-                </a>
-              </div>
+      {!mobile && <Sidebar route={null} go={noop} status={STATUS} theme={theme} setTheme={setTheme} toast={toast} />}
+      <div className="workspace">
+        <main className="workspace-main">
+          <div className="page">
+            <div className="empty not-found">
+              <h1>页面不存在</h1>
+              <a className="btn btn-secondary" href="#" onClick={(e) => e.preventDefault()}>
+                全部图片
+              </a>
             </div>
           </div>
         </main>
       </div>
-      {mobile && (
-        <nav className="tabbar" aria-label="主导航">
-          {NAV.slice(0, 3).map((n) => (
-            <button key={n.key} type="button" className="tab">
-              <Icon name={n.icon} size={20} />
-              <span>{n.short}</span>
-            </button>
-          ))}
-          <button type="button" className="tab">
-            <Icon name="more" size={20} />
-            <span>更多</span>
-          </button>
-        </nav>
-      )}
+      {mobile && <TabBar route={null} go={noop} status={STATUS} moreOpen={moreOpen} onMore={() => setMoreOpen(true)} />}
+      {mobile && moreOpen && <MoreSheet route={null} go={noop} status={STATUS} theme={theme} setTheme={setTheme} toast={toast} onClose={() => setMoreOpen(false)} />}
     </div>
   );
 }
-
-const NAV = [
-  { key: 'images', label: '全部图片', short: '图片', icon: 'images', group: '图片' },
-  { key: 'trash', label: '回收站', short: '回收站', icon: 'trash', group: '图片' },
-  { key: 'tokens', label: '令牌', short: '令牌', icon: 'key', group: '接入' },
-  { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: '系统' },
-  { key: 'status', label: '状态', short: '状态', icon: 'activity', group: '系统' },
-];
 
 const SCREENS = {
   setup: ['empty', 'errors', 'wrong', 'busy', 'done'],
@@ -221,6 +166,12 @@ function AuthApp() {
   const [preset, setPreset] = React.useState(AUTH_PARAMS.get('p') || SCREENS[AUTH_PARAMS.get('s') || 'login'][0]);
   const [theme, setTheme] = React.useState(AUTH_PARAMS.get('theme') || 'light');
   const [open, setOpen] = React.useState(false);
+  const [toasts, setToasts] = React.useState([]);
+  const toast = (text) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts((t) => [...t.slice(-2), { id, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+  };
   React.useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
@@ -234,7 +185,8 @@ function AuthApp() {
     <>
       {screen === 'setup' && <SetupScreen key={key} preset={preset} />}
       {screen === 'login' && <LoginScreen key={key} preset={preset} />}
-      {screen === 'not-found' && <NotFoundScreen key={key} />}
+      {screen === 'not-found' && <NotFoundScreen key={key} theme={theme} setTheme={setTheme} toast={toast} />}
+      <Toasts toasts={toasts} dismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
       {!AUTH_PARAMS.has('embed') && (
         <div data-proto="controls">
           <button type="button" className="proto-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
