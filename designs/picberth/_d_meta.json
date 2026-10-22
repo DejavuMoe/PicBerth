@@ -8,7 +8,7 @@
         {
           "path": "index.html",
           "createdAt": "2026-10-21T12:27:29.586Z",
-          "status": "needs-review",
+          "status": "approved",
           "subtitle": "侧栏 / 图标栏 / 底部标签栏，宽屏停靠详情",
           "viewport": {
             "width": 1440,
@@ -22,7 +22,7 @@
         {
           "path": "auth.html",
           "createdAt": "2026-10-21T15:20:41.681Z",
-          "status": "needs-review",
+          "status": "approved",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -32,5 +32,5 @@
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-22T04:40:03.349Z"
+  "updatedAt": "2026-10-22T05:06:43.412Z"
 }

@@ -106,7 +106,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "needs-review"
+      "status": "approved"
     },
     {
       "id": "auth",
@@ -158,7 +158,7 @@
         ],
         "tests": []
       },
-      "status": "needs-review"
+      "status": "approved"
     }
   ]
 }
