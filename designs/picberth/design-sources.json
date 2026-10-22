@@ -14,16 +14,16 @@
       "licenseOrPermission": "repository",
       "localCopies": [],
       "observations": [
-        "Image API supports state, q (filename/ID/SHA-256), format, visibility, gps, sort new/old/large/small and cursor pagination.",
-        "PATCH accepts only visibility; batch supports trash, restore, purge and visibility for up to 500 IDs.",
+        "Image API supports state, q (filename/ID/SHA-256/tag), format, tag, source, visibility, gps, since/until, sort new/old/large/small/name, cursor pagination, and a facets endpoint.",
+        "PATCH accepts any non-empty subset of visibility, filename and tags; batch supports trash, restore, purge and visibility for up to 500 IDs.",
         "Upload accepts an optional visibility part and returns duplicate=true for an existing image.",
         "Error strings in web/src/lib/api.ts are reused for upload errors in the prototype."
       ],
       "inferences": [
-        "Tags, rename, date-range and source filters need new backend work and are shown only behind the extension toggle."
+        "Tags, rename, date-range and source filters were added to the backend after the prototype round; the approved prototype's extension toggle corresponds to shipped behaviour."
       ],
       "limitations": [
-        "The production SPA ships the rejected darkroom design; its layout and metaphor copy carry no authority."
+        "The earlier darkroom design was rejected and has been replaced in production; its layout and metaphor copy carry no authority."
       ]
     },
     {
