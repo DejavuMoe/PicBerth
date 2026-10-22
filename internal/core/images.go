@@ -168,7 +168,6 @@ type ListParams struct {
 	Tags       []string // image must carry all of them
 	Sources    []string // any of: "web", "cli", "token:<id>"
 	Visibility string
-	GPS        bool
 	TokenID    *int64
 	Since      *time.Time // created at or after
 	Until      *time.Time // created before
@@ -284,7 +283,7 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if lp.Visibility != "" && lp.Visibility != "public" && lp.Visibility != "private" {
 		return nil, "", validation("visibility must be public or private.")
 	}
-	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), Visibility: lp.Visibility, GPS: lp.GPS, TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
+	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), Visibility: lp.Visibility, TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
 	if len(q.Q) > 200 {
 		return nil, "", validation("q is too long.")
 	}
@@ -364,7 +363,6 @@ type Facets struct {
 	Bytes      int64            `json:"bytes"`
 	Formats    map[string]int64 `json:"formats"`
 	Visibility map[string]int64 `json:"visibility"`
-	GPS        int64            `json:"gps"`
 	Sources    []FacetSource    `json:"sources"`
 	Tags       []FacetTag       `json:"tags"`
 }
@@ -407,7 +405,7 @@ func (s *Service) ImageFacets(ctx context.Context, p Principal, state string) (F
 		return Facets{}, err
 	}
 	f := Facets{
-		Total: mf.Total, Bytes: mf.Bytes, GPS: mf.GPS,
+		Total: mf.Total, Bytes: mf.Bytes,
 		Formats:    map[string]int64{},
 		Visibility: map[string]int64{"public": mf.Visibility["public"], "private": mf.Visibility["private"]},
 		Sources:    []FacetSource{},

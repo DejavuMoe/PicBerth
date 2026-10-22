@@ -218,8 +218,8 @@ func (db *DB) queryIDs(ctx context.Context, q string, args ...any) ([]string, er
 
 // Stats are the aggregate numbers shown on the status page.
 type Stats struct {
-	Active, Trashed, Broken, WithGPS int64
-	Bytes                            int64 // active + trashed
+	Active, Trashed, Broken int64
+	Bytes                   int64 // active + trashed
 }
 
 // ImageStats aggregates image counts.
@@ -229,9 +229,8 @@ func (db *DB) ImageStats(ctx context.Context) (Stats, error) {
 		COALESCE(SUM(state = 'active'), 0),
 		COALESCE(SUM(state = 'trashed'), 0),
 		COALESCE(SUM(broken_at IS NOT NULL AND state != 'purged'), 0),
-		COALESCE(SUM(has_gps = 1 AND state = 'active'), 0),
 		COALESCE(SUM(CASE WHEN state != 'purged' THEN size ELSE 0 END), 0)
-		FROM images`).Scan(&s.Active, &s.Trashed, &s.Broken, &s.WithGPS, &s.Bytes)
+		FROM images`).Scan(&s.Active, &s.Trashed, &s.Broken, &s.Bytes)
 	return s, err
 }
 
@@ -256,7 +255,6 @@ type ListQuery struct {
 	Tags       []string // all of these tags
 	Sources    []SourceFilter
 	Visibility string
-	GPS        bool
 	TokenID    *int64 // filter: uploaded by this token
 	OwnerID    *int64 // filter: owned by this user
 	Since      *int64 // created_at >= Since (unix ms)
@@ -343,9 +341,6 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 	if q.Visibility != "" {
 		where = append(where, "i.visibility = ?")
 		args = append(args, q.Visibility)
-	}
-	if q.GPS {
-		where = append(where, "i.has_gps = 1")
 	}
 	if q.TokenID != nil {
 		where = append(where, "i.token_id = ?")

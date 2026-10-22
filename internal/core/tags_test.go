@@ -463,7 +463,7 @@ func TestImageFacetsService(t *testing.T) {
 	for _, v := range []ImageView{w1, w2, t1, own, c1} {
 		bytes += v.Size
 	}
-	if f.Total != 5 || f.Bytes != bytes || f.GPS != 0 {
+	if f.Total != 5 || f.Bytes != bytes {
 		t.Fatalf("totals: %+v (bytes want %d)", f, bytes)
 	}
 	if !reflect.DeepEqual(f.Formats, map[string]int64{"jpeg": 1, "png": 4, "gif": 0, "webp": 0, "avif": 0}) {

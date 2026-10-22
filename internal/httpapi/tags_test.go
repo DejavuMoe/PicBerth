@@ -227,7 +227,6 @@ func TestFacetsEndpoint(t *testing.T) {
 		Bytes      int64            `json:"bytes"`
 		Formats    map[string]int64 `json:"formats"`
 		Visibility map[string]int64 `json:"visibility"`
-		GPS        int64            `json:"gps"`
 		Sources    []struct {
 			Key       string `json:"key"`
 			Kind      string `json:"kind"`
@@ -245,7 +244,7 @@ func TestFacetsEndpoint(t *testing.T) {
 	resp, body = h.web("GET", "/api/v1/images/facets", nil)
 	wantStatus(t, resp, body, 200)
 	f := decode[facets](t, body)
-	if f.Total != 3 || f.Bytes <= 0 || f.GPS != 0 {
+	if f.Total != 3 || f.Bytes <= 0 {
 		t.Fatalf("facets: %s", body)
 	}
 	if !reflect.DeepEqual(f.Formats, map[string]int64{"jpeg": 0, "png": 3, "gif": 0, "webp": 0, "avif": 0}) {

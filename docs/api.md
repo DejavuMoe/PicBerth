@@ -171,7 +171,6 @@ List query parameters:
 | `tag` | repeatable; the image must have **all** given tags (exact match) | — |
 | `source` | repeatable, any-of: `web`, `cli`, `token:<id>` (decimal token id) | — |
 | `visibility` | `public` \| `private` | — |
-| `gps` | `true` | — |
 | `tokenId` | integer | — |
 | `since`, `until` | RFC 3339 timestamps (URL-encode `+`): `createdAt >= since` and `createdAt < until` | — |
 | `sort` | `new` \| `old` \| `large` \| `small` \| `name` (filename ascending, ASCII case-insensitive, then id) | `new` |
@@ -187,7 +186,6 @@ All params combine with AND; within `format` and `source` the values are alterna
 { "total": 26, "bytes": 23400000,
   "formats": { "jpeg": 7, "png": 16, "gif": 1, "webp": 2, "avif": 0 },
   "visibility": { "public": 21, "private": 5 },
-  "gps": 4,
   "sources": [ { "key": "web", "kind": "web", "count": 13 },
                { "key": "token:1", "kind": "token", "tokenId": 1, "tokenName": "PicGo · 笔记本", "count": 5 },
                { "key": "cli", "kind": "cli", "count": 2 } ],
@@ -241,7 +239,7 @@ curl -H "Authorization: Bearer pb_…" -F file=@shot.png https://pics.example.co
 {
   "version": "0.1.0", "commit": "…", "goVersion": "go1.27.3", "sqliteVersion": "3.53.4",
   "startedAt": "…", "uptimeSeconds": 3600,
-  "images": { "active": 1204, "trashed": 12, "bytes": 734003200, "withGps": 31, "broken": 0 },
+  "images": { "active": 1204, "trashed": 12, "bytes": 734003200, "broken": 0 },
   "database": { "bytes": 2490368, "walBytes": 41200 },
   "disk": { "freeBytes": 51539607552, "totalBytes": 107374182400, "watermarkBytes": 2147483648 },
   "dataDir": "/var/lib/picberth",

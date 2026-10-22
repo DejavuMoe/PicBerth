@@ -265,7 +265,7 @@ func TestImageFacets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Total != 3 || f.Bytes != 175 || f.GPS != 1 {
+	if f.Total != 3 || f.Bytes != 175 {
 		t.Fatalf("totals: %+v", f)
 	}
 	if f.Exts["png"] != 2 || f.Exts["jpg"] != 1 || f.Visibility["public"] != 2 || f.Visibility["private"] != 1 {

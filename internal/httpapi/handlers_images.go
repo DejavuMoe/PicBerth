@@ -159,13 +159,6 @@ func (s *Server) listImages(w http.ResponseWriter, r *http.Request, c *call) {
 			*dst = &t
 		}
 	}
-	if v := q.Get("gps"); v != "" {
-		if v != "true" {
-			s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "gps must be true."})
-			return
-		}
-		lp.GPS = true
-	}
 	if v := q.Get("tokenId"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || n < 1 {
