@@ -2,9 +2,9 @@
 
 Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
 `internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
-The production SPA implements the approved prototype in `designs/picberth/` (console: single shell, revised and
-approved 2026-10-22; auth and not-found screens). The earlier 「暗房」 design was **rejected** by the user on 2026-10-21 and no longer exists in
-the code; it has no authority.
+The production SPA implements the approved prototype in `designs/picberth/` (console: single shell, design
+approved as `fe9ca37`, implemented in `16297e6`; auth and not-found screens). The earlier 「暗房」 design was
+**rejected** by the user on 2026-10-21 and no longer exists in the code; it has no authority.
 
 ## Users and primary jobs
 
@@ -33,11 +33,11 @@ the code; it has no authority.
 
 | Object | User-visible fields | Allowed actions (web session) | Rules | Evidence |
 |---|---|---|---|---|
-| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, visibility 公开/私有, hasGps, broken, duplicate, source (网页 / 令牌名 / 命令行), tags, createdAt, trashedAt, links{url, markdown, html, bbcode} | upload, set visibility, rename, edit tags, trash, restore, purge, download raw | link bytes never change; purged IDs never reused; private images not publicly reachable | `lib/types.ts` Image, `handlers_images.go` |
+| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, visibility 公开/私有, broken, duplicate, source (网页 / 令牌名 / 命令行), tags, createdAt, trashedAt, links{url, markdown, html, bbcode} | upload, set visibility, rename, edit tags, trash, restore, purge, download raw | link bytes never change; purged IDs never reused; private images not publicly reachable; `hasGps` is returned by the API but not shown in the console | `lib/types.ts` Image, `handlers_images.go` |
 | Upload item | file name, progress, status queued/uploading/processing/done/error, error text, retryable | cancel, retry (retryable only), remove, copy link | concurrency 3; client pre-check of size/format; 429 auto-retry | `lib/upload.svelte.ts` |
 | Token (令牌) | name, prefix, scopes 上传/只读/管理, createdAt, lastUsedAt, expiresAt, revokedAt | create, revoke | secret shown once; tokens cannot manage tokens/settings | `lib/types.ts` Token, `api.md` |
 | Settings (设置) | maxUploadBytes, maxPixels, allowedFormats, dedupe, defaultVisibility, trashRetentionDays, uploadsPerMinute, sessionIdleMinutes, sessionAbsoluteHours; read-only publicUrl, imageUrl, hardMaxUploadBytes | edit writable fields | — | `lib/types.ts` Settings |
-| Status (状态) | images {active, trashed, bytes, withGps, broken}, database, disk, lastSnapshot, lastCheck, warnings, versions | run check (quick/full), create snapshot | — | `lib/types.ts` Status |
+| Status (状态) | images {active, trashed, bytes, broken}, database, disk, lastSnapshot, lastCheck, warnings, versions | run check (quick/full), create snapshot | — | `lib/types.ts` Status |
 | Audit entry | at, actor, action, target, detail, ip | read, paginate | — | `GET /api/v1/audit` |
 
 ## Library query capabilities (what "find / filter" can do today)
@@ -45,12 +45,12 @@ the code; it has no authority.
 `GET /api/v1/images` supports, all combined with AND: `state` (active | trashed), `q` (filename or tag
 substring, ID or SHA-256 prefix), `format` (any-of jpeg | png | gif | webp | avif; repeatable and/or
 comma-separated), `tag` (repeatable, image must have all), `source` (repeatable any-of: `web`, `cli`,
-`token:<id>`), `visibility` (public | private), `gps=true`, `since` / `until` (RFC 3339, upload time,
+`token:<id>`), `visibility` (public | private), `since` / `until` (RFC 3339, upload time,
 `since` inclusive, `until` exclusive), `sort` (new | old | large | small | name), cursor pagination
 (`limit`, `cursor`). No size range.
 
 `GET /api/v1/images/facets?state=active|trashed` returns counts for the whole visible set of that state
-(ignoring other filters): total, bytes, per format, per visibility, GPS count, per source (web, each token with
+(ignoring other filters): total, bytes, per format, per visibility, per source (web, each token with
 its name, cli) and per tag. Use it for filter counts and tag/source pickers.
 
 Images carry `tags` (up to 20, 1–32 characters each; no comma, no leading `#`). `PATCH /api/v1/images/{id}`
@@ -83,26 +83,28 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
   swipe in detail. Phones: 选择 toggle starts selection mode; a floating upload button sits above the tab bar.
 - Table row actions show on hover or focus and always on touch. Default library view is the table on every
   width; the choice is remembered (`picberth.view`).
-- Tag editor: up to 20 tags, 32 characters each (server limit); a leading `#` is stripped.
+- Tag editor: up to 20 tags, 32 characters each (server limit); a leading `#` is stripped. The add field is a
+  combobox listing existing tags with counts.
 - Status figures are one card; the settings unsaved bar floats at the bottom (above the tab bar on phones).
 - Live region announces upload completions/errors; icon buttons have labels.
 - Overlays (modal, drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced-motion`.
-- zh-CN only; light/dark with manual override.
+- zh-CN only; light and dark follow the system, with a manual override (跟随系统 / 浅色 / 深色, `picberth.theme`).
 
 ## Platform, viewport, and runtime constraints
 
 - SPA embedded in a Go binary; strict CSP (`script-src 'self'`, images from self/blob/data/image origin).
 - Svelte 5 + Vite, no UI libraries. Target Chrome/Edge 111+, Firefox 114+, Safari 16.4+.
-- Desktop and mobile both supported: full sidebar from 1100 px, icon rail 721–1099 px, no sidebar at ≤ 720 px
-  (bottom tab bar). Library phone rows at ≤ 720 px; image detail docked column ≥ 1280 px, right drawer 721–1279 px,
-  bottom sheet on phones. The toolbar adapts to the width of the page content, not the viewport.
+- Breakpoints: full sidebar from 1100 px, icon rail 721–1099 px, full-bleed panel with a bottom tab bar at
+  ≤ 720 px. Library phone rows at ≤ 720 px; image detail docked column ≥ 1280 px (380 px), right drawer
+  721–1279 px, bottom sheet on phones. The header controls adapt to the width of the panel content, not the
+  viewport.
 - The server serves the SPA only for its known routes: an unknown URL requested directly gets a plain 404; unknown
   in-app paths show the not-found screen.
 
 ## Content authority currently evidenced
 
 - Domain terminology in production code: 图片, 上传, 图库, 回收站, 令牌, 设置, 状态, 公开, 私有, 链接, 复制,
-  移到回收站, 恢复, 永久删除, 撤销, 含位置, 动图, 损坏, 上传 / 只读 / 管理.
+  移到回收站, 恢复, 永久删除, 撤销, 动图, 损坏, 上传 / 只读 / 管理.
 - State/error strings in `lib/api.ts` (`errorMessage`) and `lib/upload.svelte.ts` must stay compatible.
 - Rejected metaphor copy (底片, 帧, 冲洗, 显影, 暗房已就绪, 图片的泊位 …) has no authority.
 - Explicitly approved marketing copy: none.
