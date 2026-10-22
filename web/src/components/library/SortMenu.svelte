@@ -4,16 +4,24 @@
   import Menu from '../Menu.svelte';
   import MenuItem from '../MenuItem.svelte';
 
-  let { lib }: { lib: Library } = $props();
+  let { lib, iconOnly = false }: { lib: Library; iconOnly?: boolean } = $props();
 
   const current = $derived(SORTS.find((s) => s.key === lib.sort) ?? SORTS[0]!);
 </script>
 
 <Menu align="right" width={160}>
   {#snippet trigger(open, toggle)}
-    <button type="button" class="btn btn-secondary" aria-expanded={open} onclick={toggle}>
+    <button
+      type="button"
+      class="btn btn-secondary"
+      class:btn-icon={iconOnly}
+      aria-expanded={open}
+      aria-label={iconOnly ? `排序：${current.label}` : undefined}
+      title={iconOnly ? `排序：${current.label}` : undefined}
+      onclick={toggle}
+    >
       <Icon name="sort" />
-      <span>{current.label}</span>
+      {#if !iconOnly}<span>{current.label}</span>{/if}
     </button>
   {/snippet}
   {#snippet children(close)}

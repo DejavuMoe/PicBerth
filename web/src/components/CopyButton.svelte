@@ -7,12 +7,14 @@
     text: string;
     label?: string;
     small?: boolean;
-    variant?: 'secondary' | 'primary' | 'ghost';
+    variant?: 'secondary' | 'primary' | 'ghost' | 'overlay';
     iconOnly?: boolean;
     /** Text control to select when the clipboard is unavailable. */
     field?: HTMLInputElement | null;
+    /** Runs after the text reached the clipboard. */
+    oncopied?: () => void;
   }
-  let { text, label = '复制', small = false, variant = 'secondary', iconOnly = false, field = null }: Props = $props();
+  let { text, label = '复制', small = false, variant = 'secondary', iconOnly = false, field = null, oncopied }: Props = $props();
 
   let done = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -23,6 +25,7 @@
     if (r === 'failed') return toast('当前连接不安全，无法写入剪贴板');
     if (r === 'selected') return toast(INSECURE_HINT);
     done = true;
+    oncopied?.();
     clearTimeout(timer);
     timer = setTimeout(() => (done = false), 1400);
   }
@@ -34,6 +37,7 @@
   class="btn btn-{variant}"
   class:btn-sm={small}
   class:btn-icon={iconOnly}
+  class:copied={done}
   onclick={run}
   aria-label={iconOnly ? name : undefined}
   title={iconOnly ? name : undefined}

@@ -9,18 +9,21 @@
   }
   let { id, tags, known, onchange }: Props = $props();
 
+  // Same limits as the server: 20 tags per image, 32 characters each.
+  const MAX_TAGS = 20;
+
   let value = $state('');
 
   function add() {
-    const t = value.trim();
-    if (t && !tags.includes(t)) onchange([...tags, t]);
+    const t = value.trim().replace(/^#/, '');
+    if (t && !tags.includes(t) && tags.length < MAX_TAGS) onchange([...tags, t]);
     value = '';
   }
 </script>
 
 <div class="tag-editor">
   {#each tags as t (t)}
-    <span class="tag">
+    <span class="tag tag-edit">
       {t}
       <button type="button" aria-label={`移除标签 ${t}`} onclick={() => onchange(tags.filter((x) => x !== t))}>
         <Icon name="x" size={12} />
@@ -28,11 +31,11 @@
     </span>
   {/each}
   <input
-    class="input"
+    class="input tag-input"
     placeholder="添加标签"
     aria-label="添加标签"
     list={`tags-${id}`}
-    maxlength={20}
+    maxlength={32}
     bind:value
     onkeydown={(e) => {
       if (e.key === 'Enter' || e.key === ',') {

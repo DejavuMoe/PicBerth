@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ICONS, type IconName } from '../lib/icons';
+  import { ICON_STROKE, ICONS, type IconName } from '../lib/icons';
 
   let { name, size = 16 }: { name: IconName; size?: number } = $props();
 </script>
@@ -10,7 +10,7 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width="1.7"
+  stroke-width={ICON_STROKE[name] ?? 1.7}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"

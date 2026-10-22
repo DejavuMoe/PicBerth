@@ -3,15 +3,13 @@
   import { daysLeft, formatName } from '../../lib/image';
   import type { Library } from '../../lib/library.svelte';
   import { longpress } from '../../lib/longpress';
-  import { LINK_FORMATS, uploads } from '../../lib/upload.svelte';
-  import CopyButton from '../CopyButton.svelte';
   import Icon from '../Icon.svelte';
   import Thumb from '../Thumb.svelte';
+  import CopyLink from './CopyLink.svelte';
 
   let { lib }: { lib: Library } = $props();
 
   const trash = $derived(lib.mode === 'trash');
-  const fmtLabel = $derived(LINK_FORMATS.find((f) => f.value === uploads.format)?.label ?? '');
 
   function tileKey(e: KeyboardEvent, id: string) {
     if (e.target !== e.currentTarget) return;
@@ -47,24 +45,24 @@
         lib.suppressNextClick();
       }}
     >
-      <Thumb image={im} cover />
-      <label class="tile-check">
-        <input type="checkbox" class="check" checked={on} onclick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
-      </label>
-      <span class="tile-badges">
-        {#if im.visibility === 'private'}
-          <span class="badge"><Icon name="lock" size={12} />私有</span>
-        {/if}
-        {#if im.frames > 1}<span class="badge">{formatName(im) === 'GIF' ? 'GIF' : '动图'}</span>{/if}
-        {#if im.hasGps}
-          <span class="badge" title="含位置信息" aria-label="含位置信息"><Icon name="pin" size={12} /></span>
+      <span class="tile-media">
+        <Thumb image={im} cover />
+        <label class="tile-check">
+          <input type="checkbox" class="check" checked={on} onclick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
+        </label>
+        <span class="tile-badges">
+          {#if im.visibility === 'private'}
+            <span class="badge badge-overlay"><Icon name="lock" size={12} />私有</span>
+          {/if}
+          {#if im.frames > 1}<span class="badge badge-overlay">{formatName(im) === 'GIF' ? 'GIF' : '动图'}</span>{/if}
+          {#if im.hasGps}
+            <span class="badge badge-overlay" title="含位置信息" aria-label="含位置信息"><Icon name="pin" size={12} /></span>
+          {/if}
+        </span>
+        {#if !trash}
+          <span class="tile-copy"><CopyLink image={im} variant="overlay" /></span>
         {/if}
       </span>
-      {#if !trash}
-        <span class="tile-copy">
-          <CopyButton iconOnly small text={im.links[uploads.format]} label={`复制 ${fmtLabel}`} />
-        </span>
-      {/if}
       <span class="tile-meta">
         <span class="name truncate" title={im.filename}>{im.filename}</span>
         <span class="sub truncate">

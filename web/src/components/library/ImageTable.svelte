@@ -1,12 +1,12 @@
 <script lang="ts">
   import { formatAbsolute, formatBytes, formatRelative } from '../../lib/format';
-  import { daysLeft, formatName } from '../../lib/image';
+  import { daysLeft, formatName, hasAlpha } from '../../lib/image';
   import type { Library } from '../../lib/library.svelte';
   import type { ImageSort } from '../../lib/types';
-  import CopyLinkSplit from '../CopyLinkSplit.svelte';
   import Icon from '../Icon.svelte';
   import Thumb from '../Thumb.svelte';
-  import VisBadge from '../VisBadge.svelte';
+  import VisLabel from '../VisLabel.svelte';
+  import CopyLink from './CopyLink.svelte';
   import RowMenu from './RowMenu.svelte';
 
   let { lib }: { lib: Library } = $props();
@@ -36,18 +36,18 @@
   }
 </script>
 
-{#snippet sortHead(label: string, desc: ImageSort, asc: ImageSort, numeric: boolean)}
+{#snippet sortHead(label: string, desc: ImageSort, asc: ImageSort, numeric: boolean, extra = '')}
   {@const on = lib.sort === desc || lib.sort === asc}
-  <th class={numeric ? 'c-num' : undefined} aria-sort={on ? (asc === desc || lib.sort === asc ? 'ascending' : 'descending') : 'none'}>
+  <th class={`${numeric ? 'c-num' : ''} ${extra}`.trim() || undefined} aria-sort={on ? (asc === desc || lib.sort === asc ? 'ascending' : 'descending') : 'none'}>
     <button type="button" class:sorted={on} onclick={() => lib.setSort(lib.sort === desc ? asc : desc)}>
       {label}
-      <Icon name={on && lib.sort === asc && asc !== desc ? 'chevron-up' : 'chevron-down'} size={12} />
+      <span class="sort-ind"><Icon name={on && lib.sort === asc && asc !== desc ? 'chevron-up' : 'chevron-down'} size={12} /></span>
     </button>
   </th>
 {/snippet}
 
 <div class="table-wrap">
-  <table class="table clickable">
+  <table class="table">
     <thead>
       <tr>
         <th class="c-check">
@@ -62,14 +62,14 @@
         </th>
         <th class="c-thumb"><span class="sr-only">预览</span></th>
         {@render sortHead('文件名', 'name', 'name', false)}
-        <th class="c-num col-dims">尺寸</th>
+        <th class="c-num c-dim">尺寸</th>
         {@render sortHead('大小', 'large', 'small', true)}
         {#if trash}
-          <th>删除时间</th>
+          <th class="c-date">删除时间</th>
           <th>自动清除</th>
         {:else}
-          <th>可见性</th>
-          {@render sortHead('上传时间', 'new', 'old', false)}
+          <th class="c-vis">可见性</th>
+          {@render sortHead('上传时间', 'new', 'old', false, 'c-date')}
         {/if}
         <th class="c-actions"><span class="sr-only">操作</span></th>
       </tr>
@@ -95,37 +95,41 @@
               aria-label={`选择 ${im.filename}`}
             />
           </td>
-          <td class="c-thumb"><Thumb image={im} size="sm" /></td>
+          <td class="c-thumb"><Thumb image={im} size="sm" cover={!hasAlpha(im)} /></td>
           <td class="c-name">
             <span class="cell-name">
               <span class="name truncate" title={im.filename}>{im.filename}</span>
               <span class="sub">
                 <span>{formatName(im)}</span>
-                {#if im.frames > 1}<span>· 动图</span>{/if}
+                <span class="sub-dim num">{im.width} × {im.height}</span>
+                {#if im.visibility === 'private'}
+                  <span class="sub-vis"><Icon name="lock" size={12} />私有</span>
+                {/if}
+                {#if im.frames > 1}<span>动图</span>{/if}
                 {#if im.hasGps}
-                  <span class="gps" title="含位置信息">· <Icon name="pin" size={12} /> 含位置</span>
+                  <span class="gps" title="含位置信息"><Icon name="pin" size={12} />含位置</span>
                 {/if}
                 {#each im.tags as t (t)}<span class="tag">{t}</span>{/each}
               </span>
             </span>
           </td>
-          <td class="c-num subtle col-dims">{im.width} × {im.height}</td>
+          <td class="c-num c-dim subtle">{im.width} × {im.height}</td>
           <td class="c-num">{formatBytes(im.size)}</td>
           {#if trash}
-            <td class="nowrap subtle" title={im.trashedAt ? formatAbsolute(im.trashedAt) : undefined}>
+            <td class="nowrap subtle c-date" title={im.trashedAt ? formatAbsolute(im.trashedAt) : undefined}>
               {im.trashedAt ? formatRelative(im.trashedAt) : '—'}
             </td>
             <td class="nowrap">{#if left}<span class="badge">{left}</span>{/if}</td>
           {:else}
-            <td><VisBadge visibility={im.visibility} /></td>
-            <td class="nowrap subtle" title={formatAbsolute(im.createdAt)}>{formatRelative(im.createdAt)}</td>
+            <td class="c-vis"><VisLabel visibility={im.visibility} /></td>
+            <td class="nowrap subtle c-date" title={formatAbsolute(im.createdAt)}>{formatRelative(im.createdAt)}</td>
           {/if}
           <td class="c-actions">
-            <span class="cell-actions">
+            <span class="row-actions">
               {#if trash}
                 <button type="button" class="btn btn-secondary btn-sm" onclick={() => lib.restore([im.id])}>恢复</button>
               {:else}
-                <CopyLinkSplit image={im} />
+                <CopyLink image={im} />
               {/if}
               <RowMenu {lib} image={im} up={items.length > 5 && idx >= items.length - 3} />
             </span>

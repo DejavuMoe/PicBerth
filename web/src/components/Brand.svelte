@@ -4,7 +4,7 @@
   let { href = '/library' }: { href?: string } = $props();
 </script>
 
-<a class="brand" {href}>
+<a class="brand" {href} aria-label="PicBerth">
   <span class="brand-mark"><Icon name="image" size={14} /></span>
-  <span>PicBerth</span>
+  <span class="brand-name">PicBerth</span>
 </a>

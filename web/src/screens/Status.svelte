@@ -222,7 +222,7 @@
 </script>
 
 {#snippet metric(label: string, value: string, sub?: string)}
-  <div class="card adm-metric">
+  <div class="adm-metric">
     <span class="k">{label}</span>
     <span class="v">{value}</span>
     {#if sub}<span class="s">{sub}</span>{/if}
@@ -304,13 +304,13 @@
         </div>
       {/if}
 
-      <div class="adm-metrics">
+      <div class="card adm-metrics">
         {@render metric('图片', formatInt(status.images.active), status.images.broken > 0 ? `${formatInt(status.images.broken)} 张异常` : undefined)}
         {@render metric('占用空间', formatBytes(status.images.bytes))}
         {@render metric('回收站', formatInt(status.images.trashed))}
         {@render metric('含位置信息', formatInt(status.images.withGps))}
         {@render metric('数据库', formatBytes(status.database.bytes), `WAL ${formatBytes(status.database.walBytes)}`)}
-        <div class="card adm-metric">
+        <div class="adm-metric">
           <span class="k">磁盘剩余</span>
           <span class="v">{formatBytes(status.disk.freeBytes)}</span>
           <div class="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedShare}>

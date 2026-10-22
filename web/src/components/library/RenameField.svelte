@@ -6,8 +6,17 @@
   let edit = $state(false);
   let value = $state('');
   let busy = $state(false);
+  let input = $state<HTMLInputElement | null>(null);
 
   const error = $derived(!value.trim() ? '请输入文件名' : value.length > 200 ? '文件名不能超过 200 个字符' : null);
+
+  // Focus the field with the name selected, without the extension.
+  $effect(() => {
+    if (!edit || !input) return;
+    input.focus();
+    const dot = input.value.lastIndexOf('.');
+    input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
+  });
 
   function begin() {
     value = filename;
@@ -26,8 +35,8 @@
 </script>
 
 {#if !edit}
-  <div class="setting-row">
-    <span class="truncate" title={filename}>{filename}</span>
+  <div class="name-row">
+    <span class="name-text" title={filename}>{filename}</span>
     <button type="button" class="btn btn-ghost btn-sm" onclick={begin}>
       <Icon name="edit" />
       重命名
@@ -35,10 +44,9 @@
   </div>
 {:else}
   <div class="rename">
-    <!-- svelte-ignore a11y_autofocus -->
     <input
+      bind:this={input}
       class="input"
-      autofocus
       bind:value
       aria-label="文件名"
       aria-invalid={!!error}
@@ -56,8 +64,8 @@
     <button type="button" class="btn btn-ghost" onclick={cancel}>取消</button>
   </div>
   {#if error}
-    <p class="error-text" style="margin-top: 6px">{error}</p>
+    <p class="error-text">{error}</p>
   {:else}
-    <p class="hint" style="margin-top: 6px">只修改显示的文件名，链接不变。</p>
+    <p class="hint">只修改显示的文件名，链接不变。</p>
   {/if}
 {/if}

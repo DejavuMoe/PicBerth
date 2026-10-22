@@ -45,7 +45,7 @@
   {#if grid}
     <div class="grid" aria-busy="true" aria-label="正在加载">
       {#each { length: 12 } as _, i (i)}
-        <div class="tile" style="cursor: default">
+        <div class="tile is-skeleton">
           <div class="skeleton" style="aspect-ratio: 4 / 3; border-radius: 0"></div>
           <div class="tile-meta">
             <div class="skeleton" style="height: 12px; width: 70%; margin: 3px 0"></div>
@@ -55,10 +55,10 @@
       {/each}
     </div>
   {:else}
-    <div class="rows" aria-busy="true" aria-label="正在加载">
+    <div class="rows rows-skeleton" aria-busy="true" aria-label="正在加载">
       {#each { length: 8 } as _, i (i)}
         <div class="row">
-          <div class="skeleton" style="width: 40px; height: 40px; flex: none"></div>
+          <div class="skeleton" style="width: 44px; height: 44px; flex: none"></div>
           <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
             <div class="skeleton" style="height: 12px; width: {40 + ((i * 17) % 35)}%"></div>
             <div class="skeleton" style="height: 10px; width: 22%"></div>
@@ -82,13 +82,13 @@
 {:else if empty && !lib.filtered}
   {#if lib.mode === 'trash'}
     <div class="empty">
-      <Icon name="trash" size={28} />
+      <span class="empty-icon"><Icon name="trash" size={22} /></span>
       <strong>回收站是空的</strong>
       {#if lib.retention !== null}<p>移到回收站的图片会保留 {lib.retention} 天，之后自动永久删除。</p>{/if}
     </div>
   {:else}
-    <div class="empty">
-      <Icon name="image" size={28} />
+    <div class="empty empty-drop">
+      <span class="empty-icon"><Icon name="upload" size={22} /></span>
       <strong>还没有图片</strong>
       <p>把图片拖到此页面、直接粘贴，或选择文件上传。</p>
       <div class="actions">
@@ -105,7 +105,7 @@
   {/if}
 {:else if empty}
   <div class="empty">
-    <Icon name="search" size={28} />
+    <span class="empty-icon"><Icon name="search" size={22} /></span>
     <strong>没有符合条件的图片</strong>
     <p>修改搜索词或清除筛选条件后再试。</p>
     <div class="actions">
@@ -122,7 +122,7 @@
   {/if}
   <div class="pager" bind:this={footer}>
     {#if lib.cursor}
-      <span>{lib.items.length}{total !== undefined && !lib.filtered ? ` / ${total}` : ''} 张 · {formatBytes(bytes)}</span>
+      <span class="num">{lib.items.length}{total !== undefined && !lib.filtered ? ` / ${total}` : ''} 张 · {formatBytes(bytes)}</span>
       {#if lib.more === 'loading'}
         <span>加载中…</span>
       {:else}
@@ -131,7 +131,7 @@
         </button>
       {/if}
     {:else}
-      <span>
+      <span class="num">
         {total !== undefined && lib.items.length < total ? `${lib.items.length} / ${total} 张` : `共 ${lib.items.length} 张`} · {formatBytes(bytes)}
       </span>
       <span>已全部加载</span>

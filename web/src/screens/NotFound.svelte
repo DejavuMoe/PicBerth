@@ -4,7 +4,7 @@
 
 <div class="page" style="--page-w: 720px">
   <div class="empty">
-    <Icon name="search" size={28} />
+    <span class="empty-icon"><Icon name="search" size={22} /></span>
     <strong>页面不存在</strong>
     <p>这个地址没有对应的页面。</p>
     <div class="actions">
