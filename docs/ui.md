@@ -2,7 +2,7 @@
 
 The console is the Svelte 5 SPA in `web/`, embedded in the Go binary. Its visual and interaction truth is the
 approved prototype in `designs/picberth/` (single console shell `Shell` in `app.jsx`; styles in `styles.css`,
-admin pages in `admin.jsx`; design approved 2026-10-22 as `fe9ca37`, implemented in `16297e6`). Approved copy is
+admin pages in `admin.jsx`; design approved 2026-10-24 as `d4827e1`). Design rules are in `DESIGN.md`. Approved copy is
 the prototype's copy; strings it does not cover come from the production code (`web/src/lib/api.ts` error
 messages, sign-in field labels). Behaviour, states and keyboard support are inventoried in
 `docs/ui/capabilities.md`; durable constraints are in `docs/product/constraints.md`.
@@ -10,13 +10,15 @@ The earlier 「暗房」 design was rejected and no longer exists in the code.
 
 ## Visual system
 
-- Linear-like. Near-black app background; every screen sits in an inset content panel (radius 12, hairline
-  border). Hairlines replace shadows.
+- Linear-like. Every screen sits in an inset content panel (radius 12). All lines are 0.5 px; only floating
+  layers have a shadow. Colours are Radix Colors (gray, lime, red, amber, green); three type sizes (12 / 13 / 16).
+- Motion only on overlays, the detail column, toasts and switches (250 ms ease-out); hover and selection are
+  instant.
 - Light and dark themes follow the system by default. The user can override with 跟随系统 / 浅色 / 深色, stored
   in `picberth.theme` (absent = system).
 - Fonts: self-hosted Inter Variable (Latin subsets, OFL) with system CJK fonts.
-- Lime `#e4f222` appears only on the single primary action of a view: 上传, 新建令牌, 保存, 创建, the sign-in and
-  setup submit buttons, and the phone upload button.
+- Lime (Radix lime 9) appears only on the single primary action of a view: 上传, 新建令牌, 保存, 创建, the sign-in
+  and setup submit buttons, and the phone header upload button.
 - Menus, selects, comboboxes and checkboxes are drawn by the product in a floating layer. There are no native
   select popups or datalists.
 
@@ -37,7 +39,7 @@ and out; all motion is disabled under `prefers-reduced-motion`.
 - Every screen has a 48 px panel header with the title and that screen's controls. Library: search (`/`), 筛选
   (one popover: 格式 / 可见性 / 上传时间 / 来源 / 标签), sort menu, list / grid toggle, 上传 (hidden when the library
   is empty). Trash: 清空回收站. Tablet: search collapses to an icon. Phones: search icon, 选择 toggle and a ⋯ sheet
-  with sort, view and filters; a floating upload button.
+  with sort, view and filters, then the upload button.
 - Active filters show as removable chips under the header.
 - Selecting images replaces the header controls in place with 已选 N 张, 全选 / 取消全选, 复制链接, 可见性,
   移到回收站 (trash: 恢复, 永久删除) and ×. On phones the bulk bar sits above the tab bar.
@@ -53,8 +55,8 @@ and out; all motion is disabled under `prefers-reduced-motion`.
   (switch), 标签 (chips and an 添加标签 combobox listing existing tags with counts; new tags up to 32
   characters, leading `#` stripped, max 20), 来源, 上传时间, 删除时间 (trash), ID, SHA-256. Footer 下载 /
   移到回收站 (trash: 恢复 / 永久删除).
-- Upload dialog; purge confirm (the only confirmation in the app; trash and visibility changes offer 撤销
-  instead).
+- Upload dialog (closing it with nothing in flight clears finished rows); purge confirm (the only confirmation
+  dialog besides leaving unsaved settings; trash and visibility changes offer 撤销 instead).
 - Filters and sort live in the URL: `q`, `format` (repeatable), `visibility`, `date`
   (`today | 7d | 30d | older`), `source` (repeatable), `tag` (repeatable), `sort`. Dates are turned into
   `since` / `until` when the list is requested. The list is paged with `cursor`; the next page loads as you scroll.
@@ -68,11 +70,12 @@ and out; all motion is disabled under `prefers-reduced-motion`.
 
 ## Status and settings
 
-- Settings: centred column with section headings. Number fields have a fixed width with the unit inside the
+- Settings: centred column with sections 上传 / 图片 / 会话 / 地址. Number fields have a fixed width with the unit inside the
   field. Unsaved changes show a floating bar at the bottom of the screen (放弃 / 保存), above the tab bar on phones.
-- Status: a warning alert with an inline 创建快照; five figures in one card (图片, 占用空间, 回收站, 数据库,
+- Status: warning alerts (a stale snapshot is shown on the 快照 row instead); five figures in one card (图片, 占用空间, 回收站, 数据库,
   磁盘剩余 with a usage bar); maintenance rows; run information (including 已运行); audit log.
-- Tokens: a list with a small header row; the expiry is picked with the product-drawn select.
+- Tokens: a list with a small header row; 吊销 turns into 确认吊销 for 4 s and revokes on the second press; the
+  expiry is picked with the product-drawn select.
 
 ## Code layout
 

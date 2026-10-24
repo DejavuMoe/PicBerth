@@ -117,6 +117,6 @@ Steps are used for their Radix purpose:
   reversible actions over questions.
 - When a decision is unavoidable, put it where the user is already choosing: an inline second step on the same
   button (吊销 → 确认吊销) rather than a separate dialog. A blocking dialog is reserved for 永久删除, which
-  cannot be undone and can act on many images at once.
+  cannot be undone and can act on many images at once, and for leaving 设置 with unsaved changes.
 - Each action has one home. Do not repeat the same button in an alert, a header and a row.
 - Every control is product-drawn (menus, selects, comboboxes, checkboxes); no native popups.

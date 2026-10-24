@@ -75,7 +75,8 @@
 - Accessibility: WCAG AA contrast, visible focus, keyboard operation, labelled icon buttons.
 - Motion: none by default; overlays, the detail column, toasts and switches use 250 ms ease-out; disabled under
   reduced motion.
-- Purge is the only blocking confirmation dialog; revoking a token confirms inline on the same button.
+- Blocking confirmation dialogs only for purge and for leaving unsaved settings; revoking a token confirms inline
+  on the same button.
 
 ## Privacy and multimodal evidence
 

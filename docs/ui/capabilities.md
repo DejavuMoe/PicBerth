@@ -3,7 +3,7 @@
 Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
 `internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
 The production SPA implements the approved prototype in `designs/picberth/` (console: single shell, design
-approved as `fe9ca37`, implemented in `16297e6`; auth and not-found screens). The earlier 「暗房」 design was
+approved as `d4827e1`; auth and not-found screens). The earlier 「暗房」 design was
 **rejected** by the user on 2026-10-21 and no longer exists in the code; it has no authority.
 
 ## Users and primary jobs
@@ -25,7 +25,7 @@ approved as `fe9ca37`, implemented in `16297e6`; auth and not-found screens). Th
 | library | `/`, `/library` | browse/search active images, upload queue | upload, search, filter, sort, select, batch, open detail | `screens/Library.svelte`, `components/library/` |
 | image-detail | docked column / drawer / sheet over library/trash | one image | copy link (4 formats), visibility toggle, rename, edit tags, download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
 | trash | `/trash` | trashed images | restore, purge (confirm), batch | `screens/Library.svelte` (trash mode) |
-| tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke | `screens/Tokens.svelte`, `TokenDialog.svelte` |
+| tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke (inline second press) | `screens/Tokens.svelte`, `TokenDialog.svelte` |
 | settings | `/settings` | business settings | edit, save / discard, leave guard | `screens/Settings.svelte` |
 | status | `/status` | health | quick / full check, snapshot, view warnings, figures, audit log | `screens/Status.svelte` |
 
@@ -80,7 +80,7 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
 - Keyboard: `U` opens file picker, `/` focuses search, arrows move between images, Space selects, Enter opens,
   Esc clears selection / closes detail, ←/→ in detail.
 - Pointer: window-wide drag & drop and paste; Ctrl/⌘-click toggle, Shift-click range; touch long-press select,
-  swipe in detail. Phones: 选择 toggle starts selection mode; a floating upload button sits above the tab bar.
+  swipe in detail. Phones: 选择 toggle starts selection mode; the upload button is the last header control.
 - Table row actions show on hover or focus and always on touch. Default library view is the table on every
   width; the choice is remembered (`picberth.view`).
 - Tag editor: up to 20 tags, 32 characters each (server limit); a leading `#` is stripped. The add field is a
