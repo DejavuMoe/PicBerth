@@ -125,7 +125,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "implemented"
+      "status": "approved"
     },
     {
       "id": "auth",
@@ -177,7 +177,7 @@
         ],
         "tests": []
       },
-      "status": "implemented"
+      "status": "approved"
     }
   ]
 }

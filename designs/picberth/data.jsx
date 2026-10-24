@@ -24,16 +24,16 @@ const PICS = {
 };
 
 const TOKENS = [
-  { id: 1, name: 'PicGo · 笔记本', prefix: 'pb_7KQ2M', scopes: ['upload'], createdAt: NOW - 62 * DAY, lastUsedAt: NOW - 2 * 3600000, expiresAt: null, revokedAt: null },
-  { id: 2, name: 'ShareX · 工作机', prefix: 'pb_X4D9R', scopes: ['upload'], createdAt: NOW - 30 * DAY, lastUsedAt: NOW - 1 * DAY, expiresAt: NOW + 60 * DAY, revokedAt: null },
+  { id: 1, name: 'PicGo 笔记本', prefix: 'pb_7KQ2M', scopes: ['upload'], createdAt: NOW - 62 * DAY, lastUsedAt: NOW - 2 * 3600000, expiresAt: null, revokedAt: null },
+  { id: 2, name: 'ShareX 工作机', prefix: 'pb_X4D9R', scopes: ['upload'], createdAt: NOW - 30 * DAY, lastUsedAt: NOW - 1 * DAY, expiresAt: NOW + 60 * DAY, revokedAt: null },
   { id: 3, name: '备份脚本', prefix: 'pb_A0N3T', scopes: ['read'], createdAt: NOW - 120 * DAY, lastUsedAt: NOW - 9 * DAY, expiresAt: null, revokedAt: null },
   { id: 4, name: '旧手机', prefix: 'pb_Q8W1Z', scopes: ['upload', 'manage'], createdAt: NOW - 200 * DAY, lastUsedAt: NOW - 90 * DAY, expiresAt: null, revokedAt: NOW - 40 * DAY },
 ];
 
 const SOURCES = [
   { key: 'web', label: '网页' },
-  { key: 'token:1', label: 'PicGo · 笔记本' },
-  { key: 'token:2', label: 'ShareX · 工作机' },
+  { key: 'token:1', label: 'PicGo 笔记本' },
+  { key: 'token:2', label: 'ShareX 工作机' },
   { key: 'cli', label: '命令行' },
 ];
 
@@ -160,8 +160,8 @@ const STATUS = {
 };
 
 const AUDIT = [
-  { at: NOW - 8 * 60000, actor: 'ShareX · 工作机', action: '上传', target: 'screenshot-2026-10-21-152210.png' },
-  { at: NOW - 24 * 60000, actor: 'PicGo · 笔记本', action: '上传', target: 'handler-retry.png' },
+  { at: NOW - 8 * 60000, actor: 'ShareX 工作机', action: '上传', target: 'screenshot-2026-10-21-152210.png' },
+  { at: NOW - 24 * 60000, actor: 'PicGo 笔记本', action: '上传', target: 'handler-retry.png' },
   { at: NOW - 3 * 3600000, actor: 'admin', action: '设为私有', target: 'IMG_4821.jpg' },
   { at: NOW - 1 * DAY, actor: 'admin', action: '移到回收站', target: 'screenshot-old-draft.png' },
   { at: NOW - 2 * DAY, actor: 'admin', action: '修改设置', target: '回收站保留天数' },

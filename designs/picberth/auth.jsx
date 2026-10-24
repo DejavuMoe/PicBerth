@@ -32,8 +32,8 @@ function SetupScreen({ preset }) {
   const [formError, setFormError] = React.useState(preset === 'wrong' ? '初始化代码不正确' : preset === 'done' ? '管理员已经创建，请直接登录' : '');
   const full = code.replace(/-/g, '').length === 12;
   const errors = {
-    code: !code ? '请输入服务器日志中的初始化代码' : full ? null : '初始化代码共 12 位，格式为 XXXX-XXXX-XXXX',
-    username: /^[A-Za-z0-9._-]{1,64}$/.test(username.trim()) ? null : '1–64 个字符，可用字母、数字、点、下划线和连字符',
+    code: !code ? '请输入初始化代码' : full ? null : '初始化代码为 12 位',
+    username: /^[A-Za-z0-9._-]{1,64}$/.test(username.trim()) ? null : '用户名为 1–64 位字母、数字或 . _ -',
     password: password.length >= 10 && password.length <= 256 ? null : '密码需要 10–256 个字符',
     confirm: confirm === password ? null : '两次输入的密码不一致',
   };
@@ -142,7 +142,7 @@ function NotFoundScreen({ theme, setTheme, toast }) {
               <div className="empty not-found">
                 <h1>页面不存在</h1>
                 <a className="btn btn-secondary" href="#" onClick={(e) => e.preventDefault()}>
-                  全部图片
+                  返回图片
                 </a>
               </div>
             </div>
