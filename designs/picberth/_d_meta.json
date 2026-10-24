@@ -9,7 +9,7 @@
           "path": "index.html",
           "createdAt": "2026-10-21T12:27:29.586Z",
           "status": "approved",
-          "subtitle": "Linear 风格：内嵌面板、细线分隔、柠檬绿主操作，深浅跟随系统",
+          "subtitle": "DESIGN.md 修订：Radix 色彩、三种字号、0.5px 线条、精简文案与动效",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -32,5 +32,5 @@
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-22T08:14:23.702Z"
+  "updatedAt": "2026-10-24T13:57:36.835Z"
 }

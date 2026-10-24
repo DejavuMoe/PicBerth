@@ -4,11 +4,7 @@
 
 const ADM_API_URL = 'https://pics.example.com/api/v1/images';
 const ADM_SCOPE_LABEL = { upload: '上传', read: '只读', manage: '管理' };
-const ADM_SCOPE_OPTIONS = [
-  { key: 'upload', hint: '上传图片，只能查看自己上传的图片' },
-  { key: 'read', hint: '查看全部图片' },
-  { key: 'manage', hint: '修改可见性、删除和恢复图片' },
-];
+const ADM_SCOPE_KEYS = ['upload', 'read', 'manage'];
 const ADM_EXPIRY_OPTIONS = [
   { value: '0', label: '永不过期' },
   { value: '30', label: '30 天' },
@@ -83,7 +79,7 @@ function AdmTokenModal({ onClose, onDone, toast }) {
         <div className="adm-form">
           <div className="alert warning">
             <Icon name="alert" />
-            <div className="grow">关闭后将无法再次查看此令牌</div>
+            <span className="grow">令牌只显示这一次</span>
           </div>
           <div className="field">
             <label htmlFor="adm-secret">令牌</label>
@@ -152,14 +148,11 @@ function AdmTokenModal({ onClose, onDone, toast }) {
         </div>
         <div className="field">
           <span className="field-label">权限</span>
-          <div className="adm-opts">
-            {ADM_SCOPE_OPTIONS.map((o) => (
-              <label key={o.key} className="adm-opt">
-                <input type="checkbox" className="check" checked={scopes[o.key]} onChange={(e) => setScopes({ ...scopes, [o.key]: e.target.checked })} />
-                <span>
-                  <strong>{ADM_SCOPE_LABEL[o.key]}</strong>
-                  <span className="hint">{o.hint}</span>
-                </span>
+          <div className="adm-opts-row adm-opts-start">
+            {ADM_SCOPE_KEYS.map((k) => (
+              <label key={k} className="adm-opt-inline">
+                <input type="checkbox" className="check" checked={scopes[k]} onChange={(e) => setScopes({ ...scopes, [k]: e.target.checked })} />
+                {ADM_SCOPE_LABEL[k]}
               </label>
             ))}
           </div>
@@ -196,12 +189,21 @@ function AdmScopeBadges({ scopes }) {
 function TokensPage({ tokens, setTokens, toast }) {
   const mobile = useMedia('(max-width: 720px)');
   const [creating, setCreating] = React.useState(false);
-  const [revoking, setRevoking] = React.useState(null);
+  // Revoking cannot be undone, so the button asks once more in place: 吊销 turns into 确认吊销 for a few seconds.
+  const [arming, setArming] = React.useState(null);
+  const disarm = React.useRef(0);
+  React.useEffect(() => () => clearTimeout(disarm.current), []);
 
-  const revoke = () => {
-    const id = revoking.id;
-    setTokens(tokens.map((t) => (t.id === id ? { ...t, revokedAt: NOW } : t)));
-    setRevoking(null);
+  const revoke = (t) => {
+    if (arming !== t.id) {
+      setArming(t.id);
+      clearTimeout(disarm.current);
+      disarm.current = setTimeout(() => setArming(null), 4000);
+      return;
+    }
+    clearTimeout(disarm.current);
+    setArming(null);
+    setTokens(tokens.map((x) => (x.id === t.id ? { ...x, revokedAt: NOW } : x)));
     toast('令牌已吊销');
   };
   const added = (token) => {
@@ -219,8 +221,13 @@ function TokensPage({ tokens, setTokens, toast }) {
   );
   const revokeBtn = (t) =>
     !t.revokedAt && (
-      <button type="button" className="btn btn-danger-ghost btn-sm adm-revoke" onClick={() => setRevoking(t)}>
-        吊销
+      <button
+        type="button"
+        className={`btn btn-sm adm-revoke ${arming === t.id ? 'btn-danger-solid armed' : 'btn-danger-ghost'}`}
+        onClick={() => revoke(t)}
+        onBlur={() => arming === t.id && setArming(null)}
+      >
+        {arming === t.id ? '确认吊销' : '吊销'}
       </button>
     );
   const nameCell = (t) => (
@@ -264,7 +271,7 @@ function TokensPage({ tokens, setTokens, toast }) {
                   <span role="columnheader">名称</span>
                   <span role="columnheader">权限</span>
                   <span role="columnheader">最近使用</span>
-                  <span role="columnheader">过期</span>
+                  <span role="columnheader">到期</span>
                   <span role="columnheader" className="sr-only">
                     操作
                   </span>
@@ -291,25 +298,6 @@ function TokensPage({ tokens, setTokens, toast }) {
       </div>
 
       {creating && <AdmTokenModal onClose={() => setCreating(false)} onDone={added} toast={toast} />}
-      {revoking && (
-        <Modal
-          title={`吊销令牌「${revoking.name}」？`}
-          width="440px"
-          onClose={() => setRevoking(null)}
-          footer={
-            <>
-              <button type="button" className="btn btn-secondary" onClick={() => setRevoking(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-danger-solid" onClick={revoke}>
-                吊销
-              </button>
-            </>
-          }
-        >
-          <p>使用此令牌的工具将无法继续上传。</p>
-        </Modal>
-      )}
     </div>
   );
 }
@@ -423,7 +411,7 @@ function SettingsPage({ settings, setSettings, toast }) {
           <AdmRow label="像素上限" htmlFor="adm-max-px">
             {num('maxPixelsM', 'adm-max-px', '百万像素')}
           </AdmRow>
-          <AdmRow label="允许的格式">
+          <AdmRow label="格式">
             <div className="adm-opts-row">
               {ADM_FORMAT_ORDER.map((f) => (
                 <label key={f} className="adm-opt-inline">
@@ -434,8 +422,8 @@ function SettingsPage({ settings, setSettings, toast }) {
             </div>
             {errors.allowedFormats && <span className="error-text">{errors.allowedFormats}</span>}
           </AdmRow>
-          <AdmRow label="默认可见性">
-            <Seg label="默认可见性" value={draft.defaultVisibility} onChange={(v) => set('defaultVisibility', v)} options={VIS_OPTS} />
+          <AdmRow label="频率上限" htmlFor="adm-rate">
+            {num('uploadsPerMinute', 'adm-rate', '次/分钟')}
           </AdmRow>
           <AdmRow label="重复检测">
             <div className="adm-value">
@@ -444,15 +432,12 @@ function SettingsPage({ settings, setSettings, toast }) {
           </AdmRow>
         </AdmSection>
 
-        <AdmSection title="回收站">
-          <AdmRow label="保留天数" htmlFor="adm-trash-days">
-            {num('trashRetentionDays', 'adm-trash-days', '天')}
+        <AdmSection title="图片">
+          <AdmRow label="默认可见性">
+            <Seg label="默认可见性" value={draft.defaultVisibility} onChange={(v) => set('defaultVisibility', v)} options={VIS_OPTS} />
           </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="频率限制">
-          <AdmRow label="每分钟上传次数" htmlFor="adm-rate">
-            {num('uploadsPerMinute', 'adm-rate', '次')}
+          <AdmRow label="回收站保留" htmlFor="adm-trash-days">
+            {num('trashRetentionDays', 'adm-trash-days', '天')}
           </AdmRow>
         </AdmSection>
 
@@ -476,7 +461,7 @@ function SettingsPage({ settings, setSettings, toast }) {
 
         {dirty && (
           <div className="adm-sticky">
-            <span className="grow">有 {changed.length} 项未保存的更改</span>
+            <span className="grow">{changed.length} 项更改未保存</span>
             <button type="button" className="btn btn-secondary" onClick={discard}>
               放弃
             </button>
@@ -544,27 +529,26 @@ function StatusPage({ status, images, toast }) {
   const [auditExtra, setAuditExtra] = React.useState([]);
   const lc = status.lastCheck;
   const ls = status.lastSnapshot;
+  const stale = (status.warnings || []).find((w) => w.code === 'snapshot-stale');
   const lastCheckResult = lc
     ? {
         badge: lc.ok ? '正常' : `发现 ${lc.issues} 个问题`,
         tone: lc.ok ? 'badge-success' : 'badge-danger',
-        body: <span className="subtle">上次检查 {fmtRel(lc.at)}</span>,
+        body: (
+          <span className="subtle" title={fmtDate(lc.at)}>
+            {fmtRel(lc.at)}
+          </span>
+        ),
       }
     : null;
   const [results, setResults] = React.useState({
     quick: lc && lc.mode === 'quick' ? lastCheckResult : null,
     full: lc && lc.mode === 'full' ? lastCheckResult : null,
-    snapshot: ls
-      ? {
-          subtle: true,
-          body: (
-            <>
-              <span>上次快照 {fmtRel(ls.at)}</span>
-              <span className="mono">{ls.path}</span>
-            </>
-          ),
-        }
-      : null,
+    snapshot: stale
+      ? { badge: stale.title, tone: 'badge-warning', body: <span className="subtle">{ls ? fmtRel(ls.at) : null}</span> }
+      : ls
+        ? { subtle: true, body: <span title={ls.path}>{fmtRel(ls.at)}</span> }
+        : null,
   });
 
   const run = (key, ms, finish) => {
@@ -580,7 +564,16 @@ function StatusPage({ status, images, toast }) {
     run(key, 1500, () => {
       setResults((r) => ({
         ...r,
-        [key]: { badge: '正常', tone: 'badge-success', body: <span>检查了 {active.length} 张图片，用时 {seconds} 秒</span> },
+        [key]: {
+          badge: '正常',
+          tone: 'badge-success',
+          body: (
+            <>
+              <span>{active.length} 张图片</span>
+              <span className="subtle">{seconds} 秒</span>
+            </>
+          ),
+        },
       }));
       toast(`${label}完成`);
     });
@@ -595,7 +588,7 @@ function StatusPage({ status, images, toast }) {
           body: (
             <>
               <span className="mono">{path}</span>
-              <span>· 2.3 MB</span>
+              <span className="subtle">2.3 MB</span>
             </>
           ),
         },
@@ -605,7 +598,8 @@ function StatusPage({ status, images, toast }) {
       toast('快照已创建');
     });
 
-  const warnings = (status.warnings || []).filter((w) => !(snapDone && w.code === 'snapshot-stale'));
+  // A stale snapshot is shown on the snapshot row itself; other warnings stand above the figures.
+  const warnings = (status.warnings || []).filter((w) => w.code !== 'snapshot-stale');
   const audit = [...auditExtra, ...AUDIT];
 
   return (
@@ -621,12 +615,7 @@ function StatusPage({ status, images, toast }) {
         {warnings.map((w) => (
           <div key={w.code} className="alert warning">
             <Icon name="alert" />
-            <strong className="grow">{w.title}</strong>
-            {w.code === 'snapshot-stale' && (
-              <button type="button" className="btn btn-secondary btn-sm" disabled={!!running} onClick={runSnapshot}>
-                {running === 'snapshot' ? '创建中…' : '创建快照'}
-              </button>
-            )}
+            <span className="grow">{w.title}</span>
           </div>
         ))}
 
@@ -645,7 +634,7 @@ function StatusPage({ status, images, toast }) {
         <AdmSection title="维护">
           <AdmRunRow
             label="快速检查"
-            idleLabel="开始检查"
+            idleLabel="检查"
             busyLabel="检查中…"
             running={running === 'quick'}
             disabled={!!running}
@@ -654,7 +643,7 @@ function StatusPage({ status, images, toast }) {
           />
           <AdmRunRow
             label="完整检查"
-            idleLabel="开始检查"
+            idleLabel="检查"
             busyLabel="检查中…"
             running={running === 'full'}
             disabled={!!running}
@@ -662,8 +651,8 @@ function StatusPage({ status, images, toast }) {
             result={results.full}
           />
           <AdmRunRow
-            label="创建快照"
-            idleLabel="创建快照"
+            label="快照"
+            idleLabel="创建"
             busyLabel="创建中…"
             running={running === 'snapshot'}
             disabled={!!running}
@@ -674,10 +663,10 @@ function StatusPage({ status, images, toast }) {
 
         <AdmSection title="运行信息" compact>
           <AdmRow label="版本">
-            <div className="adm-value">{status.version}</div>
-          </AdmRow>
-          <AdmRow label="提交">
-            <div className="adm-value mono">{status.commit}</div>
+            <div className="adm-value adm-pair">
+              <span>{status.version}</span>
+              <span className="mono subtle">{status.commit}</span>
+            </div>
           </AdmRow>
           <AdmRow label="Go">
             <div className="adm-value">{status.goVersion}</div>
@@ -697,8 +686,9 @@ function StatusPage({ status, images, toast }) {
               {audit.map((a, i) => (
                 <div key={i} className="adm-audit-item">
                   <span className="mono subtle">{fmtDate(a.at)}</span>
-                  <span>
-                    {a.actor} · {a.action}
+                  <span className="adm-pair">
+                    <span>{a.action}</span>
+                    <span className="subtle">{a.actor}</span>
                   </span>
                   <span className="truncate subtle">{a.target}</span>
                 </div>

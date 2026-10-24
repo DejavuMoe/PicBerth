@@ -205,7 +205,7 @@ function App() {
     const list = metas.map((m) => {
       let error = null;
       if (!m.format || !settings.allowedFormats.includes(m.format)) error = '不支持的图片格式';
-      else if (m.size > settings.maxUploadMB * 1048576) error = `文件超过上限（${fmtBytes(m.size)}，上限 ${settings.maxUploadMB} MB）`;
+      else if (m.size > settings.maxUploadMB * 1048576) error = `超过 ${settings.maxUploadMB} MB 上限`;
       const dupOf = m.dup ? images.find((i) => i.filename === m.name && i.state === 'active')?.id : null;
       return { ...m, id: Math.random().toString(36).slice(2), format: m.format || 'png', vis: uploadVis, status: error ? 'error' : 'queued', error, retryable: false, progress: 0, dupOf };
     });
@@ -257,7 +257,7 @@ function App() {
     if (wasActive.current && !hasActive) {
       const done = uploads.filter((u) => u.status === 'done' || u.status === 'duplicate').length;
       const failed = uploads.filter((u) => u.status === 'error').length;
-      if (!uploadOpen) toast(failed ? `上传完成 ${done} 个，失败 ${failed} 个` : `已上传 ${done} 张图片`);
+      if (!uploadOpen) toast(failed ? `已上传 ${done} 张，失败 ${failed} 张` : `已上传 ${done} 张图片`);
     }
     wasActive.current = hasActive;
   }, [hasActive]);
@@ -430,7 +430,7 @@ function App() {
 
 // ---------------------------------------------------------------- shell
 
-const DOCK_MS = 260;
+const DOCK_MS = 250;
 
 function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen, setMoreOpen, openAdjust, uploadOpen, setUploadOpen, active, closeDetail }) {
   const mobile = lib.isMobile;
@@ -472,11 +472,6 @@ function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen,
       </div>
 
       {mobile && bulk && inLib && <BulkBar lib={lib} compact floating />}
-      {mobile && inLib && route === 'images' && !bulk && lib.dataState === 'ok' && lib.base.length > 0 && (
-        <button type="button" className="fab" aria-label="上传" onClick={lib.pick}>
-          <Icon name="upload" size={22} />
-        </button>
-      )}
       {mobile && <TabBar route={route} go={go} status={status} moreOpen={moreOpen} onMore={() => setMoreOpen(true)} />}
       {mobile && moreOpen && <MoreSheet route={route} go={go} status={status} theme={theme} setTheme={setTheme} toast={toast} onClose={() => setMoreOpen(false)} />}
 
@@ -490,7 +485,7 @@ function Shell({ lib, route, go, theme, setTheme, toast, status, page, moreOpen,
           {(close) => <DetailPanel lib={lib} image={active} onClose={close} mode="sheet" />}
         </Sheet>
       )}
-      {uploadOpen && <UploadDialog lib={lib} onClose={() => setUploadOpen(false)} />}
+      {uploadOpen && <UploadDialog lib={lib} onClose={() => (setUploadOpen(false), lib.uploads.some(isActiveUpload) || lib.clearFinished())} />}
     </div>
   );
 }

@@ -116,7 +116,7 @@ function useEsc(onEsc, active = true) {
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 /** Plays the exit animation of an overlay before it unmounts. */
-function useLeave(onClose, ms = 180) {
+function useLeave(onClose, ms = 250) {
   const [leaving, setLeaving] = React.useState(false);
   const done = React.useRef(false);
   const close = React.useCallback(() => {
@@ -403,7 +403,7 @@ function Tabs({ options, value, onChange, label }) {
 const renderKids = (children, close) => (typeof children === 'function' ? children(close) : children);
 
 function Modal({ title, onClose, children, footer, width, className = '' }) {
-  const [leaving, close] = useLeave(onClose, 120);
+  const [leaving, close] = useLeave(onClose);
   useEsc(close);
   return (
     <>
@@ -423,7 +423,7 @@ function Modal({ title, onClose, children, footer, width, className = '' }) {
 }
 
 function Drawer({ onClose, children, width, label }) {
-  const [leaving, close] = useLeave(onClose, 160);
+  const [leaving, close] = useLeave(onClose);
   useEsc(close);
   return (
     <>
@@ -436,7 +436,7 @@ function Drawer({ onClose, children, width, label }) {
 }
 
 function Sheet({ onClose, children, label, full }) {
-  const [leaving, close] = useLeave(onClose, 180);
+  const [leaving, close] = useLeave(onClose);
   useEsc(close);
   return (
     <>
@@ -539,7 +539,7 @@ function Brand() {
 // ---------------------------------------------------------------- console chrome
 
 const NAV = [
-  { key: 'images', label: '全部图片', short: '图片', icon: 'images', group: 0 },
+  { key: 'images', label: '图片', short: '图片', icon: 'images', group: 0 },
   { key: 'trash', label: '回收站', short: '回收站', icon: 'trash', group: 0 },
   { key: 'tokens', label: '令牌', short: '令牌', icon: 'key', group: 1 },
   { key: 'settings', label: '设置', short: '设置', icon: 'gear', group: 2 },

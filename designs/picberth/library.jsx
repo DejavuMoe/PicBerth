@@ -92,7 +92,7 @@ function FacetPanel({ lib }) {
       </div>
       <div className="facet">
         {head('上传时间', !!f.date, () => set({ date: '' }))}
-        {opt('all', !f.date, '不限', base.length, () => set({ date: '' }))}
+        {opt('all', !f.date, '全部', base.length, () => set({ date: '' }))}
         {DATE_RANGES.map((d) =>
           opt(d.key, f.date === d.key, d.label, countWhere(base, (i) => (d.since ? i.createdAt >= d.since() : i.createdAt < d.until())), () => set({ date: f.date === d.key ? '' : d.key })),
         )}
@@ -281,7 +281,7 @@ function SearchBox({ lib, inputRef, collapsed }) {
  *  Phone: compact title row with search, select mode and the adjustments sheet. */
 function LibraryHead({ lib, width, onUpload, onAdjust }) {
   const trash = lib.route === 'trash';
-  const title = trash ? '回收站' : '全部图片';
+  const title = trash ? '回收站' : '图片';
   const selecting = isSelecting(lib);
   const hasTools = !((lib.dataState === 'ok' || lib.dataState === 'empty') && !lib.base.length);
 
@@ -315,6 +315,11 @@ function LibraryHead({ lib, width, onUpload, onAdjust }) {
             <button type="button" className={`btn btn-ghost btn-icon ${n ? 'active-soft' : ''}`} aria-label={n ? `筛选（${n}）` : '筛选'} onClick={onAdjust}>
               <Icon name="more" />
             </button>
+            {!trash && (
+              <button type="button" className="btn btn-primary btn-icon head-upload" aria-label="上传" onClick={lib.pick}>
+                <Icon name="upload" />
+              </button>
+            )}
           </div>
         )}
       </header>
@@ -376,7 +381,7 @@ function BulkBar({ lib, compact, floating }) {
   const aria = (text, extra) => ({ 'aria-label': compact ? text : undefined, title: compact ? text : undefined, ...extra });
   return (
     <div className={`bulk ${floating ? 'bulk-floating' : ''}`} role="toolbar" aria-label="批量操作">
-      <span className="count">{ids.length ? `已选 ${ids.length} 张` : '点按图片以选择'}</span>
+      <span className="count">已选 {ids.length} 张</span>
       <button type="button" className={`btn btn-ghost ${sm}`} onClick={allOn ? lib.clearSel : lib.selectAll}>
         {allOn ? '取消全选' : '全选'}
       </button>
@@ -528,7 +533,7 @@ function ImageList({ lib, items }) {
   const trash = lib.route === 'trash';
   return (
     <div className="list-wrap">
-      <div className={`list ${isSelecting(lib) ? 'selecting' : ''}`} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '全部图片'}>
+      <div className={`list ${isSelecting(lib) ? 'selecting' : ''}`} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '图片'}>
         {items.map((im, idx) => {
           const on = lib.sel.has(im.id);
           return (
@@ -785,10 +790,7 @@ function ImageCollection({ lib }) {
     return (
       <div className="alert danger" role="alert" style={{ margin: 16 }}>
         <Icon name="alert" />
-        <div className="grow">
-          <strong>无法加载图片列表</strong>
-          <div>无法连接到服务器</div>
-        </div>
+        <span className="grow">无法连接到服务器</span>
         <button type="button" className="btn btn-secondary btn-sm" onClick={lib.retry}>
           <Icon name="refresh" />
           重试
@@ -872,7 +874,7 @@ function DetailName({ image, editable, onSave }) {
             }
           }}
         />
-        <button type="button" className="btn btn-primary" disabled={!!err} onClick={save}>
+        <button type="button" className="btn btn-secondary" disabled={!!err} onClick={save}>
           保存
         </button>
         <button type="button" className="btn btn-ghost" onClick={cancel}>
@@ -983,11 +985,12 @@ function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
           <div>
             <DetailName image={image} editable={!trash} onSave={(n) => lib.act.rename(image.id, n)} />
             <div className="d-meta num">
+              <span>{FORMAT_LABEL[image.format]}</span>
               <span>
-                {FORMAT_LABEL[image.format]} · {image.width} × {image.height} · {fmtBytes(image.size)} ·{' '}
-                <time title={fmtDate(image.createdAt)}>{fmtRel(image.createdAt)}</time>
+                {image.width} × {image.height}
               </span>
-              {trash && <span className="badge">{daysLeft(image, lib.settings.trashRetentionDays)}</span>}
+              <span>{fmtBytes(image.size)}</span>
+              {trash ? <span className="badge">{daysLeft(image, lib.settings.trashRetentionDays)}</span> : <time title={fmtDate(image.createdAt)}>{fmtRel(image.createdAt)}</time>}
             </div>
           </div>
 
@@ -1087,8 +1090,11 @@ function UploadList({ lib }) {
           <li className={`up-row up-${u.status}`} key={u.id}>
             <Thumb image={img ?? thumbSrc} />
             <div className="up-info">
-              <span className="name truncate" title={u.name}>
-                {u.name}
+              <span className="up-name">
+                <span className="name truncate" title={u.name}>
+                  {u.name}
+                </span>
+                {img && <LockMark image={img} />}
               </span>
               {u.status === 'uploading' && (
                 <>
@@ -1096,7 +1102,7 @@ function UploadList({ lib }) {
                     <span style={{ width: `${u.progress}%` }} />
                   </div>
                   <span className="sub num">
-                    {u.progress}% · {fmtBytes(Math.round((u.size * u.progress) / 100))} / {fmtBytes(u.size)}
+                    {fmtBytes(Math.round((u.size * u.progress) / 100))} / {fmtBytes(u.size)}
                   </span>
                 </>
               )}
@@ -1112,11 +1118,10 @@ function UploadList({ lib }) {
               {u.status === 'done' && (
                 <span className="sub ok">
                   <Icon name="check" size={12} />
-                  已上传 · {fmtBytes(u.size)}
-                  {img?.visibility === 'private' ? ' · 私有' : ''}
+                  已上传
                 </span>
               )}
-              {u.status === 'duplicate' && <span className="sub">已存在相同图片，返回原链接</span>}
+              {u.status === 'duplicate' && <span className="sub">已存在，使用原链接</span>}
               {u.status === 'error' && <span className="sub err">{u.error}</span>}
             </div>
             <div className="up-act">
@@ -1170,11 +1175,6 @@ function UploadDialog({ lib, onClose }) {
       footer={(close) => (
         <>
           <Seg label="上传后可见性" value={lib.uploadVis} onChange={lib.setUploadVis} options={VIS_OPTS} className="foot-start" />
-          {s.done > 0 && (
-            <button type="button" className="btn btn-ghost" onClick={lib.clearFinished}>
-              清除已完成
-            </button>
-          )}
           {s.done > 1 && (
             <button type="button" className="btn btn-secondary" onClick={() => copyFinished(lib)}>
               <Icon name="copy" />
@@ -1190,12 +1190,11 @@ function UploadDialog({ lib, onClose }) {
       <Dropzone lib={lib} />
       {lib.uploads.length > 0 && (
         <div className="up-summary">
-          <div className="up-summary-row">
+          <div className="up-summary-row num">
             <span>
-              {s.active ? `正在上传 ${s.active} 个，已完成 ${s.done} 个` : `已完成 ${s.done} 个`}
-              {s.failed ? `，失败 ${s.failed} 个` : ''}
+              已上传 {s.done} / {s.total}
             </span>
-            {s.active > 0 && <span className="num subtle">{pct}%</span>}
+            {s.active > 0 && <span>{pct}%</span>}
           </div>
           <UploadList lib={lib} />
         </div>
@@ -1221,7 +1220,7 @@ function PurgeConfirm({ count, onCancel, onConfirm }) {
         </>
       )}
     >
-      <p>文件会立即从磁盘删除，已发出的链接将失效。此操作无法撤销。</p>
+      <p>链接会立即失效，且无法撤销。</p>
     </Modal>
   );
 }

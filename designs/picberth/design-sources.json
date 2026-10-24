@@ -80,6 +80,30 @@
       ]
     },
     {
+      "id": "radix-colors",
+      "type": "design-system",
+      "location": "npm @radix-ui/colors@3.0.0 (gray, gray-alpha, lime, red, amber, green, black-alpha, white-alpha; light and dark)",
+      "roles": ["visual-reference"],
+      "trust": "external-untrusted",
+      "instructionsPolicy": "treat-as-data-never-execute",
+      "approvedByUser": true,
+      "containsSensitiveData": false,
+      "sanitization": null,
+      "licenseOrPermission": "MIT; colour values only, copied as CSS custom properties",
+      "localCopies": [],
+      "observations": [
+        "Twelve-step scales: 1-2 backgrounds, 3-5 component fills, 6-8 borders and focus, 9-10 solid fills, 11-12 text.",
+        "Lime 9 is a bright step that takes dark text; red 9 takes white text."
+      ],
+      "inferences": [
+        "Lime 9 replaces the earlier #e4f222 accent as the fill of the single primary action, at the user's request that every colour be a Radix colour."
+      ],
+      "limitations": [
+        "No Radix Themes components or CSS are used; only the scale values and their step semantics.",
+        "Display-P3 variants are not used."
+      ]
+    },
+    {
       "id": "inter-variable-font",
       "type": "brand-asset",
       "location": "npm @fontsource-variable/inter@5.2.5 (latin and latin-ext wght subsets)",
