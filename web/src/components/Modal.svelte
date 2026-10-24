@@ -20,7 +20,7 @@
   }
   let { title, onclose, width, fullOnPhone = false, dismissible = true, blocksDrop = true, children, footer }: Props = $props();
 
-  const leave = createLeave(() => onclose, 140);
+  const leave = createLeave(() => onclose, 250);
 </script>
 
 <div class="scrim modal-scrim" class:leaving={leave.leaving} role="presentation" onclick={() => dismissible && leave.close()}></div>

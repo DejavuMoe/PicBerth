@@ -68,10 +68,7 @@
 {:else if lib.phase === 'error'}
   <div class="alert danger" role="alert" style="margin: 16px">
     <Icon name="alert" />
-    <div class="grow">
-      <strong>无法加载图片列表</strong>
-      <div>{lib.errorText}</div>
-    </div>
+    <span class="grow">{lib.errorText}</span>
     <button type="button" class="btn btn-secondary btn-sm" onclick={() => lib.reload()}>
       <Icon name="refresh" />
       重试

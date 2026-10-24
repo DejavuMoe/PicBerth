@@ -121,7 +121,7 @@ export function errorMessage(e: unknown, limits?: MessageLimits): string {
   }
   if (e.code === 'too-large') {
     const mb = limits?.maxUploadBytes ? Math.round((limits.maxUploadBytes / 1048576) * 10) / 10 : 0;
-    return mb ? `文件超过 ${mb} MB 上限` : '文件超过上限';
+    return mb ? `超过 ${mb} MB 上限` : '超过上限';
   }
   return SUMMARY[e.code] ?? (e.status > 0 ? `请求失败（HTTP ${e.status}）` : '发生未知错误');
 }

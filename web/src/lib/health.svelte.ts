@@ -11,7 +11,7 @@ function judge(s: Status): { lamp: Lamp; label: string } {
   if (s.images.broken > 0 || (s.lastCheck && !s.lastCheck.ok)) {
     return { lamp: 'danger', label: '一致性检查发现问题' };
   }
-  if (s.warnings.length > 0) return { lamp: 'warn', label: `需要注意 · ${s.warnings.length} 项` };
+  if (s.warnings.length > 0) return { lamp: 'warn', label: `${s.warnings.length} 项警告` };
   return { lamp: 'ok', label: '一切正常' };
 }
 

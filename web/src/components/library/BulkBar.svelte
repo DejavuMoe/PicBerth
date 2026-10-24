@@ -21,7 +21,7 @@
 </script>
 
 <div class="bulk" class:bulk-floating={floating} role="toolbar" aria-label="批量操作">
-  <span class="count">{ids.length > 0 ? `已选 ${ids.length} 张` : '点按图片以选择'}</span>
+  <span class="count">已选 {ids.length} 张</span>
   <button type="button" class="btn btn-ghost {sm}" onclick={() => (allOn ? lib.clearSel() : lib.selectAll())}>
     {allOn ? '取消全选' : '全选'}
   </button>

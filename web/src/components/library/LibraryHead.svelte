@@ -1,6 +1,7 @@
 <script lang="ts">
   import { filterCount, type Library } from '../../lib/library.svelte';
   import { phone, tablet } from '../../lib/media.svelte';
+  import { openPicker } from '../../lib/picker';
   import { uploadDialog } from '../../lib/upload.svelte';
   import Icon from '../Icon.svelte';
   import PanelHeader from '../PanelHeader.svelte';
@@ -21,7 +22,7 @@
   let { lib, width, searchEl = $bindable(null), searchOpen = $bindable(false), onadjust }: Props = $props();
 
   const trash = $derived(lib.mode === 'trash');
-  const title = $derived(trash ? '回收站' : '全部图片');
+  const title = $derived(trash ? '回收站' : '图片');
   const n = $derived(filterCount(lib.filters));
   // Nothing to search, filter or upload into yet: the empty state carries the one primary action.
   const bare = $derived(lib.phase === 'ready' && lib.items.length === 0 && !lib.filtered);
@@ -68,6 +69,11 @@
         >
           <Icon name="more" />
         </button>
+        {#if !trash}
+          <button type="button" class="btn btn-primary btn-icon head-upload" aria-label="上传" onclick={openPicker}>
+            <Icon name="upload" />
+          </button>
+        {/if}
       {/if}
     </PanelHeader>
   {/if}

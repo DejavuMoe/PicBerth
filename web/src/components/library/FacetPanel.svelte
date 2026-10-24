@@ -57,7 +57,7 @@
 
   <div class="facet">
     {@render head('上传时间', !!f.date, () => lib.setFilters({ date: '' }))}
-    {@render option(!f.date, '不限', undefined, false, () => lib.setFilters({ date: '' }))}
+    {@render option(!f.date, '全部', undefined, false, () => lib.setFilters({ date: '' }))}
     {#each DATE_RANGES as d (d.key)}
       {@render option(f.date === d.key, d.label, undefined, false, () => lib.setFilters({ date: f.date === d.key ? '' : d.key }))}
     {/each}

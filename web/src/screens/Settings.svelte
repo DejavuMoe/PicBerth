@@ -216,7 +216,7 @@
           <AdmRow label="像素上限" htmlFor="adm-max-px">
             {@render numberField('maxMP', 'adm-max-px', '百万像素')}
           </AdmRow>
-          <AdmRow label="允许的格式">
+          <AdmRow label="格式">
             <div class="adm-opts-row">
               {#each ALL_FORMATS as f (f)}
                 <label class="adm-opt-inline">
@@ -227,6 +227,17 @@
             </div>
             {#if errors.formats}<span class="error-text">{errors.formats}</span>{/if}
           </AdmRow>
+          <AdmRow label="频率上限" htmlFor="adm-rate">
+            {@render numberField('perMinute', 'adm-rate', '次/分钟')}
+          </AdmRow>
+          <AdmRow label="重复检测">
+            <div class="adm-value">
+              <Switch checked={form.dedupe} label="重复检测" onchange={(v) => (form.dedupe = v)} />
+            </div>
+          </AdmRow>
+        </AdmSection>
+
+        <AdmSection title="图片">
           <AdmRow label="默认可见性">
             <Seg
               label="默认可见性"
@@ -238,22 +249,8 @@
               ]}
             />
           </AdmRow>
-          <AdmRow label="重复检测">
-            <div class="adm-value">
-              <Switch checked={form.dedupe} label="重复检测" onchange={(v) => (form.dedupe = v)} />
-            </div>
-          </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="回收站">
-          <AdmRow label="保留天数" htmlFor="adm-trash-days">
+          <AdmRow label="回收站保留" htmlFor="adm-trash-days">
             {@render numberField('retention', 'adm-trash-days', '天')}
-          </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="频率限制">
-          <AdmRow label="每分钟上传次数" htmlFor="adm-rate">
-            {@render numberField('perMinute', 'adm-rate', '次')}
           </AdmRow>
         </AdmSection>
 
@@ -277,8 +274,9 @@
 
         {#if dirty}
           <div class="adm-sticky" role="region" aria-label="未保存的更改">
-            <span class="grow" aria-live="polite">
-              有 {changed.length} 项未保存的更改{#if saveError}<span class="error-text"> · {saveError}</span>{/if}
+            <span class="grow adm-pair" aria-live="polite">
+              <span>{changed.length} 项更改未保存</span>
+              {#if saveError}<span class="error-text">{saveError}</span>{/if}
             </span>
             <button type="button" class="btn btn-secondary" disabled={saving} onclick={discard}>放弃</button>
             <button type="button" class="btn btn-primary" disabled={saving || invalid} onclick={save}>保存</button>

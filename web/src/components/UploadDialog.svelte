@@ -16,6 +16,7 @@
   } from '../lib/upload.svelte';
   import CopyButton from './CopyButton.svelte';
   import Icon from './Icon.svelte';
+  import LockMark from './LockMark.svelte';
   import Modal from './Modal.svelte';
   import Seg from './Seg.svelte';
   import Thumb from './Thumb.svelte';
@@ -23,7 +24,6 @@
   const items = $derived(uploads.items);
   const active = $derived(items.filter((u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing').length);
   const done = $derived(items.filter((u) => u.status === 'done').length);
-  const failed = $derived(items.filter((u) => u.status === 'error').length);
   const fmtLabel = $derived(LINK_FORMATS.find((f) => f.value === uploads.format)?.label ?? '');
 
   // Overall progress over the items that can still finish; failed ones do not drag it down.
@@ -36,8 +36,10 @@
 
   const isActive = (u: UploadItem) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing';
 
+  // Closing with nothing in flight clears the finished rows; failed ones stay for a retry.
   function close() {
     uploadDialog.open = false;
+    if (!items.some(isActive)) clearFinished();
   }
   function cancel(u: UploadItem) {
     removeItem(u.id);
@@ -56,11 +58,9 @@
 
   {#if items.length > 0}
     <div class="up-summary">
-      <div class="up-summary-row">
-        <span>
-          {active ? `正在上传 ${active} 个，已完成 ${done} 个` : `已完成 ${done} 个`}{failed ? `，失败 ${failed} 个` : ''}
-        </span>
-        {#if active > 0}<span class="num subtle">{pct}%</span>{/if}
+      <div class="up-summary-row num">
+        <span>已上传 {done} / {items.length}</span>
+        {#if active > 0}<span>{pct}%</span>{/if}
       </div>
       <ul class="up-list">
         {#each items as u (u.id)}
@@ -71,13 +71,16 @@
               <Thumb src={u.previewUrl ?? ''} />
             {/if}
             <div class="up-info">
-              <span class="name truncate" title={u.name}>{u.name}</span>
+              <span class="up-name">
+                <span class="name truncate" title={u.name}>{u.name}</span>
+                {#if u.image}<LockMark visibility={u.image.visibility} />{/if}
+              </span>
               {#if u.status === 'uploading'}
                 {@const p = Math.round(u.progress * 100)}
                 <div class="progress" role="progressbar" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100} aria-label={`${u.name} 上传进度`}>
                   <span style:width="{p}%"></span>
                 </div>
-                <span class="sub num">{p}% · {formatBytes(Math.round(u.file.size * u.progress))} / {formatBytes(u.file.size)}</span>
+                <span class="sub num">{formatBytes(Math.round(u.file.size * u.progress))} / {formatBytes(u.file.size)}</span>
               {:else if u.status === 'queued'}
                 <span class="sub">等待上传</span>
               {:else if u.status === 'processing'}
@@ -85,11 +88,11 @@
                 <span class="sub">处理中</span>
               {:else if u.status === 'done'}
                 {#if u.image?.duplicate}
-                  <span class="sub">已存在相同图片，返回原链接</span>
+                  <span class="sub">已存在，使用原链接</span>
                 {:else}
                   <span class="sub ok">
                     <Icon name="check" size={12} />
-                    已上传 · {formatBytes(u.file.size)}{u.image?.visibility === 'private' ? ' · 私有' : ''}
+                    已上传
                   </span>
                 {/if}
               {:else}
@@ -129,13 +132,10 @@
       value={currentVisibility()}
       onchange={(v: Visibility) => (uploads.visibilityChoice = v)}
       options={[
-        { key: 'public', label: '公开' },
-        { key: 'private', label: '私有' },
+        { key: 'public', label: '公开', icon: 'globe' },
+        { key: 'private', label: '私有', icon: 'lock' },
       ]}
     />
-    {#if done > 0}
-      <button type="button" class="btn btn-ghost" onclick={clearFinished}>清除已完成</button>
-    {/if}
     {#if done > 1}
       <button type="button" class="btn btn-secondary" onclick={copyAll}>
         <Icon name="copy" />

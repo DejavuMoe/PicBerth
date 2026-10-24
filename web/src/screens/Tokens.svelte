@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
-  import Modal from '../components/Modal.svelte';
   import PanelHeader from '../components/PanelHeader.svelte';
   import { api, errorMessage } from '../lib/api';
   import { formatAbsolute, formatDate, formatRelative } from '../lib/format';
@@ -16,7 +15,10 @@
   let phase = $state<'loading' | 'ready' | 'error'>('loading');
   let errorText = $state('');
   let creating = $state(false);
-  let revoking = $state<Token | null>(null);
+  // Revoking cannot be undone, so the button asks once more in place: 吊销 turns into 确认吊销 for a few seconds.
+  let arming = $state<number | null>(null);
+  let disarm = 0;
+  onMount(() => () => clearTimeout(disarm));
 
   async function load() {
     try {
@@ -29,10 +31,14 @@
   }
   onMount(() => void load());
 
-  async function revoke() {
-    const t = revoking;
-    revoking = null;
-    if (!t) return;
+  async function revoke(t: Token) {
+    clearTimeout(disarm);
+    if (arming !== t.id) {
+      arming = t.id;
+      disarm = window.setTimeout(() => (arming = null), 4000);
+      return;
+    }
+    arming = null;
     try {
       await api.revokeToken(t.id);
       toast('令牌已吊销');
@@ -84,7 +90,15 @@
 
 {#snippet revokeButton(t: Token)}
   {#if !t.revokedAt}
-    <button type="button" class="btn btn-danger-ghost btn-sm adm-revoke" aria-label={`吊销「${t.name}」`} onclick={() => (revoking = t)}>吊销</button>
+    <button
+      type="button"
+      class="btn btn-sm adm-revoke {arming === t.id ? 'btn-danger-solid armed' : 'btn-danger-ghost'}"
+      aria-label={arming === t.id ? `确认吊销「${t.name}」` : `吊销「${t.name}」`}
+      onclick={() => void revoke(t)}
+      onblur={() => arming === t.id && (arming = null)}
+    >
+      {arming === t.id ? '确认吊销' : '吊销'}
+    </button>
   {/if}
 {/snippet}
 
@@ -140,7 +154,7 @@
               <span role="columnheader">名称</span>
               <span role="columnheader">权限</span>
               <span role="columnheader">最近使用</span>
-              <span role="columnheader">过期</span>
+              <span role="columnheader">到期</span>
               <span role="columnheader" class="sr-only">操作</span>
             </div>
             {#each tokens as t (t.id)}
@@ -160,14 +174,4 @@
 </div>
 {#if creating}
   <TokenDialog onclose={() => (creating = false)} onfinished={() => void load()} />
-{/if}
-
-{#if revoking}
-  <Modal title={`吊销令牌「${revoking.name}」？`} width="440px" onclose={() => (revoking = null)}>
-    <p>使用此令牌的工具将无法继续上传。</p>
-    {#snippet footer()}
-      <button type="button" class="btn btn-secondary" data-autofocus onclick={() => (revoking = null)}>取消</button>
-      <button type="button" class="btn btn-danger-solid" onclick={revoke}>吊销</button>
-    {/snippet}
-  </Modal>
 {/if}

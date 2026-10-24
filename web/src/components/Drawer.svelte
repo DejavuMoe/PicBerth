@@ -12,7 +12,7 @@
   }
   let { label, onclose, width, children }: Props = $props();
 
-  const leave = createLeave(() => onclose, 200);
+  const leave = createLeave(() => onclose, 250);
 </script>
 
 <div class="scrim" class:leaving={leave.leaving} role="presentation" onclick={leave.close}></div>
