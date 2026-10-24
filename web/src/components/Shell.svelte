@@ -30,7 +30,7 @@
     tab: boolean;
   }
   const NAV: NavEntry[] = [
-    { href: '/library', match: ['/', '/library'], label: '全部图片', short: '图片', icon: 'images', group: 0, tab: true },
+    { href: '/library', match: ['/', '/library'], label: '图片', short: '图片', icon: 'images', group: 0, tab: true },
     { href: '/trash', match: ['/trash'], label: '回收站', short: '回收站', icon: 'trash', group: 0, tab: true },
     { href: '/tokens', match: ['/tokens'], label: '令牌', short: '令牌', icon: 'key', group: 1, tab: true },
     { href: '/settings', match: ['/settings'], label: '设置', short: '设置', icon: 'gear', group: 2, tab: false },

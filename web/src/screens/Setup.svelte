@@ -42,11 +42,11 @@
 
   const errors = $derived({
     code: !code.trim()
-      ? '请输入服务器日志中的初始化代码'
+      ? '请输入初始化代码'
       : codeComplete
         ? null
-        : '初始化代码共 12 位，格式为 XXXX-XXXX-XXXX',
-    username: /^[A-Za-z0-9._-]{1,64}$/.test(username.trim()) ? null : '1–64 个字符，可用字母、数字、点、下划线和连字符',
+        : '初始化代码为 12 位',
+    username: /^[A-Za-z0-9._-]{1,64}$/.test(username.trim()) ? null : '用户名为 1–64 位字母、数字或 . _ -',
     password: password.length >= 10 && password.length <= 256 ? null : '密码需要 10–256 个字符',
     confirm: confirm === password ? null : '两次输入的密码不一致',
   });

@@ -54,8 +54,8 @@
   });
 
   const TITLES: Record<string, string> = {
-    '/': '全部图片',
-    '/library': '全部图片',
+    '/': '图片',
+    '/library': '图片',
     '/trash': '回收站',
     '/tokens': '令牌',
     '/settings': '设置',
@@ -65,7 +65,7 @@
   };
   $effect(() => {
     const t = TITLES[router.path];
-    document.title = t ? `${t} · PicBerth` : 'PicBerth';
+    document.title = t ? `${t} - PicBerth` : 'PicBerth';
   });
 
   // Window-wide drop and paste feed the upload queue, which opens the upload dialog.

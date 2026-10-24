@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import Drawer from '../components/Drawer.svelte';
-  import Icon from '../components/Icon.svelte';
   import AdjustSheet from '../components/library/AdjustSheet.svelte';
   import BulkBar from '../components/library/BulkBar.svelte';
   import DetailPanel from '../components/library/DetailPanel.svelte';
@@ -14,7 +13,6 @@
   import { Library } from '../lib/library.svelte';
   import { phone, wide } from '../lib/media.svelte';
   import { isTypingTarget } from '../lib/modal';
-  import { openPicker } from '../lib/picker';
   import { bottomBar } from '../lib/toast.svelte';
   import type { Image } from '../lib/types';
   import { onUploaded } from '../lib/upload.svelte';
@@ -26,7 +24,7 @@
   const trash = lib.mode === 'trash';
 
   /** How long the docked column takes to collapse; the panel keeps its last image until then. */
-  const DOCK_MS = 260;
+  const DOCK_MS = 250;
 
   let searchEl = $state<HTMLInputElement | null>(null);
   let searchOpen = $state(false);
@@ -86,7 +84,6 @@
   });
 
   const bare = $derived(lib.phase === 'ready' && lib.items.length === 0 && !lib.filtered);
-  const showFab = $derived(phone.matches && !trash && lib.phase === 'ready' && !bare && !lib.selecting);
 
   async function focusSearch() {
     searchOpen = true;
@@ -143,12 +140,6 @@
 
 {#if phone.matches && lib.selecting}
   <BulkBar {lib} compact floating />
-{/if}
-
-{#if showFab}
-  <button type="button" class="fab" aria-label="上传" onclick={openPicker}>
-    <Icon name="upload" size={22} />
-  </button>
 {/if}
 
 {#if lib.active && !canDock}

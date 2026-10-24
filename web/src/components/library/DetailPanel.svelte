@@ -72,11 +72,15 @@
           <DetailName filename={image.filename} editable={!trashed} onsave={(n) => lib.rename(image.id, n)} />
         {/key}
         <div class="d-meta num">
-          <span>
-            {formatName(image)} · {image.width} × {image.height} · {formatBytes(image.size)}{image.frames > 1 ? ` · 动图 · ${image.frames} 帧` : ''} ·
+          <span>{formatName(image)}</span>
+          <span>{image.width} × {image.height}</span>
+          <span>{formatBytes(image.size)}</span>
+          {#if image.frames > 1}<span>动图 {image.frames} 帧</span>{/if}
+          {#if left}
+            <span class="badge">{left}</span>
+          {:else}
             <time title={formatAbsolute(image.createdAt)}>{formatRelative(image.createdAt)}</time>
-          </span>
-          {#if left}<span class="badge">{left}</span>{/if}
+          {/if}
         </div>
       </div>
 

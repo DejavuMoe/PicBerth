@@ -12,11 +12,7 @@
   let { onclose, onfinished }: { onclose: () => void; onfinished: () => void } = $props();
 
   const SCOPE_LABEL: Record<Scope, string> = { upload: '上传', read: '只读', manage: '管理' };
-  const SCOPES: { key: Scope; hint: string }[] = [
-    { key: 'upload', hint: '上传图片，只能查看自己上传的图片' },
-    { key: 'read', hint: '查看全部图片' },
-    { key: 'manage', hint: '修改可见性、删除和恢复图片' },
-  ];
+  const SCOPES: Scope[] = ['upload', 'read', 'manage'];
   const EXPIRY = [
     { value: '', label: '永不过期' },
     { value: '30', label: '30 天' },
@@ -33,7 +29,7 @@
   let created = $state<{ token: Token; secret: string } | null>(null);
   let kind = $state<'curl' | 'picgo' | 'sharex'>('curl');
 
-  const chosen = $derived(SCOPES.filter((s) => scopes[s.key]).map((s) => s.key));
+  const chosen = $derived(SCOPES.filter((s) => scopes[s]));
   const nameErr = $derived(name.trim() ? (name.trim().length > 80 ? '名称最多 80 个字符' : '') : '请输入名称');
   const scopeErr = $derived(chosen.length > 0 ? '' : '请选择至少一项权限');
 
@@ -100,7 +96,7 @@
     <div class="adm-form">
       <div class="alert warning">
         <Icon name="alert" />
-        <div class="grow">关闭后将无法再次查看此令牌</div>
+        <span class="grow">令牌只显示这一次</span>
       </div>
       <div class="field">
         <label for="adm-secret">令牌</label>
@@ -163,14 +159,11 @@
       </div>
       <fieldset class="field adm-fieldset">
         <legend>权限</legend>
-        <div class="adm-opts">
-          {#each SCOPES as o (o.key)}
-            <label class="adm-opt">
-              <input type="checkbox" class="check" bind:checked={scopes[o.key]} />
-              <span>
-                <strong>{SCOPE_LABEL[o.key]}</strong>
-                <span class="hint">{o.hint}</span>
-              </span>
+        <div class="adm-opts-row adm-opts-start">
+          {#each SCOPES as s (s)}
+            <label class="adm-opt-inline">
+              <input type="checkbox" class="check" bind:checked={scopes[s]} />
+              {SCOPE_LABEL[s]}
             </label>
           {/each}
         </div>

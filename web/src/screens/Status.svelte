@@ -104,6 +104,8 @@
     badge?: string;
     tone?: string;
     text?: string;
+    extra?: string;
+    title?: string;
     path?: string;
     subtle?: boolean;
     issues?: CheckIssue[];
@@ -118,15 +120,19 @@
   function remembered(key: Key): Result | null {
     if (!status) return null;
     if (key === 'snapshot') {
+      // A stale snapshot shows its warning on this row instead of in a separate alert.
       const s = status.lastSnapshot;
-      return s ? { subtle: true, text: `上次快照 ${formatRelative(s.at)}`, path: s.path } : null;
+      const stale = status.warnings.find((w) => w.code === 'snapshot-stale');
+      if (stale) return { badge: HEADLINE[stale.code] ?? stale.message, tone: 'badge-warning', text: s ? formatRelative(s.at) : undefined, title: s?.path, subtle: true };
+      return s ? { subtle: true, text: formatRelative(s.at), title: s.path } : null;
     }
     const c = status.lastCheck;
     if (!c || c.mode !== key) return null;
     return {
       badge: c.ok ? '正常' : `发现 ${c.issues} 个问题`,
       tone: c.ok ? 'badge-success' : 'badge-danger',
-      text: `上次检查 ${formatRelative(c.at)}`,
+      text: formatRelative(c.at),
+      title: formatAbsolute(c.at),
       subtle: true,
     };
   }
@@ -140,7 +146,8 @@
       local[mode] = {
         badge: r.ok ? '正常' : `发现 ${r.issues.length} 个问题`,
         tone: r.ok ? 'badge-success' : 'badge-danger',
-        text: `检查了 ${formatInt(r.checked)} 张图片，用时 ${secs(r.durationMs)}`,
+        text: `${formatInt(r.checked)} 张图片`,
+        extra: secs(r.durationMs),
         issues: r.issues,
       };
       toast(`${mode === 'quick' ? '快速检查' : '完整检查'}完成`);
@@ -159,7 +166,7 @@
     running = 'snapshot';
     try {
       const s = await api.createSnapshot();
-      local.snapshot = { badge: '已创建', tone: 'badge-success', path: s.path, text: `· ${formatBytes(s.bytes)}` };
+      local.snapshot = { badge: '已创建', tone: 'badge-success', path: s.path, extra: formatBytes(s.bytes) };
       toast('快照已创建');
     } catch (e) {
       local.snapshot = { badge: '失败', tone: 'badge-danger', text: errorMessage(e) };
@@ -234,8 +241,9 @@
         {:else if r}
           <div class="adm-result" class:subtle={r.subtle}>
             {#if r.badge}<span class="badge {r.tone ?? 'badge-success'}">{r.badge}</span>{/if}
-            {#if r.text}<span>{r.text}</span>{/if}
+            {#if r.text}<span title={r.title}>{r.text}</span>{/if}
             {#if r.path}<span class="mono">{r.path}</span>{/if}
+            {#if r.extra}<span class="subtle">{r.extra}</span>{/if}
           </div>
         {/if}
         <button type="button" class="btn btn-secondary" disabled={running !== null} onclick={run}>
@@ -284,18 +292,13 @@
           <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadStatus()}>重试</button>
         </div>
       {:else}
-        {#each status.warnings as w (w.code)}
+        {#each status.warnings.filter((w) => w.code !== 'snapshot-stale') as w (w.code)}
           <div class="alert warning">
             <Icon name="alert" />
             <div class="grow">
               <strong>{HEADLINE[w.code] ?? w.message}</strong>
-              {#if w.code !== 'snapshot-stale' && REMEDY[w.code]}<div>{REMEDY[w.code]}</div>{/if}
+              {#if REMEDY[w.code]}<div>{REMEDY[w.code]}</div>{/if}
             </div>
-            {#if w.code === 'snapshot-stale'}
-              <button type="button" class="btn btn-secondary btn-sm" disabled={running !== null} onclick={() => void createSnapshot()}>
-                {running === 'snapshot' ? '创建中…' : '创建快照'}
-              </button>
-            {/if}
           </div>
         {/each}
 
@@ -327,15 +330,19 @@
         </div>
 
         <AdmSection title="维护">
-          {@render runRow('quick', '快速检查', '开始检查', '检查中…', () => void runCheck('quick'))}
-          {@render runRow('full', '完整检查', '开始检查', '检查中…', () => void runCheck('full'))}
-          {@render runRow('snapshot', '创建快照', '创建快照', '创建中…', () => void createSnapshot())}
+          {@render runRow('quick', '快速检查', '检查', '检查中…', () => void runCheck('quick'))}
+          {@render runRow('full', '完整检查', '检查', '检查中…', () => void runCheck('full'))}
+          {@render runRow('snapshot', '快照', '创建', '创建中…', () => void createSnapshot())}
         </AdmSection>
 
         <AdmSection title="运行信息" compact>
-          <AdmRow label="版本"><div class="adm-value">{status.version}</div></AdmRow>
+          <AdmRow label="版本">
+            <div class="adm-value adm-pair">
+              <span>{status.version}</span>
+              {#if status.commit}<span class="mono subtle">{status.commit}</span>{/if}
+            </div>
+          </AdmRow>
           <AdmRow label="已运行"><div class="adm-value">{uptime}</div></AdmRow>
-          <AdmRow label="提交"><div class="adm-value mono">{status.commit || '—'}</div></AdmRow>
           <AdmRow label="Go"><div class="adm-value">{status.goVersion}</div></AdmRow>
           <AdmRow label="SQLite"><div class="adm-value">{status.sqliteVersion}</div></AdmRow>
           <AdmRow label="数据目录"><div class="adm-value mono">{status.dataDir}</div></AdmRow>
@@ -360,9 +367,17 @@
               {#each audit as a (a.id)}
                 <div class="adm-audit-item">
                   <span class="mono subtle" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
-                  <span>{actorLabel(a.actor)} · {ACTION[a.action] ?? a.action}</span>
+                  <span class="adm-pair">
+                    <span>{ACTION[a.action] ?? a.action}</span>
+                    <span class="subtle">{actorLabel(a.actor)}</span>
+                  </span>
                   {#if a.target}<span class="truncate subtle">{a.target}</span>{/if}
-                  {#if a.detail || a.ip}<span class="subtle">{[a.detail, a.ip].filter(Boolean).join(' · ')}</span>{/if}
+                  {#if a.detail || a.ip}
+                    <span class="adm-pair subtle">
+                      {#if a.detail}<span>{a.detail}</span>{/if}
+                      {#if a.ip}<span class="mono">{a.ip}</span>{/if}
+                    </span>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -381,7 +396,12 @@
                   <span role="cell" class="nowrap">{ACTION[a.action] ?? a.action}</span>
                   <span role="cell">
                     <span class="truncate" title={a.target ?? undefined}>{a.target ?? ''}</span>
-                    {#if a.detail || a.ip}<span class="truncate sub">{[a.detail, a.ip].filter(Boolean).join(' · ')}</span>{/if}
+                    {#if a.detail || a.ip}
+                      <span class="adm-pair sub">
+                        {#if a.detail}<span class="truncate">{a.detail}</span>{/if}
+                        {#if a.ip}<span class="mono">{a.ip}</span>{/if}
+                      </span>
+                    {/if}
                   </span>
                 </div>
               {/each}

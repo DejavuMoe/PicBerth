@@ -28,7 +28,7 @@
 </script>
 
 <div class="list-wrap">
-  <div class="list" class:selecting={lib.selecting} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '全部图片'}>
+  <div class="list" class:selecting={lib.selecting} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '图片'}>
     {#each items as im, idx (im.id)}
       {@const on = lib.sel.has(im.id)}
       <div
