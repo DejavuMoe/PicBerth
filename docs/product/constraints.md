@@ -25,7 +25,8 @@
   search/filter/sort, batch trash/restore/purge/visibility with undo, token reveal-once, settings leave guard,
   checks/snapshots, audit log).
 - Strict CSP: no third-party scripts, fonts or images at runtime; server strings rendered as text only.
-- Purge is the only action that asks for confirmation; reversible actions offer 撤销.
+- Purge is the only action with a confirmation dialog; token revocation confirms inline; reversible actions
+  offer 撤销.
 
 ## Explicit non-goals
 
@@ -55,14 +56,16 @@
 ## Visual and interaction constraints
 
 - Visual language (changed 2026-10-22 at the user's request): Linear-like precision console — near-black
-  canvas with an inset content panel, hairline borders instead of shadows, compact density, low font weights
+  canvas with an inset content panel, 0.5 px lines instead of shadows, compact density, low font weights
   (400–590), tight tracking. Dark and light themes follow the system setting and are polished equally; the
   user can still override.
-- Colour: neutral grey scale plus one acid-lime accent `#e4f222` used only as the fill of the single primary
-  action per view (dark text on it); never as text, link, or decoration. Status colours (success, warning,
-  danger) only for state. No Linear logos, brand marks or marketing layouts; there is no landing page.
+- Detailed visual, copy, colour, type, radius, line, motion and decision rules (changed 2026-10-24 at the
+  user's request): `DESIGN.md`. They bind prototypes and production.
+- Colour: Radix Colors only (changed 2026-10-24) — gray for every surface, line and text, lime step 9 only as
+  the fill of the single primary action per view (dark ink on it), red / amber / green only for state. No
+  Linear logos, brand marks or marketing layouts; there is no landing page.
 - Type: self-hosted Inter Variable (OFL, Latin subsets embedded, no network requests) for UI, system CJK fonts
-  for Chinese, `ui-monospace` for IDs and hashes.
+  for Chinese, `ui-monospace` for IDs and hashes; three sizes (12 / 13 / 16 px), 12 px minimum.
 - Plain and restrained: no decorative imagery, no gradients, no emoji.
 - Production stays lightweight: Svelte 5 + Vite only; no Next.js, no Tailwind or other CSS/UI frameworks.
 - Every control is drawn by the product (menus, selects, comboboxes, checkboxes, scrollbars styled); no
@@ -70,7 +73,9 @@
 - Density/layout: management-first — tables/lists and grids with filters, selection and batch actions;
   responsive from phone to desktop.
 - Accessibility: WCAG AA contrast, visible focus, keyboard operation, labelled icon buttons.
-- Motion: short functional transitions only; disabled under reduced motion.
+- Motion: none by default; overlays, the detail column, toasts and switches use 250 ms ease-out; disabled under
+  reduced motion.
+- Purge is the only blocking confirmation dialog; revoking a token confirms inline on the same button.
 
 ## Privacy and multimodal evidence
 

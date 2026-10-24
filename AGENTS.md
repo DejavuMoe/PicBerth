@@ -32,6 +32,14 @@
 - Keep design-only and production implementation commits separate.
 - Build success alone is not UI completion; run and compare the real product.
 
+## Design and UI/UX
+
+Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+
+`DESIGN.md` holds the binding design rules (copy, hierarchy, Radix colours, three type sizes, alignment,
+concentric radii, 0.5 px lines, motion, decisions). Every prototype revision and implementation follows it;
+check a design against it before review.
+
 ## Content firewall
 
 - The task brief is not product copy.
@@ -45,7 +53,6 @@
 
 ## Visual and interaction defaults
 
-- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 - Reuse the approved design and current product terminology.
 - Preserve keyboard, pointer, touch, drag/drop and paste conventions.
 
