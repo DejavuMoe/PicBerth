@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import Floating from './Floating.svelte';
 
   interface Props {
@@ -7,30 +7,18 @@
     trigger: Snippet<[boolean, () => void]>;
     /** The menu content; `close` closes the menu and returns focus to the trigger. */
     children: Snippet<[() => void]>;
+    /** Which edge of the trigger the menu lines up with. */
     align?: 'left' | 'right';
     /** Prefer opening above the trigger. */
     up?: boolean;
     /** Minimum width of the menu in px. */
     width?: number;
-    /** At least as wide as the trigger. */
-    matchWidth?: boolean;
-    /** Extra class on the menu (e.g. `menu-facets`). */
+    /** Extra class on the menu element (e.g. `popover`). */
     class?: string;
-    /** Extra class on the wrapper around the trigger (e.g. `block`, `account-wrap`). */
-    wrapClass?: string;
+    /** Accessible name of the menu. */
     label?: string;
   }
-  let {
-    trigger,
-    children,
-    align = 'left',
-    up = false,
-    width,
-    matchWidth = false,
-    class: className = '',
-    wrapClass = '',
-    label,
-  }: Props = $props();
+  let { trigger, children, align = 'left', up = false, width, class: className = 'menu', label }: Props = $props();
 
   let open = $state(false);
   let wrap = $state<HTMLElement | null>(null);
@@ -46,6 +34,11 @@
       (wrap?.querySelector<HTMLElement>('[aria-expanded]') ?? wrap?.querySelector<HTMLElement>('button'))?.focus();
     }
     open = false;
+  }
+  /** Escape and outside presses also hand focus back to the trigger, as in the prototype. */
+  function dismiss() {
+    (wrap?.querySelector<HTMLElement>('[aria-expanded]') ?? wrap?.querySelector<HTMLElement>('button'))?.focus();
+    close();
   }
 
   $effect(() => {
@@ -65,6 +58,7 @@
       if (!open) {
         byKeyboard = true;
         open = true;
+        void tick();
       } else focusItem(e.key === 'ArrowDown' ? 0 : -1);
     } else if (e.key === 'Enter' || e.key === ' ') {
       byKeyboard = true;
@@ -89,20 +83,19 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="menu-wrap {wrapClass}" bind:this={wrap} onkeydown={onwrapkeydown} onpointerdown={() => (byKeyboard = false)}>
+<div class="menu-wrap" bind:this={wrap} onkeydown={onwrapkeydown} onpointerdown={() => (byKeyboard = false)}>
   {@render trigger(open, toggle)}
 </div>
 {#if open}
   <Floating
     anchor={wrap}
     bind:el={layer}
-    onclose={close}
+    onclose={dismiss}
     {align}
     {up}
-    {matchWidth}
     minWidth={width}
-    class="menu {className}"
-    role="menu"
+    class={className}
+    role={className === 'popover' ? 'dialog' : 'menu'}
     aria-label={label}
     onkeydown={onlayerkeydown}
   >

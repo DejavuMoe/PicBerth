@@ -1,103 +1,156 @@
 <script lang="ts">
-  import { filterCount, type Library } from '../../lib/library.svelte';
-  import { phone, tablet } from '../../lib/media.svelte';
+  import { tick, untrack } from 'svelte';
+  import type { Library } from '../../lib/library.svelte';
+  import { phone } from '../../lib/media.svelte';
   import { openPicker } from '../../lib/picker';
-  import { uploadDialog } from '../../lib/upload.svelte';
+  import Check from '../Check.svelte';
   import Icon from '../Icon.svelte';
-  import PanelHeader from '../PanelHeader.svelte';
-  import BulkBar from './BulkBar.svelte';
+  import BulkActions from './BulkActions.svelte';
+  import DisplayMenu from './DisplayMenu.svelte';
   import FilterPopover from './FilterPopover.svelte';
-  import SearchBox from './SearchBox.svelte';
-  import SortMenu from './SortMenu.svelte';
-  import ViewToggle from './ViewToggle.svelte';
 
   interface Props {
     lib: Library;
-    /** Width the page content gets (the detail column takes some of it), not the viewport. */
-    width: number;
     searchEl?: HTMLInputElement | null;
-    searchOpen?: boolean;
-    onadjust: () => void;
+    searching?: boolean;
   }
-  let { lib, width, searchEl = $bindable(null), searchOpen = $bindable(false), onadjust }: Props = $props();
+  let { lib, searchEl = $bindable(null), searching = $bindable(false) }: Props = $props();
 
   const trash = $derived(lib.mode === 'trash');
-  const title = $derived(trash ? '回收站' : '图片');
-  const n = $derived(filterCount(lib.filters));
-  // Nothing to search, filter or upload into yet: the empty state carries the one primary action.
-  const bare = $derived(lib.phase === 'ready' && lib.items.length === 0 && !lib.filtered);
-  const hasTools = $derived(!bare);
-  const trashCount = $derived(lib.facets?.total ?? lib.items.length);
-  const collapsed = $derived(tablet.matches || width < (trash ? 660 : 640));
+  const items = $derived(lib.items);
+  const allOn = $derived(items.length > 0 && items.every((i) => lib.sel.has(i.id)));
+  const someOn = $derived(items.some((i) => lib.sel.has(i.id)));
+  const pool = $derived(lib.facets?.total ?? items.length);
+
+  // The box edits local text; the URL (and the query) follows after a short pause. Enter applies at once.
+  let text = $state(untrack(() => lib.filters.q));
+  $effect(() => {
+    const v = text.trim();
+    if (v === lib.filters.q) return;
+    const t = setTimeout(() => lib.setFilters({ q: v }), 200);
+    return () => clearTimeout(t);
+  });
+  $effect(() => {
+    const q = lib.filters.q;
+    untrack(() => {
+      if (q !== text.trim()) text = q;
+    });
+  });
+  $effect(() => {
+    if (searching && phone.matches && searchEl) void tick().then(() => searchEl?.focus());
+  });
+
+  function toggleAll() {
+    if (allOn) lib.selectNone();
+    else lib.selectAll();
+  }
+
+  function cancelSearch() {
+    text = '';
+    lib.setFilters({ q: '' });
+    searching = false;
+  }
+
+  function searchKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      lib.setFilters({ q: text.trim() });
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      if (text) {
+        text = '';
+        lib.setFilters({ q: '' });
+      } else if (e.currentTarget instanceof HTMLInputElement) {
+        e.currentTarget.blur();
+      }
+    }
+  }
 </script>
 
-{#if phone.matches}
-  {#if searchOpen || lib.filters.q}
-    <header class="page-head">
-      <SearchBox {lib} bind:el={searchEl} bind:open={searchOpen} collapsed keepOpen />
+{#if phone.matches && searching}
+  <div class="head">
+    <div class="field-wrap grow">
+      <Icon name="search" />
+      <input
+        bind:this={searchEl}
+        class="input"
+        type="search"
+        placeholder="搜索"
+        aria-label="搜索"
+        autocomplete="off"
+        spellcheck="false"
+        value={text}
+        oninput={(e) => (text = e.currentTarget.value)}
+        onkeydown={searchKey}
+      />
+    </div>
+    <button type="button" class="btn btn-ghost" onclick={cancelSearch}>取消</button>
+  </div>
+{:else if lib.selecting}
+  <div class="head" style:padding-left={phone.matches ? '8px' : '12px'}>
+    <div class="bulk">
+      <Check on={allOn ? true : someOn ? 'mixed' : false} onchange={toggleAll} label="全选" />
+      <span class="n">已选 {lib.sel.size} 张</span>
+      {#if !phone.matches && lib.sel.size > 0}
+        <BulkActions {lib} />
+      {/if}
+      <span class="grow"></span>
+      <button type="button" class="btn btn-ghost" onclick={() => lib.clearSel()}>
+        {phone.matches ? '完成' : '取消选择'}
+      </button>
+    </div>
+  </div>
+{:else}
+  <div class="head">
+    <div class="head-title">
+      <h1>{trash ? '回收站' : '图片'}</h1>
+      {#if lib.phase === 'ready'}
+        {#if !lib.filtered}<span class="count">{pool}</span>{:else if !lib.cursor}<span class="count">{items.length} / {pool}</span>{/if}
+      {/if}
+    </div>
+    {#if phone.matches}
       <button
         type="button"
-        class="btn btn-ghost"
-        onclick={() => {
-          lib.setFilters({ q: '' });
-          searchOpen = false;
-        }}
+        class="btn btn-ghost btn-icon"
+        aria-label="搜索"
+        title="搜索"
+        onclick={() => (searching = true)}
       >
-        取消
+        <Icon name="search" />
       </button>
-    </header>
-  {:else}
-    <PanelHeader {title}>
-      {#if hasTools}
-        <SearchBox {lib} bind:el={searchEl} bind:open={searchOpen} collapsed keepOpen />
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon"
-          class:active-soft={lib.selecting}
-          aria-label="选择"
-          aria-pressed={lib.selecting}
-          onclick={() => (lib.selecting ? lib.clearSel() : (lib.selectMode = true))}
-        >
-          <Icon name="select" />
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-icon"
-          class:active-soft={n > 0}
-          aria-label={n > 0 ? `筛选（${n}）` : '筛选'}
-          onclick={onadjust}
-        >
-          <Icon name="more" />
-        </button>
-        {#if !trash}
-          <button type="button" class="btn btn-primary btn-icon head-upload" aria-label="上传" onclick={openPicker}>
-            <Icon name="upload" />
-          </button>
-        {/if}
-      {/if}
-    </PanelHeader>
-  {/if}
-{:else}
-  <PanelHeader {title}>
-    {#if lib.selecting}
-      <BulkBar {lib} compact={width < 620} />
     {:else}
-      {#if hasTools}
-        <SearchBox {lib} bind:el={searchEl} bind:open={searchOpen} {collapsed} />
-        <FilterPopover {lib} />
-        <SortMenu {lib} />
-        <ViewToggle {lib} />
-      {/if}
-      {#if trash}
-        {#if trashCount > 0}
-          <button type="button" class="btn btn-danger-ghost" onclick={() => lib.emptyTrash()}>清空回收站</button>
-        {/if}
-      {:else if hasTools}
-        <button type="button" class="btn btn-primary" title="上传 (U)" onclick={() => (uploadDialog.open = true)}>
-          <Icon name="upload" />
-          上传
-        </button>
-      {/if}
+      <div class="field-wrap search">
+        <Icon name="search" />
+        <input
+          bind:this={searchEl}
+          class="input"
+          type="search"
+          placeholder="搜索"
+          aria-label="搜索"
+          autocomplete="off"
+          spellcheck="false"
+          value={text}
+          oninput={(e) => (text = e.currentTarget.value)}
+          onkeydown={searchKey}
+        />
+        {#if !text}<kbd>/</kbd>{/if}
+      </div>
     {/if}
-  </PanelHeader>
+    <FilterPopover {lib} />
+    <DisplayMenu {lib} />
+    {#if !trash}
+      <button
+        type="button"
+        class="btn btn-primary"
+        class:btn-icon={phone.matches}
+        style:color={phone.matches ? 'var(--accent-ink)' : undefined}
+        aria-label="上传"
+        title="上传 (U)"
+        onclick={openPicker}
+      >
+        <Icon name="upload" />
+        {#if !phone.matches}上传{/if}
+      </button>
+    {/if}
+  </div>
 {/if}

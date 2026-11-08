@@ -11,24 +11,14 @@ const MIME_FORMAT: Record<string, ImageFormat> = {
   'image/avif': 'avif',
 };
 
-export function imageFormat(img: Pick<Image, 'mime'>): ImageFormat | null {
+function imageFormat(img: Pick<Image, 'mime'>): ImageFormat | null {
   return MIME_FORMAT[img.mime] ?? null;
-}
-
-/** Formats that can carry transparency are previewed on a checkerboard. */
-export function hasAlpha(img: Pick<Image, 'mime'>): boolean {
-  const f = imageFormat(img);
-  return f === 'png' || f === 'webp' || f === 'gif' || f === 'avif';
 }
 
 export function formatName(img: Pick<Image, 'mime' | 'ext'>): string {
   const f = imageFormat(img);
   if (!f) return img.ext.toUpperCase();
   return { jpeg: 'JPEG', png: 'PNG', gif: 'GIF', webp: 'WebP', avif: 'AVIF' }[f];
-}
-
-export function isAnimated(img: Pick<Image, 'frames'>): boolean {
-  return img.frames > 1;
 }
 
 export function sourceLabel(src: { kind: string; tokenName?: string }): string {
@@ -47,11 +37,6 @@ export function sourceKeyLabel(key: string, known: readonly { key: string; kind:
 
 export function thumbSrc(img: Pick<Image, 'id' | 'hasThumb'>): string {
   return img.hasThumb ? thumbUrl(img.id) : rawUrl(img.id);
-}
-
-/** The address "打开原图" opens: the public link when there is one, the signed-in raw route otherwise. */
-export function originalHref(img: Pick<Image, 'id' | 'url' | 'visibility'>): string {
-  return img.visibility === 'public' ? img.url : rawUrl(img.id);
 }
 
 /** "N 天后清除" for a trashed image, or null while the retention is unknown. */

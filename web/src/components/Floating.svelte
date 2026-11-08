@@ -12,6 +12,7 @@
     up?: boolean;
     matchWidth?: boolean;
     minWidth?: number | undefined;
+    /** The floating-layer class: `menu` or `popover`. */
     class?: string;
     el?: HTMLElement | null;
     children: Snippet;
@@ -23,7 +24,7 @@
     up = false,
     matchWidth = false,
     minWidth,
-    class: className = '',
+    class: className = 'menu',
     el = $bindable(null),
     children,
     ...rest
@@ -53,6 +54,6 @@
   });
 </script>
 
-<div bind:this={el} class="float {className}" use:portal use:place={{ anchor, align, up, matchWidth, minWidth }} {...rest}>
+<div bind:this={el} class={className} use:portal use:place={{ anchor, align, up, matchWidth, minWidth }} data-float {...rest}>
   {@render children()}
 </div>

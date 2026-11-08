@@ -8,8 +8,8 @@ import { startOfDay } from './format';
 import { refreshHealth } from './health.svelte';
 import { router, updateQuery } from './router.svelte';
 import { toast } from './toast.svelte';
-import type { BatchAction, Image, ImageFormat, ImageQuery, ImageSort, ImageState, Visibility } from './types';
-import { LINK_FORMATS, uploads } from './upload.svelte';
+import type { BatchAction, Image, ImageFormat, ImageQuery, ImageSort, ImageState, LinkFormat } from './types';
+import { LINK_FORMATS, setLinkFormat, uploads } from './upload.svelte';
 
 export const FORMATS: ImageFormat[] = ['jpeg', 'png', 'gif', 'webp', 'avif'];
 
@@ -32,21 +32,18 @@ export const SORTS: { key: ImageSort; label: string }[] = [
 export interface Filters {
   q: string;
   formats: ImageFormat[];
-  vis: '' | Visibility;
   date: '' | DateKey;
   sources: string[];
   tags: string[];
 }
 
-export const EMPTY_FILTERS: Filters = { q: '', formats: [], vis: '', date: '', sources: [], tags: [] };
+export const EMPTY_FILTERS: Filters = { q: '', formats: [], date: '', sources: [], tags: [] };
 
 function parseFilters(p: URLSearchParams): Filters {
-  const vis = p.get('visibility');
   const date = p.get('date');
   return {
     q: p.get('q') ?? '',
     formats: FORMATS.filter((f) => p.getAll('format').includes(f)),
-    vis: vis === 'public' || vis === 'private' ? vis : '',
     date: DATE_RANGES.find((d) => d.key === date)?.key ?? '',
     sources: [...new Set(p.getAll('source').filter(Boolean))],
     tags: [...new Set(p.getAll('tag').filter(Boolean))],
@@ -60,7 +57,7 @@ function parseSort(p: URLSearchParams): ImageSort {
 
 /** Number of active filters, not counting the search text. */
 export function filterCount(f: Filters): number {
-  return f.formats.length + (f.vis ? 1 : 0) + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
+  return f.formats.length + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
 }
 
 function dateRange(key: DateKey, now = Date.now()): { since?: string; until?: string } {
@@ -96,16 +93,31 @@ export function downloadImage(img: Image) {
   toast(`已开始下载 ${img.filename}`);
 }
 
-export async function copyLinks(images: Pick<Image, 'links'>[]) {
-  if (images.length === 0) return;
-  const fmt = uploads.format;
-  const label = LINK_FORMATS.find((f) => f.value === fmt)?.label ?? '';
-  const r = await copyText(images.map((i) => i.links[fmt]).join('\n'));
-  if (r !== 'copied') return toast('当前连接不安全，无法写入剪贴板');
-  toast(images.length === 1 ? `已复制 ${label} 链接` : `已复制 ${images.length} 条 ${label} 链接`);
+const COPY_FAILED = '当前连接不安全，无法写入剪贴板';
+
+function formatLabel(f: LinkFormat): string {
+  return LINK_FORMATS.find((x) => x.value === f)?.label ?? '';
 }
 
-const countText = (n: number, one: string) => (n === 1 ? one : `${n} 张图片`);
+/** Copy one value (an ID, a hash) and say what was copied. */
+export async function copyValue(text: string, label: string) {
+  const r = await copyText(text);
+  toast(r === 'copied' ? `已复制 ${label}` : COPY_FAILED);
+}
+
+/** Copy one link in the given format and remember that format for the next copy. */
+export async function copyLink(img: Pick<Image, 'links'>, format: LinkFormat = uploads.format) {
+  setLinkFormat(format);
+  await copyValue(img.links[format], formatLabel(format));
+}
+
+/** Copy every selected link, one per line, in the last-used format. */
+export async function copyLinks(images: Pick<Image, 'links'>[]) {
+  if (images.length === 0) return;
+  const format = uploads.format;
+  const r = await copyText(images.map((i) => i.links[format]).join('\n'));
+  toast(r === 'copied' ? `已复制 ${images.length} 条 ${formatLabel(format)}` : COPY_FAILED);
+}
 
 export class Library {
   readonly mode: 'library' | 'trash';
@@ -123,7 +135,6 @@ export class Library {
   selectMode = $state(false);
   activeId = $state<string | null>(null);
   purgeIds = $state<string[] | null>(null);
-  busyVisibility = new SvelteSet<string>();
 
   filters = $derived(parseFilters(router.query));
   sort = $derived(parseSort(router.query));
@@ -162,10 +173,9 @@ export class Library {
   setFilters(patch: Partial<Filters>) {
     const f = { ...this.filters, ...patch };
     updateQuery((p) => {
-      for (const k of ['q', 'format', 'visibility', 'date', 'source', 'tag']) p.delete(k);
+      for (const k of ['q', 'format', 'date', 'source', 'tag']) p.delete(k);
       if (f.q) p.set('q', f.q);
       for (const x of f.formats) p.append('format', x);
-      if (f.vis) p.set('visibility', f.vis);
       if (f.date) p.set('date', f.date);
       for (const x of f.sources) p.append('source', x);
       for (const x of f.tags) p.append('tag', x);
@@ -196,7 +206,6 @@ export class Library {
       state: this.state,
       q: f.q || undefined,
       format: f.formats.length ? f.formats : undefined,
-      visibility: f.vis || undefined,
       tag: f.tags.length ? f.tags : undefined,
       source: f.sources.length ? f.sources : undefined,
       ...range,
@@ -283,6 +292,11 @@ export class Library {
     for (const i of this.items) this.sel.add(i.id);
   }
 
+  /** Uncheck every row but stay in selection mode. */
+  selectNone() {
+    this.sel.clear();
+  }
+
   toggle(id: string, range = false) {
     if (range && this.#anchor) {
       const ids = this.items.map((i) => i.id);
@@ -345,9 +359,9 @@ export class Library {
 
   // ---- batch actions -----------------------------------------------------------------------------
 
-  async #batch(action: BatchAction, ids: string[], visibility?: Visibility) {
+  async #batch(action: BatchAction, ids: string[]) {
     try {
-      const results = await api.batch(action, ids, visibility);
+      const results = await api.batch(action, ids);
       const ok = results.filter((r) => r.ok).map((r) => r.id);
       return { ok, failed: results.length - ok.length };
     } catch (e) {
@@ -393,7 +407,14 @@ export class Library {
     this.clearSel();
     const tail = r.failed > 0 ? `，${r.failed} 张失败` : '';
     if (r.ok.length > 0) {
-      const text = action === 'trash' ? `已将${countText(r.ok.length, '图片')}移到回收站${tail}` : `已恢复${countText(r.ok.length, '图片')}${tail}`;
+      const text =
+        action === 'trash'
+          ? r.ok.length > 1
+            ? `已将 ${r.ok.length} 张图片移到回收站${tail}`
+            : `已移到回收站${tail}`
+          : r.ok.length > 1
+            ? `已恢复 ${r.ok.length} 张图片${tail}`
+            : `已恢复${tail}`;
       toast(text, { action: { label: '撤销', run: () => void this.#undo(action === 'trash' ? 'restore' : 'trash', removed, forSeq) } });
     } else if (r.failed > 0) {
       toast(action === 'trash' ? `${r.failed} 张未能移到回收站` : `${r.failed} 张未能恢复`);
@@ -413,22 +434,6 @@ export class Library {
     if (ids.length > 0) this.purgeIds = ids;
   }
 
-  /** Every trashed image, not only the loaded pages. */
-  async emptyTrash() {
-    const ids: string[] = [];
-    let cursor: string | null = null;
-    try {
-      do {
-        const page = await api.listImages({ state: 'trashed', limit: 200, cursor: cursor ?? undefined });
-        ids.push(...page.items.map((i) => i.id));
-        cursor = page.nextCursor;
-      } while (cursor);
-    } catch (e) {
-      return toast(errorMessage(e));
-    }
-    this.requestPurge(ids);
-  }
-
   async confirmPurge() {
     const ids = this.purgeIds;
     this.purgeIds = null;
@@ -437,51 +442,14 @@ export class Library {
     if (!r) return;
     this.#take(r.ok);
     this.clearSel();
-    toast(r.failed > 0 ? `已永久删除 ${r.ok.length} 张，${r.failed} 张失败` : `已永久删除${countText(r.ok.length, '图片')}`);
+    if (r.ok.length === 0) toast(`${r.failed} 张未能删除`);
+    else if (r.failed > 0) toast(`已永久删除 ${r.ok.length} 张，${r.failed} 张失败`);
+    else toast(r.ok.length > 1 ? `已永久删除 ${r.ok.length} 张图片` : '已永久删除');
     if (this.mode === 'trash' && this.items.length === 0 && this.cursor) void this.reload();
     this.#refresh();
   }
 
   // ---- single-image edits ------------------------------------------------------------------------
-
-  /** Optimistic: flip now, put back what the server refused. */
-  async setVisibility(ids: string[], v: Visibility, undoable = true) {
-    const before = new Map<string, Visibility>();
-    for (const id of ids) {
-      const row = this.items.find((i) => i.id === id);
-      if (row && row.visibility !== v) before.set(id, row.visibility);
-    }
-    const changed = [...before.keys()];
-    if (changed.length === 0) return;
-    for (const id of changed) {
-      const row = this.items.find((i) => i.id === id);
-      if (row) row.visibility = v;
-      this.busyVisibility.add(id);
-    }
-    const r = await this.#batch('visibility', changed, v);
-    for (const id of changed) this.busyVisibility.delete(id);
-    const okSet = new Set(r?.ok ?? []);
-    for (const id of changed) {
-      if (okSet.has(id)) continue;
-      const row = this.items.find((i) => i.id === id);
-      const prev = before.get(id);
-      if (row && prev) row.visibility = prev;
-    }
-    if (!r || okSet.size === 0) return;
-    this.#refresh();
-    const label = v === 'public' ? '公开' : '私有';
-    const text = `已将${countText(okSet.size, '图片')}设为${label}${r.failed > 0 ? `，${r.failed} 张失败` : ''}`;
-    if (!undoable) return toast(text);
-    toast(text, {
-      action: {
-        label: '撤销',
-        run: () => {
-          const back = v === 'public' ? 'private' : 'public';
-          void this.setVisibility([...okSet], back, false);
-        },
-      },
-    });
-  }
 
   async rename(id: string, filename: string): Promise<boolean> {
     try {

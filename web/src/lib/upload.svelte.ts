@@ -4,8 +4,9 @@
 import { ApiError, errorDetail, errorMessage, handleUnauthorized, isRetryable, networkError, noteVersion, problemFrom } from './api';
 import { formatBytes, formatLimit, formatNames } from './format';
 import { dropBlocked, isTypingTarget } from './modal';
+import { navigate, router } from './router.svelte';
 import { session } from './session.svelte';
-import type { Image, ImageFormat, LinkFormat, Visibility } from './types';
+import type { Image, ImageFormat, LinkFormat } from './types';
 
 export type UploadStatus = 'queued' | 'uploading' | 'processing' | 'done' | 'error';
 
@@ -13,7 +14,6 @@ export interface UploadItem {
   id: number;
   file: File;
   name: string;
-  visibility: Visibility;
   previewUrl: string | null;
   status: UploadStatus;
   /** 0..1 of request body bytes sent. */
@@ -63,9 +63,6 @@ function loadFormat(): LinkFormat {
   return 'url';
 }
 
-/** The upload dialog; opened whenever files are queued. */
-export const uploadDialog = $state({ open: false });
-
 type UploadedListener = (image: Image) => void;
 const uploadedListeners = new Set<UploadedListener>();
 
@@ -78,8 +75,6 @@ export function onUploaded(fn: UploadedListener): () => void {
 export const uploads = $state({
   items: [] as UploadItem[],
   format: loadFormat(),
-  /** null = follow the server default. */
-  visibilityChoice: null as Visibility | null,
   drag: { active: false, count: 0 },
   announcement: '',
 });
@@ -91,10 +86,6 @@ export function setLinkFormat(f: LinkFormat) {
   } catch {
     // ignore
   }
-}
-
-export function currentVisibility(): Visibility {
-  return uploads.visibilityChoice ?? session.limits?.defaultVisibility ?? 'public';
 }
 
 export function allowedFormats(): ImageFormat[] {
@@ -152,14 +143,12 @@ function announce(message: string) {
 
 export function addFiles(files: File[]) {
   if (files.length === 0) return;
-  const visibility = currentVisibility();
   const batch: UploadItem[] = files.map((file) => {
     const problem = precheck(file);
     return {
       id: seq++,
       file,
       name: file.name || '未命名',
-      visibility,
       previewUrl: detectFormat(file) ? URL.createObjectURL(file) : null,
       status: problem ? 'error' : 'queued',
       progress: 0,
@@ -174,7 +163,6 @@ export function addFiles(files: File[]) {
   const rejected = batch.filter((i) => i.status === 'error').length;
   if (rejected > 0) announce(`${rejected} 个文件未通过检查，未上传`);
   uploads.items.unshift(...batch);
-  uploadDialog.open = true;
   pump();
 }
 
@@ -211,8 +199,8 @@ function start(item: UploadItem) {
   item.error = null;
 
   const body = new FormData();
-  // Text part first so a streaming server knows the visibility before it stores the file.
-  body.append('visibility', item.visibility);
+  // Every uploaded image is public; the text part comes first so a streaming server knows it before the file.
+  body.append('visibility', 'public');
   body.append('file', item.file, item.name);
 
   const xhr = new XMLHttpRequest();
@@ -308,19 +296,15 @@ export function removeItem(id: number) {
   pump();
 }
 
-/** Remove finished rows; keeps failures and anything still waiting or in flight. */
+/** Remove settled rows (finished uploads and failures); keeps anything still waiting or in flight. */
 export function clearFinished() {
   for (let i = uploads.items.length - 1; i >= 0; i--) {
     const item = uploads.items[i];
-    if (item && item.status === 'done') {
+    if (item && (item.status === 'done' || item.status === 'error')) {
       release(item);
       uploads.items.splice(i, 1);
     }
   }
-}
-
-export function linkOf(item: UploadItem, format: LinkFormat): string {
-  return item.image?.links[format] ?? '';
 }
 
 export function busy(): boolean {
@@ -338,6 +322,11 @@ function pastedName(file: File): File {
   const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
   const ext = extOf(file.name) || (file.type.split('/')[1] ?? 'png').replace('jpeg', 'jpg');
   return new File([file], `pasted-${stamp}.${ext}`, { type: file.type, lastModified: file.lastModified });
+}
+
+/** Files can only be watched on the library screen, so a drop or paste elsewhere goes there. */
+function goToLibrary() {
+  if (router.path !== '/' && router.path !== '/library') void navigate('/library');
 }
 
 /** Install on authenticated routes. */
@@ -379,6 +368,7 @@ export function installGlobalInput(): () => void {
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (files.length === 0) return;
     addFiles(files);
+    goToLibrary();
   };
   const onPaste = (e: ClipboardEvent) => {
     if (isTypingTarget(e.target) || dropBlocked()) return;
@@ -386,6 +376,7 @@ export function installGlobalInput(): () => void {
     if (files.length === 0) return;
     e.preventDefault();
     addFiles(files.map(pastedName));
+    goToLibrary();
   };
   const onBeforeUnload = (e: BeforeUnloadEvent) => {
     if (!busy()) return;

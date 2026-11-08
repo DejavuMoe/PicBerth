@@ -1,9 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import AdmRow from '../components/AdmRow.svelte';
-  import AdmSection from '../components/AdmSection.svelte';
   import Icon from '../components/Icon.svelte';
-  import PanelHeader from '../components/PanelHeader.svelte';
   import { api, errorMessage } from '../lib/api';
   import { formatAbsolute, formatBytes, formatInt, formatRelative } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
@@ -42,15 +39,15 @@
   };
 
   const REMEDY: Record<string, string> = {
-    'public-url-unset': '设置公开地址（PICBERTH_PUBLIC_URL），否则生成的链接可能无法在外部访问。',
-    'insecure-public-url': '公开地址使用 http。请在反向代理上启用 HTTPS，并把公开地址改为 https。',
+    'public-url-unset': '设置 PICBERTH_PUBLIC_URL，否则链接可能无法从外部访问。',
+    'insecure-public-url': '在反向代理上启用 HTTPS，并把公开地址改为 https。',
     'untrusted-forwarded':
       '收到来自不受信任来源的 X-Forwarded-For。若前面有反向代理，请把它的地址加入受信任代理（PICBERTH_TRUSTED_PROXIES）。',
-    'low-disk': '剩余磁盘空间低于水位线，新的上传会被拒绝。请清理空间或扩容。',
-    'snapshot-stale': '最近没有新的快照。请在下方创建快照，并考虑定期执行。',
-    'check-failed': '最近一次检查发现了问题。请运行完整检查并查看下方结果。',
-    'non-loopback-listen': '服务监听在非本地回环地址。请确认前面有反向代理或防火墙保护。',
-    'wal-large': '数据库的 WAL 文件过大，可能有长时间未结束的读取。创建快照或重启服务通常可以让它缩小。',
+    'low-disk': '新的上传会被拒绝。清理空间或扩容。',
+    'snapshot-stale': '在下方创建快照。',
+    'check-failed': '运行完整检查并查看下方结果。',
+    'non-loopback-listen': '确认前面有反向代理或防火墙。',
+    'wal-large': '创建快照或重启服务通常可以让它缩小。',
   };
 
   const ACTION: Record<string, string> = {
@@ -101,13 +98,10 @@
 
   // ---- maintenance -----------------------------------------------------------------------------
   interface Result {
-    badge?: string;
-    tone?: string;
-    text?: string;
-    extra?: string;
-    title?: string;
+    tone: string;
+    text: string;
+    at: string | null;
     path?: string;
-    subtle?: boolean;
     issues?: CheckIssue[];
   }
   type Key = 'quick' | 'full' | 'snapshot';
@@ -115,26 +109,15 @@
   let running = $state<Key | null>(null);
   let local = $state<Partial<Record<Key, Result>>>({});
 
-  const secs = (ms: number) => `${(ms / 1000).toFixed(1)} 秒`;
-
   function remembered(key: Key): Result | null {
     if (!status) return null;
     if (key === 'snapshot') {
-      // A stale snapshot shows its warning on this row instead of in a separate alert.
       const s = status.lastSnapshot;
-      const stale = status.warnings.find((w) => w.code === 'snapshot-stale');
-      if (stale) return { badge: HEADLINE[stale.code] ?? stale.message, tone: 'badge-warning', text: s ? formatRelative(s.at) : undefined, title: s?.path, subtle: true };
-      return s ? { subtle: true, text: formatRelative(s.at), title: s.path } : null;
+      return s ? { tone: 'idle', text: '', at: s.at, path: s.path } : null;
     }
     const c = status.lastCheck;
     if (!c || c.mode !== key) return null;
-    return {
-      badge: c.ok ? '正常' : `发现 ${c.issues} 个问题`,
-      tone: c.ok ? 'badge-success' : 'badge-danger',
-      text: formatRelative(c.at),
-      title: formatAbsolute(c.at),
-      subtle: true,
-    };
+    return { tone: c.ok ? 'success' : 'danger', text: c.ok ? '正常' : `发现 ${c.issues} 个问题`, at: c.at };
   }
   const result = (key: Key): Result | null => local[key] ?? remembered(key);
 
@@ -144,15 +127,14 @@
     try {
       const r = await api.runCheck(mode);
       local[mode] = {
-        badge: r.ok ? '正常' : `发现 ${r.issues.length} 个问题`,
-        tone: r.ok ? 'badge-success' : 'badge-danger',
-        text: `${formatInt(r.checked)} 张图片`,
-        extra: secs(r.durationMs),
+        tone: r.ok ? 'success' : 'danger',
+        text: r.ok ? '正常' : `发现 ${r.issues.length} 个问题`,
+        at: r.startedAt,
         issues: r.issues,
       };
       toast(`${mode === 'quick' ? '快速检查' : '完整检查'}完成`);
     } catch (e) {
-      local[mode] = { badge: '失败', tone: 'badge-danger', text: errorMessage(e) };
+      local[mode] = { tone: 'danger', text: '失败', at: null, path: errorMessage(e) };
     } finally {
       running = null;
       void loadStatus();
@@ -166,10 +148,10 @@
     running = 'snapshot';
     try {
       const s = await api.createSnapshot();
-      local.snapshot = { badge: '已创建', tone: 'badge-success', path: s.path, extra: formatBytes(s.bytes) };
+      local.snapshot = { tone: 'success', text: '已创建', at: s.createdAt, path: s.path };
       toast('快照已创建');
     } catch (e) {
-      local.snapshot = { badge: '失败', tone: 'badge-danger', text: errorMessage(e) };
+      local.snapshot = { tone: 'danger', text: '失败', at: null, path: errorMessage(e) };
     } finally {
       running = null;
       void loadStatus();
@@ -184,13 +166,14 @@
   let auditPhase = $state<'loading' | 'ready' | 'error'>('loading');
   let auditMore = $state(false);
   let auditError = $state('');
+  const PAGE = 20;
 
   /** `quiet` reloads the first page without swapping the list for a loading line. */
   async function loadAudit(more = false, quiet = false) {
     if (more) auditMore = true;
     else if (!quiet || auditPhase !== 'ready') auditPhase = 'loading';
     try {
-      const page = await api.audit(20, more ? auditCursor : null);
+      const page = await api.audit(PAGE, more ? auditCursor : null);
       audit = more ? [...audit, ...page.items] : page.items;
       auditCursor = page.nextCursor;
       auditPhase = 'ready';
@@ -228,194 +211,197 @@
     const days = Math.floor(status.uptimeSeconds / 86400);
     return days > 0 ? `${days} 天` : `${Math.max(1, Math.floor(status.uptimeSeconds / 3600))} 小时`;
   });
+  const warnings = $derived(status ? status.warnings : []);
+  const MAINT: { k: Key; name: string; btn: string; busy: string }[] = [
+    { k: 'quick', name: '快速检查', btn: '检查', busy: '检查中…' },
+    { k: 'full', name: '完整检查', btn: '检查', busy: '检查中…' },
+    { k: 'snapshot', name: '快照', btn: '创建', busy: '创建中…' },
+  ];
 </script>
 
-{#snippet runRow(key: Key, label: string, idle: string, busy: string, run: () => void)}
-  {@const r = result(key)}
-  <div>
-    <div class="adm-row">
-      <span class="label">{label}</span>
-      <div class="adm-run">
-        {#if running === key}
-          <div class="progress indeterminate adm-run-bar" role="progressbar" aria-label={label}><span></span></div>
-        {:else if r}
-          <div class="adm-result" class:subtle={r.subtle}>
-            {#if r.badge}<span class="badge {r.tone ?? 'badge-success'}">{r.badge}</span>{/if}
-            {#if r.text}<span title={r.title}>{r.text}</span>{/if}
-            {#if r.path}<span class="mono">{r.path}</span>{/if}
-            {#if r.extra}<span class="subtle">{r.extra}</span>{/if}
-          </div>
-        {/if}
-        <button type="button" class="btn btn-secondary" disabled={running !== null} onclick={run}>
-          {running === key ? busy : idle}
-        </button>
-      </div>
+<div class="panel-main">
+  <div class="head">
+    <div class="head-title">
+      <h1>状态</h1>
     </div>
-    {#if running !== key && r?.issues && r.issues.length > 0}
-      <div class="adm-issues" role="table" aria-label="检查结果">
-        <div class="adm-grid head" role="row">
-          <span role="columnheader">类型</span>
-          <span role="columnheader">图片</span>
-          <span role="columnheader">路径</span>
-          <span role="columnheader">状态</span>
-        </div>
-        {#each r.issues as issue, i (i)}
-          <div class="adm-grid" role="row">
-            <span role="cell" class="nowrap">{KIND[issue.kind] ?? issue.kind}</span>
-            <span role="cell" class="mono truncate" title={issue.imageId ?? undefined}>{issue.imageId ?? '—'}</span>
-            <span role="cell" class="mono truncate" title={issue.path ?? undefined}>{issue.path ?? '—'}</span>
-            <span role="cell">
-              {#if issue.repaired}<span class="badge badge-success">已修复</span>{:else}<span class="badge badge-warning">未修复</span>{/if}
-            </span>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
-{/snippet}
-
-<div class="page">
-  <PanelHeader title="状态">
     <button type="button" class="btn btn-ghost" disabled={refreshing || phase === 'loading'} onclick={() => void refresh()}>
       <Icon name="refresh" />
       刷新
     </button>
-  </PanelHeader>
-  <div class="page-body">
-    <div class="adm-col">
-      {#if phase === 'loading'}
-        <p class="subtle">加载中…</p>
-      {:else if phase === 'error' || !status}
-        <div class="alert danger" role="alert">
-          <Icon name="alert" />
-          <div class="grow">加载失败：{loadError}</div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadStatus()}>重试</button>
-        </div>
-      {:else}
-        {#each status.warnings.filter((w) => w.code !== 'snapshot-stale') as w (w.code)}
-          <div class="alert warning">
-            <Icon name="alert" />
-            <div class="grow">
-              <strong>{HEADLINE[w.code] ?? w.message}</strong>
-              {#if REMEDY[w.code]}<div>{REMEDY[w.code]}</div>{/if}
-            </div>
+  </div>
+  <div class="scroll">
+    {#if phase === 'loading' || phase === 'error' || !status}
+      <div class="page" style="max-width: 960px;">
+        {#if phase === 'error'}
+          <div class="state" role="alert">
+            <span class="t">状态加载失败</span>
+            <span class="d">{loadError}</span>
+            <button type="button" class="btn btn-secondary" onclick={() => void loadStatus()}>重试</button>
           </div>
-        {/each}
-
-        <div class="stats">
-          <div class="stat">
-            <span class="k">图片</span>
-            <span class="v">{formatInt(status.images.active)}</span>
-            {#if status.images.broken > 0}<span class="s">{formatInt(status.images.broken)} 张异常</span>{/if}
-          </div>
-          <div class="stat">
-            <span class="k">占用空间</span>
-            <span class="v">{formatBytes(status.images.bytes)}</span>
-          </div>
-          <div class="stat">
-            <span class="k">回收站</span>
-            <span class="v">{formatInt(status.images.trashed)}</span>
-          </div>
-          <div class="stat">
-            <span class="k">数据库</span>
-            <span class="v">{formatBytes(status.database.bytes)}</span>
-          </div>
-          <div class="stat">
-            <span class="k">磁盘剩余</span>
-            <span class="v">{formatBytes(status.disk.freeBytes)}</span>
-            <div class="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedShare}>
-              <span style:width="{usedShare}%"></span>
-            </div>
-          </div>
-        </div>
-
-        <AdmSection title="维护">
-          {@render runRow('quick', '快速检查', '检查', '检查中…', () => void runCheck('quick'))}
-          {@render runRow('full', '完整检查', '检查', '检查中…', () => void runCheck('full'))}
-          {@render runRow('snapshot', '快照', '创建', '创建中…', () => void createSnapshot())}
-        </AdmSection>
-
-        <AdmSection title="运行信息" compact>
-          <AdmRow label="版本">
-            <div class="adm-value adm-pair">
-              <span>{status.version}</span>
-              {#if status.commit}<span class="mono subtle">{status.commit}</span>{/if}
-            </div>
-          </AdmRow>
-          <AdmRow label="已运行"><div class="adm-value">{uptime}</div></AdmRow>
-          <AdmRow label="Go"><div class="adm-value">{status.goVersion}</div></AdmRow>
-          <AdmRow label="SQLite"><div class="adm-value">{status.sqliteVersion}</div></AdmRow>
-          <AdmRow label="数据目录"><div class="adm-value mono">{status.dataDir}</div></AdmRow>
-        </AdmSection>
-      {/if}
-
-      <section class="adm-sec">
-        <h2>操作记录</h2>
-        {#if auditPhase === 'loading'}
-          <p class="subtle">加载中…</p>
-        {:else if auditPhase === 'error'}
-          <div class="alert danger" role="alert">
-            <Icon name="alert" />
-            <div class="grow">加载失败：{auditError}</div>
-            <button type="button" class="btn btn-secondary btn-sm" onclick={() => void loadAudit()}>重试</button>
-          </div>
-        {:else if audit.length === 0}
-          <p class="subtle">暂无记录</p>
         {:else}
-          {#if phone.matches}
-            <div class="adm-audit-list">
-              {#each audit as a (a.id)}
-                <div class="adm-audit-item">
-                  <span class="mono subtle" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
-                  <span class="adm-pair">
-                    <span>{ACTION[a.action] ?? a.action}</span>
-                    <span class="subtle">{actorLabel(a.actor)}</span>
-                  </span>
-                  {#if a.target}<span class="truncate subtle">{a.target}</span>{/if}
-                  {#if a.detail || a.ip}
-                    <span class="adm-pair subtle">
-                      {#if a.detail}<span>{a.detail}</span>{/if}
-                      {#if a.ip}<span class="mono">{a.ip}</span>{/if}
-                    </span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div class="adm-audit" role="table" aria-label="操作记录">
-              <div class="adm-grid head" role="row">
-                <span role="columnheader">时间</span>
-                <span role="columnheader">操作者</span>
-                <span role="columnheader">操作</span>
-                <span role="columnheader">对象</span>
-              </div>
-              {#each audit as a (a.id)}
-                <div class="adm-grid" role="row">
-                  <span role="cell" class="mono subtle nowrap" title={formatRelative(a.at)}>{formatAbsolute(a.at)}</span>
-                  <span role="cell" class="truncate" title={a.actor}>{actorLabel(a.actor)}</span>
-                  <span role="cell" class="nowrap">{ACTION[a.action] ?? a.action}</span>
-                  <span role="cell">
-                    <span class="truncate" title={a.target ?? undefined}>{a.target ?? ''}</span>
-                    {#if a.detail || a.ip}
-                      <span class="adm-pair sub">
-                        {#if a.detail}<span class="truncate">{a.detail}</span>{/if}
-                        {#if a.ip}<span class="mono">{a.ip}</span>{/if}
-                      </span>
-                    {/if}
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/if}
-          {#if auditCursor}
-            <div class="adm-more">
-              <button type="button" class="btn btn-secondary" disabled={auditMore} onclick={() => void loadAudit(true)}>
-                {auditMore ? '加载中…' : '加载更多'}
-              </button>
-            </div>
-          {/if}
+          <div class="skeleton" style="height: 76px; border-radius: 8px;" aria-busy="true"></div>
         {/if}
-      </section>
-    </div>
+      </div>
+    {:else}
+      <div class="page" style="max-width: 960px;">
+        {#if warnings.length > 0}
+          <section class="section" aria-label="警告">
+            <div>
+              {#each warnings as w (w.code)}
+                <div class="warn-row" role="alert">
+                  <span class="dot dot-warning"></span>
+                  <span class="t">{HEADLINE[w.code] ?? w.message}</span>
+                  {#if REMEDY[w.code]}<span class="d">{REMEDY[w.code]}</span>{/if}
+                </div>
+              {/each}
+            </div>
+          </section>
+        {/if}
+
+        <div class="figures">
+          <div class="figure">
+            <span class="v">{formatInt(status.images.active)}</span>
+            <span class="k">图片</span>
+          </div>
+          <div class="figure">
+            <span class="v">{formatBytes(status.images.bytes)}</span>
+            <span class="k">占用空间</span>
+          </div>
+          <div class="figure">
+            <span class="v">{formatInt(status.images.trashed)}</span>
+            <span class="k">回收站</span>
+          </div>
+          <div class="figure">
+            <span class="v">{formatBytes(status.database.bytes)}</span>
+            <span class="k">数据库</span>
+          </div>
+          <div class="figure">
+            <span class="v">{formatBytes(status.disk.freeBytes)}</span>
+            <span class="k">磁盘剩余</span>
+            <div class="meter" role="progressbar" aria-label="磁盘已用" aria-valuenow={usedShare} aria-valuemin={0} aria-valuemax={100}>
+              <i style="width: {usedShare}%;"></i>
+            </div>
+          </div>
+        </div>
+
+        <section class="section">
+          <h2>维护</h2>
+          <div class="list">
+            {#each MAINT as m (m.k)}
+              {@const r = result(m.k)}
+              <div class="list-row maint-row">
+                <span class="medium">{m.name}</span>
+                <span class="c-res badge">
+                  {#if r?.tone}<span class="dot dot-{r.tone}"></span>{/if}
+                  {#if r?.text}<span title={r.path}>{r.text}</span>{/if}
+                  {#if r?.at}<span class="num" title={formatAbsolute(r.at)}>{formatRelative(r.at)}</span>{/if}
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  disabled={running !== null}
+                  onclick={() => void (m.k === 'snapshot' ? createSnapshot() : runCheck(m.k as 'quick' | 'full'))}
+                >
+                  {running === m.k ? m.busy : m.btn}
+                </button>
+              </div>
+              {#if running !== m.k && r?.issues && r.issues.length > 0}
+                <div class="list" role="table" aria-label="检查结果">
+                  <div class="list-row list-head audit-row" role="row">
+                    <span>类型</span>
+                    <span>图片</span>
+                    <span>路径</span>
+                    <span>状态</span>
+                  </div>
+                  {#each r.issues as issue, i (i)}
+                    <div class="list-row audit-row" role="row">
+                      <span>{KIND[issue.kind] ?? issue.kind}</span>
+                      <span class="mono ellipsis" title={issue.imageId ?? undefined}>{issue.imageId ?? '—'}</span>
+                      <span class="mono ellipsis" title={issue.path ?? undefined}>{issue.path ?? '—'}</span>
+                      <span>
+                        {#if issue.repaired}<span class="text-success">已修复</span>{:else}<span class="text-warning">未修复</span>{/if}
+                      </span>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            {/each}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>操作记录</h2>
+          {#if auditPhase === 'loading'}
+            <div class="list" aria-busy="true">
+              {#each [0, 1, 2] as i (i)}
+                <div class="list-row audit-row">
+                  <div class="skeleton" style="height: 10px; width: 60%;"></div>
+                </div>
+              {/each}
+            </div>
+          {:else if auditPhase === 'error'}
+            <div class="state" role="alert">
+              <span class="t">记录加载失败</span>
+              <span class="d">{auditError}</span>
+              <button type="button" class="btn btn-secondary" onclick={() => void loadAudit()}>重试</button>
+            </div>
+          {:else if audit.length === 0}
+            <span class="muted">暂无记录</span>
+          {:else}
+            <div class="list" role="table" aria-label="操作记录">
+              {#if !phone.matches}
+                <div class="list-row list-head audit-row" role="row">
+                  <span>时间</span>
+                  <span>操作者</span>
+                  <span>操作</span>
+                  <span>对象</span>
+                </div>
+              {/if}
+              {#each audit as a (a.id)}
+                <div class="list-row audit-row" role="row">
+                  <span class="c-at muted num" title={formatAbsolute(a.at)}>{formatRelative(a.at)}</span>
+                  <span class="c-actor ellipsis" title={a.actor}>{actorLabel(a.actor)}</span>
+                  <span class="c-action medium">{ACTION[a.action] ?? a.action}</span>
+                  <span class="c-target ellipsis muted" title={a.target ?? undefined}>{a.target ?? ''}</span>
+                </div>
+              {/each}
+            </div>
+            {#if auditCursor}
+              <div>
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  style="margin-left: -12px;"
+                  disabled={auditMore}
+                  onclick={() => void loadAudit(true)}
+                >
+                  {auditMore ? '加载中…' : '加载更多'}
+                </button>
+              </div>
+            {/if}
+          {/if}
+        </section>
+
+        <section class="section">
+          <h2>运行信息</h2>
+          <dl class="dl">
+            <dt>版本</dt>
+            <dd class="num row" style="gap: 12px;">
+              <span>{status.version}</span>
+              {#if status.commit}<span class="mono muted">{status.commit}</span>{/if}
+            </dd>
+            <dt>运行环境</dt>
+            <dd class="num row" style="gap: 12px;">
+              <span>{status.goVersion}</span>
+              <span>SQLite {status.sqliteVersion}</span>
+            </dd>
+            <dt>已运行</dt>
+            <dd>{uptime}</dd>
+            <dt>数据目录</dt>
+            <dd class="mono" style="font-size: var(--fs-m);">{status.dataDir}</dd>
+          </dl>
+        </section>
+      </div>
+    {/if}
   </div>
 </div>

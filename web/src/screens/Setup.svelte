@@ -1,7 +1,7 @@
 <script lang="ts">
-  import AuthCard from '../components/AuthCard.svelte';
   import { api, ApiError, errorMessage } from '../lib/api';
   import { refreshSession } from '../lib/session.svelte';
+  import Icon from '../components/Icon.svelte';
 
   let code = $state('');
   let username = $state('admin');
@@ -76,42 +76,58 @@
   }
 </script>
 
-<AuthCard title="初始化">
-  <form class="auth-form" onsubmit={submit} novalidate>
-    <div class="field">
-      <label for="setup-code">初始化代码</label>
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        id="setup-code"
-        class="input code-input"
-        value={code}
-        oninput={oncodeinput}
-        autocomplete="off"
-        autocapitalize="characters"
-        spellcheck="false"
-        placeholder="XXXX-XXXX-XXXX"
-        aria-invalid={submitted && errors.code ? 'true' : undefined}
-        autofocus
-      />
-      <span class="hint">在服务器日志中找到初始化代码</span>
-      {#if submitted && errors.code}<span class="error-text">{errors.code}</span>{/if}
+<div class="auth">
+  <div class="auth-box">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      PicBerth
     </div>
-    <div class="field">
-      <label for="setup-user">用户名</label>
-      <input id="setup-user" class="input" bind:value={username} autocomplete="username" autocapitalize="none" spellcheck="false" aria-invalid={submitted && errors.username ? 'true' : undefined} />
-      {#if submitted && errors.username}<span class="error-text">{errors.username}</span>{/if}
-    </div>
-    <div class="field">
-      <label for="setup-pass">密码</label>
-      <input id="setup-pass" class="input" type="password" bind:value={password} autocomplete="new-password" aria-invalid={submitted && errors.password ? 'true' : undefined} />
-      {#if submitted && errors.password}<span class="error-text">{errors.password}</span>{/if}
-    </div>
-    <div class="field">
-      <label for="setup-confirm">确认密码</label>
-      <input id="setup-confirm" class="input" type="password" bind:value={confirm} autocomplete="new-password" aria-invalid={submitted && errors.confirm ? 'true' : undefined} />
-      {#if submitted && errors.confirm}<span class="error-text">{errors.confirm}</span>{/if}
-    </div>
-    {#if formError}<p class="error-text" role="alert">{formError}</p>{/if}
-    <button type="submit" class="btn btn-primary btn-block" disabled={busy}>{busy ? '正在创建…' : '创建管理员'}</button>
-  </form>
-</AuthCard>
+    <h1>初始化</h1>
+    <form class="auth-form" onsubmit={submit} novalidate>
+      <div class="field">
+        <label for="setup-code">初始化代码</label>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          id="setup-code"
+          class="input mono"
+          value={code}
+          oninput={oncodeinput}
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          maxlength={14}
+          placeholder="XXXX-XXXX-XXXX"
+          aria-invalid={submitted && errors.code ? 'true' : undefined}
+          autofocus
+        />
+        {#if submitted && errors.code}
+          <span class="field-error">{errors.code}</span>
+        {:else}
+          <span class="s muted">在服务器启动日志中</span>
+        {/if}
+      </div>
+      <div class="field">
+        <label for="setup-user">用户名</label>
+        <input id="setup-user" class="input" bind:value={username} autocomplete="username" autocapitalize="none" spellcheck="false" aria-invalid={submitted && errors.username ? 'true' : undefined} />
+        {#if submitted && errors.username}<span class="field-error">{errors.username}</span>{/if}
+      </div>
+      <div class="field">
+        <label for="setup-pass">密码</label>
+        <input id="setup-pass" class="input" type="password" bind:value={password} autocomplete="new-password" aria-invalid={submitted && errors.password ? 'true' : undefined} />
+        {#if submitted && errors.password}<span class="field-error">{errors.password}</span>{/if}
+      </div>
+      <div class="field">
+        <label for="setup-confirm">确认密码</label>
+        <input id="setup-confirm" class="input" type="password" bind:value={confirm} autocomplete="new-password" aria-invalid={submitted && errors.confirm ? 'true' : undefined} />
+        {#if submitted && errors.confirm}<span class="field-error">{errors.confirm}</span>{/if}
+      </div>
+      {#if formError}
+        <div class="alert" role="alert">
+          <Icon name="alert" />
+          <span>{formError}</span>
+        </div>
+      {/if}
+      <button type="submit" class="btn btn-primary btn-block" disabled={busy}>{busy ? '正在创建…' : '创建管理员'}</button>
+    </form>
+  </div>
+</div>
