@@ -5,7 +5,7 @@
 - Product type: personal self-hosted image host (单二进制 + 数据目录), managed through a web console.
 - Primary users: the single administrator of the instance.
 - Primary jobs to be done: upload images and copy their links (URL / Markdown / HTML / BBCode); find
-  existing images again; manage them (visibility, trash, restore, permanent deletion, batch actions);
+  existing images again; manage them (rename, tags, trash, restore, permanent deletion, batch actions);
   administer API tokens, settings and health.
 - It is a management tool for one's own image files, not a photo album or gallery.
 - UI surface classification: operational
@@ -22,8 +22,11 @@
 ## Must preserve
 
 - Every capability listed in `docs/ui/capabilities.md` (upload with progress/retry, four link formats,
-  search/filter/sort, batch trash/restore/purge/visibility with undo, token reveal-once, settings leave guard,
+  search/filter/sort, batch trash/restore/purge with undo, token reveal-once, settings leave guard,
   checks/snapshots, audit log).
+- Every uploaded image is public (changed 2026-11-08 at the user's request): the console has no 公开 / 私有
+  concept, no visibility control, filter, badge or default-visibility setting. The backend `visibility` field
+  stays until a separate backend change removes it.
 - Strict CSP: no third-party scripts, fonts or images at runtime; server strings rendered as text only.
 - Purge is the only action with a confirmation dialog; token revocation confirms inline; reversible actions
   offer 撤销.
