@@ -1,729 +1,405 @@
-// Image management building blocks. Every component receives `lib`, the library controller created in app.jsx.
+// 图片 and 回收站: list, filters, selection, uploads, detail.
 
-const FORMATS = ['jpeg', 'png', 'gif', 'webp', 'avif'];
-const VIS_OPTS = [
-  { key: 'public', label: '公开', icon: 'globe' },
-  { key: 'private', label: '私有', icon: 'lock' },
-];
-
-function toggleIn(arr, v) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+function Thumb({ img, className = 'thumb' }) {
+  return <img className={className} src={img.thumb} alt="" loading="lazy" draggable="false" />;
 }
-function countWhere(list, fn) {
-  let n = 0;
-  for (const x of list) if (fn(x)) n++;
-  return n;
-}
-function fmtLabel(key) {
-  return LINK_FORMATS.find((f) => f.key === key)?.label ?? key;
-}
-function stop(e) {
-  e.stopPropagation();
-}
-const isSelecting = (lib) => lib.sel.size > 0 || lib.selectMode;
 
 // ---------------------------------------------------------------- filters
+function FilterPopover({ filters, setFilters, pool }) {
+  const n = filterCount(filters);
+  const tags = useMemo(() => tagCounts(pool), [pool]);
+  const fmtCounts = useMemo(() => {
+    const m = {};
+    for (const im of pool) m[im.format] = (m[im.format] ?? 0) + 1;
+    return m;
+  }, [pool]);
+  const toggle = (key, v) =>
+    setFilters((f) => ({ ...f, [key]: f[key].includes(v) ? f[key].filter((x) => x !== v) : [...f[key], v] }));
+  return (
+    <Popover
+      className="popover"
+      label="筛选"
+      trigger={(p) => (
+        <button {...p} type="button" className="btn btn-ghost" aria-label={n ? `筛选，已选 ${n} 项` : '筛选'}>
+          <Icon name="filter" />
+          <span className="hide-phone">筛选</span>
+          {n > 0 && <span className="num muted">{n}</span>}
+        </button>
+      )}
+    >
+      {() => (
+        <>
+          <div className="fp-section">
+            <div className="fp-label">格式</div>
+            <div className="fp-chips">
+              {Object.keys(FORMAT_LABEL).map((k) => (
+                <button key={k} type="button" className="chip" aria-pressed={filters.formats.includes(k)} disabled={!fmtCounts[k]} onClick={() => toggle('formats', k)}>
+                  {FORMAT_LABEL[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="fp-section">
+            <div className="fp-label">上传时间</div>
+            <div className="fp-chips">
+              {DATE_RANGES.map((d) => (
+                <button key={d.key} type="button" className="chip" aria-pressed={filters.date === d.key} onClick={() => setFilters((f) => ({ ...f, date: f.date === d.key ? '' : d.key }))}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="fp-section">
+            <div className="fp-label">来源</div>
+            <div className="fp-list">
+              {SOURCES.map((s) => {
+                const on = filters.sources.includes(s.key);
+                return (
+                  <button key={s.key} type="button" className="fp-opt" role="checkbox" aria-checked={on} onClick={() => toggle('sources', s.key)}>
+                    <span className="check" data-on={String(on)}>{on && <Icon name="check" />}</span>
+                    {s.label}
+                    <span className="n">{pool.filter((im) => im.source === s.key).length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="fp-section">
+            <div className="fp-label">标签</div>
+            <div className="fp-list">
+              {tags.map(([t, c]) => {
+                const on = filters.tags.includes(t);
+                return (
+                  <button key={t} type="button" className="fp-opt" role="checkbox" aria-checked={on} onClick={() => toggle('tags', t)}>
+                    <span className="check" data-on={String(on)}>{on && <Icon name="check" />}</span>
+                    {t}
+                    <span className="n">{c}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </Popover>
+  );
+}
 
-function FilterChips({ lib }) {
-  const f = lib.filters;
-  const set = (p) => lib.setFilters({ ...f, ...p });
+function ActiveFilters({ filters, setFilters }) {
   const chips = [];
-  f.formats.forEach((k) => chips.push({ k: 'f' + k, label: FORMAT_LABEL[k], rm: () => set({ formats: f.formats.filter((x) => x !== k) }) }));
-  if (f.vis) chips.push({ k: 'vis', label: f.vis === 'public' ? '公开' : '私有', rm: () => set({ vis: '' }) });
-  if (f.date) chips.push({ k: 'date', label: DATE_RANGES.find((d) => d.key === f.date).label, rm: () => set({ date: '' }) });
-  f.sources.forEach((s) => chips.push({ k: 's' + s, label: sourceLabel(s), rm: () => set({ sources: f.sources.filter((x) => x !== s) }) }));
-  f.tags.forEach((t) => chips.push({ k: 't' + t, label: `#${t}`, rm: () => set({ tags: f.tags.filter((x) => x !== t) }) }));
+  const drop = (key, v) => setFilters((f) => ({ ...f, [key]: Array.isArray(f[key]) ? f[key].filter((x) => x !== v) : '' }));
+  if (filters.q) chips.push({ k: 'q', label: `“${filters.q}”`, rm: () => setFilters((f) => ({ ...f, q: '' })) });
+  filters.formats.forEach((v) => chips.push({ k: 'f' + v, label: FORMAT_LABEL[v], rm: () => drop('formats', v) }));
+  if (filters.date) chips.push({ k: 'date', label: DATE_RANGES.find((d) => d.key === filters.date).label, rm: () => drop('date') });
+  filters.sources.forEach((v) => chips.push({ k: 's' + v, label: sourceLabel(v), rm: () => drop('sources', v) }));
+  filters.tags.forEach((v) => chips.push({ k: 't' + v, label: v, rm: () => drop('tags', v) }));
   if (!chips.length) return null;
   return (
-    <div className="chips">
+    <div className="filters">
       {chips.map((c) => (
-        <span className="chip" key={c.k}>
+        <span key={c.k} className="chip" style={{ color: 'var(--text)' }}>
           {c.label}
-          <button type="button" aria-label={`移除筛选 ${c.label}`} onClick={c.rm}>
-            <Icon name="x" size={12} />
+          <button type="button" className="x" aria-label={`移除 ${c.label}`} onClick={c.rm}>
+            <Icon name="x" size="s" />
           </button>
         </span>
       ))}
-      <button type="button" className="chip-clear" onClick={() => lib.setFilters({ ...EMPTY_FILTERS, q: f.q })}>
-        清除筛选
+      <button type="button" className="btn btn-ghost btn-sm muted" onClick={() => setFilters(EMPTY_FILTERS)}>
+        清除
       </button>
     </div>
   );
 }
 
-/** Faceted filter list, shown in the filter popover and the phone sheet. */
-function FacetPanel({ lib }) {
-  const f = lib.filters;
-  const base = lib.base;
-  const set = (p) => lib.setFilters({ ...f, ...p });
-  const opt = (key, on, label, count, onClick, multi) => (
-    <button type="button" key={key} className={`facet-opt ${on ? 'on' : ''}`} aria-pressed={on} onClick={onClick}>
-      {multi ? (
-        <span className={`menu-check ${on ? 'on' : ''}`} aria-hidden="true">
-          {on && <Icon name="check" size={12} />}
-        </span>
-      ) : (
-        <span className={`radio ${on ? 'on' : ''}`} aria-hidden="true" />
-      )}
-      <span className="truncate">{label}</span>
-      {count !== undefined && <span className="count">{count}</span>}
-    </button>
-  );
-  const head = (title, active, clear) => (
-    <h3>
-      {title}
-      {active && (
-        <button type="button" onClick={clear}>
-          清除
-        </button>
-      )}
-    </h3>
-  );
+function DisplayMenu({ view, setView, sort, setSort, phone, onSelectMode }) {
   return (
-    <div>
-      <div className="facet">
-        {head('格式', f.formats.length > 0, () => set({ formats: [] }))}
-        {FORMATS.map((k) => opt(k, f.formats.includes(k), FORMAT_LABEL[k], countWhere(base, (i) => i.format === k), () => set({ formats: toggleIn(f.formats, k) }), true))}
-      </div>
-      <div className="facet">
-        {head('可见性', !!f.vis, () => set({ vis: '' }))}
-        {opt('all', !f.vis, '全部', base.length, () => set({ vis: '' }))}
-        {VIS_OPTS.map((o) => opt(o.key, f.vis === o.key, o.label, countWhere(base, (i) => i.visibility === o.key), () => set({ vis: f.vis === o.key ? '' : o.key })))}
-      </div>
-      <div className="facet">
-        {head('上传时间', !!f.date, () => set({ date: '' }))}
-        {opt('all', !f.date, '全部', base.length, () => set({ date: '' }))}
-        {DATE_RANGES.map((d) =>
-          opt(d.key, f.date === d.key, d.label, countWhere(base, (i) => (d.since ? i.createdAt >= d.since() : i.createdAt < d.until())), () => set({ date: f.date === d.key ? '' : d.key })),
-        )}
-      </div>
-      <div className="facet">
-        {head('来源', f.sources.length > 0, () => set({ sources: [] }))}
-        {SOURCES.map((s) => opt(s.key, f.sources.includes(s.key), s.label, countWhere(base, (i) => i.source === s.key), () => set({ sources: toggleIn(f.sources, s.key) }), true))}
-      </div>
-      <div className="facet">
-        {head('标签', f.tags.length > 0, () => set({ tags: [] }))}
-        {allTags(base).map(([t, n]) => opt(t, f.tags.includes(t), t, n, () => set({ tags: toggleIn(f.tags, t) }), true))}
-      </div>
-    </div>
-  );
-}
-
-/** The single 筛选 button: every facet lives in one popover. */
-function FilterPopover({ lib }) {
-  const n = activeFilterCount({ ...lib.filters, q: '' }, true);
-  return (
-    <Menu
-      align="right"
-      className="menu-facets"
-      width={300}
-      trigger={(open, toggle) => (
-        <button type="button" className="btn btn-ghost filter-btn" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
-          <Icon name="filter" />
-          <span>筛选</span>
-          {n > 0 && <span className="filter-n">{n}</span>}
+    <Popover
+      label="显示"
+      trigger={(p) => (
+        <button {...p} type="button" className="btn btn-ghost btn-icon" aria-label={phone ? '更多' : '显示'} title={phone ? '更多' : '显示'}>
+          <Icon name={phone ? 'more' : view === 'grid' ? 'grid' : 'list'} />
         </button>
       )}
     >
-      <FacetPanel lib={lib} />
-    </Menu>
-  );
-}
-
-/** Phone adjustments sheet: sort, view and the same facets, applied live. */
-function AdjustSheet({ lib, onClose }) {
-  const n = activeFilterCount({ ...lib.filters, q: '' }, true);
-  return (
-    <Sheet onClose={onClose} label="筛选">
       {(close) => (
         <>
-          <div className="sheet-head">
-            <h2>筛选</h2>
-            {n > 0 && (
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => lib.setFilters({ ...EMPTY_FILTERS, q: lib.filters.q })}>
-                清除
-              </button>
-            )}
-          </div>
-          <div className="sheet-body">
-            <div className="facet">
-              <h3>排序</h3>
-              {SORTS.map((s) => (
-                <button type="button" key={s.key} className={`facet-opt ${lib.sort === s.key ? 'on' : ''}`} aria-pressed={lib.sort === s.key} onClick={() => lib.setSort(s.key)}>
-                  <span className={`radio ${lib.sort === s.key ? 'on' : ''}`} aria-hidden="true" />
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div className="facet">
-              <h3>视图</h3>
-              <div className="facet-seg">
-                <Seg
-                  fill
-                  label="视图"
-                  value={lib.view}
-                  onChange={lib.setView}
-                  options={[
-                    { key: 'table', icon: 'list', label: '列表' },
-                    { key: 'grid', icon: 'grid', label: '网格' },
-                  ]}
-                />
-              </div>
-            </div>
-            <FacetPanel lib={lib} />
-          </div>
-          <div className="sheet-foot">
-            <button type="button" className="btn btn-primary btn-block btn-lg" onClick={close}>
-              显示 {lib.items.length} 张图片
-            </button>
-          </div>
+          {phone && (
+            <>
+              <MenuItem icon="select" onClick={() => (onSelectMode(), close())}>
+                选择
+              </MenuItem>
+              <div className="menu-sep" />
+            </>
+          )}
+          <div className="menu-group">视图</div>
+          <MenuItem checked={view === 'table'} onClick={() => (setView('table'), close())}>
+            列表
+          </MenuItem>
+          <MenuItem checked={view === 'grid'} onClick={() => (setView('grid'), close())}>
+            网格
+          </MenuItem>
+          <div className="menu-sep" />
+          <div className="menu-group">排序</div>
+          {SORTS.map((s) => (
+            <MenuItem key={s.key} checked={sort === s.key} onClick={() => (setSort(s.key), close())}>
+              {s.label}
+            </MenuItem>
+          ))}
         </>
       )}
-    </Sheet>
+    </Popover>
   );
 }
 
-function SortMenu({ lib }) {
-  const cur = SORTS.find((s) => s.key === lib.sort) ?? SORTS[0];
+// ---------------------------------------------------------------- uploads
+function UploadTray({ items, onCancel, onRetry, onRemove, onCopy, onCopyAll, onClear, onOpen }) {
+  if (!items.length) return null;
+  const done = items.filter((u) => u.status === 'done' || u.status === 'duplicate');
+  const busy = items.some((u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing');
   return (
-    <Menu
-      align="right"
-      width={160}
-      trigger={(open, toggle) => (
-        <button type="button" className="btn btn-ghost btn-icon" aria-haspopup="menu" aria-expanded={open} aria-label={`排序：${cur.label}`} title={`排序：${cur.label}`} onClick={toggle}>
-          <Icon name="sort" />
+    <section className="uploads" aria-label="上传">
+      <div className="uploads-head">
+        <span className="strong">上传</span>
+        <span className="muted num">
+          {done.length} / {items.length}
+        </span>
+        <span className="grow" />
+        {done.length > 1 && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCopyAll}>
+            <Icon name="copy" size="s" />
+            复制全部链接
+          </button>
+        )}
+        {!busy && (
+          <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label="关闭" title="关闭" onClick={onClear}>
+            <Icon name="x" />
+          </button>
+        )}
+      </div>
+      {items.map((u) => (
+        <div key={u.id} className="up-row">
+          <img className="thumb" src={u.thumb} alt="" />
+          <div className="up-name">
+            <span className="ellipsis medium">{u.name}</span>
+            {(u.status === 'uploading' || u.status === 'queued') && (
+              <div className="bar" role="progressbar" aria-label={u.name} aria-valuenow={Math.round(u.progress)} aria-valuemin={0} aria-valuemax={100}>
+                <i style={{ width: `${u.progress}%` }} />
+              </div>
+            )}
+            {u.status === 'processing' && (
+              <div className="bar indeterminate" role="progressbar" aria-label={u.name}>
+                <i />
+              </div>
+            )}
+            {u.status === 'error' && <span className="s text-danger">{u.error}</span>}
+            {u.status === 'done' && <span className="s muted">{fmtBytes(u.size)}</span>}
+            {u.status === 'duplicate' && <span className="s muted">已存在，使用原有链接</span>}
+          </div>
+          <div className="row" style={{ gap: 2 }}>
+            {u.status === 'queued' && <span className="s muted">等待中</span>}
+            {u.status === 'uploading' && <span className="s muted num">{Math.round(u.progress)}%</span>}
+            {u.status === 'processing' && <span className="s muted">处理中</span>}
+            {(u.status === 'queued' || u.status === 'uploading') && (
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`取消 ${u.name}`} title="取消" onClick={() => onCancel(u.id)}>
+                <Icon name="x" />
+              </button>
+            )}
+            {u.status === 'error' && u.retryable && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRetry(u.id)}>
+                重试
+              </button>
+            )}
+            {u.status === 'error' && (
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`移除 ${u.name}`} title="移除" onClick={() => onRemove(u.id)}>
+                <Icon name="x" />
+              </button>
+            )}
+            {(u.status === 'done' || u.status === 'duplicate') && (
+              <>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(u.imageId)}>
+                  查看
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onCopy(u.imageId)}>
+                  <Icon name="copy" size="s" />
+                  复制
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- list views
+function ImageTable({ list, mode, sel, openId, onRowClick, onToggle, onToggleAll, onCopy, onRestore, onTrash, onPurge, retention, selecting }) {
+  const allOn = list.length > 0 && list.every((im) => sel.has(im.id));
+  const someOn = list.some((im) => sel.has(im.id));
+  return (
+    <table className={'table' + (selecting ? ' selecting' : '')} aria-label={mode === 'trash' ? '回收站' : '图片'} aria-multiselectable="true">
+      <colgroup>
+        <col className="col-check" />
+        <col className="col-thumb" />
+        <col />
+        <col className="col-tags" style={{ width: '18%' }} />
+        <col className="col-dims" style={{ width: 112 }} />
+        <col className="col-size" style={{ width: 84 }} />
+        <col className="col-date" style={{ width: 112 }} />
+        <col className="col-act" style={{ width: 84 }} />
+      </colgroup>
+      <thead>
+        <tr>
+          <th className="col-check">
+            <Check on={allOn ? true : someOn ? 'mixed' : false} onChange={onToggleAll} label="全选" className="cell-check" />
+          </th>
+          <th className="col-thumb">
+            <span className="sr-only">预览</span>
+          </th>
+          <th>文件名</th>
+          <th className="col-tags">标签</th>
+          <th className="col-dims">尺寸</th>
+          <th className="col-size r">大小</th>
+          <th className="col-date">{mode === 'trash' ? '清除' : '上传时间'}</th>
+          <th className="col-act">
+            <span className="sr-only">操作</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {list.map((im) => {
+          const on = sel.has(im.id);
+          const when = mode === 'trash' ? purgeIn(im, retention) : fmtRel(im.createdAt);
+          return (
+            <tr
+              key={im.id}
+              aria-selected={on}
+              className={openId === im.id ? 'is-open' : ''}
+              onClick={(e) => onRowClick(im, e)}
+              tabIndex={0}
+              data-id={im.id}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onRowClick(im, e);
+                if (e.key === ' ') (e.preventDefault(), onToggle(im.id));
+              }}
+            >
+              <td className="col-check">
+                <Check on={on} onChange={(e) => onToggle(im.id, e)} label={`选择 ${im.filename}`} className="cell-check" />
+              </td>
+              <td className="col-thumb">
+                <Thumb img={im} />
+              </td>
+              <td>
+                <div className="name-cell">
+                  <span className="name ellipsis">{im.filename}</span>
+                </div>
+                <div className="mobile-meta num">
+                  <span>{fmtBytes(im.size)}</span>
+                  <span>
+                    {im.width} × {im.height}
+                  </span>
+                  <span>{when}</span>
+                </div>
+              </td>
+              <td className="col-tags">
+                <span className="tags">
+                  {im.tags.map((t) => (
+                    <span key={t} className="tag">
+                      {t}
+                    </span>
+                  ))}
+                </span>
+              </td>
+              <td className="col-dims muted num">
+                {im.width} × {im.height}
+              </td>
+              <td className="col-size r muted num">{fmtBytes(im.size)}</td>
+              <td className="col-date muted num">{when}</td>
+              <td className="col-act">
+                <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                  {mode === 'active' ? (
+                    <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`复制 ${im.filename} 的链接`} title="复制链接" onClick={() => onCopy(im)}>
+                      <Icon name="copy" />
+                    </button>
+                  ) : (
+                    <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`恢复 ${im.filename}`} title="恢复" onClick={() => onRestore([im.id])}>
+                      <Icon name="restore" />
+                    </button>
+                  )}
+                  <RowMenu im={im} mode={mode} onCopy={onCopy} onTrash={onTrash} onPurge={onPurge} />
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function RowMenu({ im, mode, onCopy, onTrash, onPurge }) {
+  return (
+    <Popover
+      trigger={(p) => (
+        <button {...p} type="button" className="btn btn-ghost btn-sm btn-icon more" aria-label={`${im.filename} 的更多操作`} title="更多">
+          <Icon name="more" />
         </button>
       )}
     >
       {(close) =>
-        SORTS.map((s) => (
-          <RadioItem key={s.key} on={s.key === lib.sort} onClick={() => (lib.setSort(s.key), close())}>
-            {s.label}
-          </RadioItem>
-        ))
-      }
-    </Menu>
-  );
-}
-
-function ViewToggle({ lib }) {
-  return (
-    <Seg
-      icons
-      label="视图"
-      value={lib.view}
-      onChange={lib.setView}
-      options={[
-        { key: 'table', icon: 'list', title: '列表' },
-        { key: 'grid', icon: 'grid', title: '网格' },
-      ]}
-    />
-  );
-}
-
-/** Search field. `collapsed`: an icon button that expands into the field (tablet and phone headers). */
-function SearchBox({ lib, inputRef, collapsed }) {
-  const q = lib.filters.q;
-  if (collapsed && !lib.searchOpen && !q)
-    return (
-      <button type="button" className="btn btn-ghost btn-icon" aria-label="搜索" title="搜索 (/)" onClick={() => lib.setSearchOpen(true)}>
-        <Icon name="search" />
-      </button>
-    );
-  return (
-    <label className={`search ${collapsed ? 'search-open' : ''}`}>
-      <Icon name="search" />
-      <input
-        ref={inputRef}
-        className="input"
-        type="text"
-        role="searchbox"
-        autoComplete="off"
-        spellCheck="false"
-        placeholder="搜索"
-        aria-label="搜索图片"
-        autoFocus={collapsed}
-        value={q}
-        onChange={(e) => lib.setFilters({ ...lib.filters, q: e.target.value })}
-        onBlur={() => {
-          if (collapsed && !lib.filters.q && !lib.isMobile) lib.setSearchOpen(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key !== 'Escape') return;
-          lib.setFilters({ ...lib.filters, q: '' });
-          lib.setSearchOpen(false);
-          e.currentTarget.blur();
-        }}
-      />
-      {q ? (
-        <button
-          type="button"
-          className="search-clear"
-          aria-label="清除"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            lib.setFilters({ ...lib.filters, q: '' });
-            inputRef.current?.focus();
-          }}
-        >
-          <Icon name="x" size={12} />
-        </button>
-      ) : (
-        !collapsed && <kbd className="hide-touch">/</kbd>
-      )}
-    </label>
-  );
-}
-
-// ---------------------------------------------------------------- page header
-
-/** Library header. Desktop and tablet: title left, tools right (replaced in place by the bulk actions while selecting).
- *  Phone: compact title row with search, select mode and the adjustments sheet. */
-function LibraryHead({ lib, width, onUpload, onAdjust }) {
-  const trash = lib.route === 'trash';
-  const title = trash ? '回收站' : '图片';
-  const selecting = isSelecting(lib);
-  const hasTools = !((lib.dataState === 'ok' || lib.dataState === 'empty') && !lib.base.length);
-
-  if (lib.isMobile) {
-    const n = activeFilterCount({ ...lib.filters, q: '' }, true);
-    if (lib.searchOpen || lib.filters.q)
-      return (
-        <header className="page-head">
-          <SearchBox lib={lib} inputRef={lib.searchRef} collapsed />
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              lib.setFilters({ ...lib.filters, q: '' });
-              lib.setSearchOpen(false);
-            }}
-          >
-            取消
-          </button>
-        </header>
-      );
-    return (
-      <header className="page-head">
-        <h1>{title}</h1>
-        {hasTools && (
-          <div className="page-actions">
-            <SearchBox lib={lib} inputRef={lib.searchRef} collapsed />
-            <button type="button" className={`btn btn-ghost btn-icon ${selecting ? 'active-soft' : ''}`} aria-label="选择" aria-pressed={selecting} onClick={() => (selecting ? lib.clearSel() : lib.setSelectMode(true))}>
-              <Icon name="select" />
-            </button>
-            <button type="button" className={`btn btn-ghost btn-icon ${n ? 'active-soft' : ''}`} aria-label={n ? `筛选（${n}）` : '筛选'} onClick={onAdjust}>
-              <Icon name="more" />
-            </button>
-            {!trash && (
-              <button type="button" className="btn btn-primary btn-icon head-upload" aria-label="上传" onClick={lib.pick}>
-                <Icon name="upload" />
-              </button>
-            )}
-          </div>
-        )}
-      </header>
-    );
-  }
-
-  const w = width || 1200;
-  const collapsed = lib.rail || w < (trash ? 660 : 640);
-  return (
-    <PageHead title={title}>
-      {selecting ? (
-        <BulkBar lib={lib} compact={w < 620} />
-      ) : (
-        <>
-          {hasTools && (
-            <>
-              <SearchBox lib={lib} inputRef={lib.searchRef} collapsed={collapsed} />
-              <FilterPopover lib={lib} />
-              <SortMenu lib={lib} />
-              <ViewToggle lib={lib} />
-            </>
-          )}
-          {trash ? (
-            lib.base.length > 0 && (
-              <button type="button" className="btn btn-danger-ghost" onClick={() => lib.act.purge(lib.base.map((i) => i.id))}>
-                清空回收站
-              </button>
-            )
-          ) : (
-            hasTools && (
-              <button type="button" className="btn btn-primary" onClick={onUpload} title="上传 (U)">
-                <Icon name="upload" />
-                上传
-              </button>
-            )
-          )}
-        </>
-      )}
-    </PageHead>
-  );
-}
-
-// ---------------------------------------------------------------- selection
-
-function copyMany(lib, imgs, fmt = lib.linkFormat) {
-  writeClipboard(imgs.map((i) => i.links[fmt]).join('\n'));
-  lib.toast(imgs.length === 1 ? `已复制 ${fmtLabel(fmt)} 链接` : `已复制 ${imgs.length} 条 ${fmtLabel(fmt)} 链接`);
-}
-
-/** Bulk actions. In the page header on desktop and tablet; `floating` above the tab bar on phones.
- *  `compact`: icon-only buttons. */
-function BulkBar({ lib, compact, floating }) {
-  const ids = [...lib.sel];
-  const imgs = ids.map((id) => lib.byId[id]).filter(Boolean);
-  const trash = lib.route === 'trash';
-  const all = lib.items.length;
-  const allOn = ids.length === all && all > 0;
-  const sm = floating ? 'btn-sm' : '';
-  const aria = (text, extra) => ({ 'aria-label': compact ? text : undefined, title: compact ? text : undefined, ...extra });
-  return (
-    <div className={`bulk ${floating ? 'bulk-floating' : ''}`} role="toolbar" aria-label="批量操作">
-      <span className="count">已选 {ids.length} 张</span>
-      <button type="button" className={`btn btn-ghost ${sm}`} onClick={allOn ? lib.clearSel : lib.selectAll}>
-        {allOn ? '取消全选' : '全选'}
-      </button>
-      {floating && <span className="grow" />}
-      {ids.length > 0 &&
-        (trash ? (
+        mode === 'active' ? (
           <>
-            <button type="button" className={`btn btn-ghost ${sm}`} onClick={() => lib.act.restore(ids)}>
-              <Icon name="restore" />
-              恢复
-            </button>
-            <button type="button" className={`btn btn-danger-ghost ${sm}`} onClick={() => lib.act.purge(ids)}>
-              永久删除
-            </button>
+            {LINK_FORMATS.map((f) => (
+              <MenuItem key={f.key} onClick={() => (onCopy(im, f.key), close())}>
+                复制 {f.label}
+              </MenuItem>
+            ))}
+            <div className="menu-sep" />
+            <MenuItem icon="download" onClick={close}>
+              下载原图
+            </MenuItem>
+            <MenuItem icon="trash" onClick={() => (onTrash([im.id]), close())}>
+              移到回收站
+            </MenuItem>
           </>
         ) : (
-          <>
-            <button type="button" className={`btn btn-ghost ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('复制链接')} onClick={() => copyMany(lib, imgs)}>
-              <Icon name="copy" />
-              {!compact && '复制链接'}
-            </button>
-            <Menu
-              align="right"
-              up={floating}
-              trigger={(open, toggle) => (
-                <button type="button" className={`btn btn-ghost ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('可见性', { 'aria-expanded': open, 'aria-haspopup': 'menu' })} onClick={toggle}>
-                  <Icon name="lock" />
-                  {!compact && '可见性'}
-                  {!compact && <Icon name="chevron-down" size={14} />}
-                </button>
-              )}
-            >
-              {(close) => (
-                <>
-                  <MenuItem icon="globe" onClick={() => (lib.act.setVis(ids, 'public'), close())}>
-                    设为公开
-                  </MenuItem>
-                  <MenuItem icon="lock" onClick={() => (lib.act.setVis(ids, 'private'), close())}>
-                    设为私有
-                  </MenuItem>
-                </>
-              )}
-            </Menu>
-            <button type="button" className={`btn btn-danger-ghost ${sm} ${compact ? 'btn-icon' : ''}`} {...aria('移到回收站')} onClick={() => lib.act.trash(ids)}>
-              <Icon name="trash" />
-              {!compact && '移到回收站'}
-            </button>
-          </>
-        ))}
-      <button type="button" className={`btn btn-ghost btn-icon ${sm}`} aria-label="取消选择" title="取消选择 (Esc)" onClick={lib.clearSel}>
-        <Icon name="x" />
-      </button>
-    </div>
+          <MenuItem danger icon="trash" onClick={() => (onPurge([im.id]), close())}>
+            永久删除
+          </MenuItem>
+        )
+      }
+    </Popover>
   );
 }
 
-// ---------------------------------------------------------------- per-image actions
-
-function RowMenu({ lib, image, up }) {
-  const trash = image.state === 'trashed';
+function ImageGrid({ list, mode, sel, openId, onRowClick, onToggle, retention, selecting }) {
   return (
-    <span onClick={stop}>
-      <Menu
-        align="right"
-        up={up}
-        width={196}
-        trigger={(open, toggle) => (
-          <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`${image.filename} 的更多操作`} title="更多操作" aria-expanded={open} onClick={toggle}>
-            <Icon name="more" />
-          </button>
-        )}
-      >
-        {(close) => {
-          const run = (fn) => () => {
-            close();
-            fn();
-          };
-          return trash ? (
-            <>
-              <MenuItem icon="restore" onClick={run(() => lib.act.restore([image.id]))}>
-                恢复
-              </MenuItem>
-              <MenuItem icon="download" onClick={run(() => lib.act.download(image))}>
-                下载
-              </MenuItem>
-              <div className="menu-sep" />
-              <MenuItem icon="trash" danger onClick={run(() => lib.act.purge([image.id]))}>
-                永久删除
-              </MenuItem>
-            </>
-          ) : (
-            <>
-              <div className="menu-label">复制为</div>
-              {LINK_FORMATS.map((f) => (
-                <RadioItem
-                  key={f.key}
-                  on={f.key === lib.linkFormat}
-                  onClick={run(() => {
-                    lib.setLinkFormat(f.key);
-                    copyMany(lib, [image], f.key);
-                  })}
-                >
-                  {f.label}
-                </RadioItem>
-              ))}
-              <div className="menu-sep" />
-              <MenuItem icon="external" onClick={run(() => lib.toast('已在新标签页打开原图'))}>
-                打开原图
-              </MenuItem>
-              <MenuItem icon="download" onClick={run(() => lib.act.download(image))}>
-                下载
-              </MenuItem>
-              {image.visibility === 'public' ? (
-                <MenuItem icon="lock" onClick={run(() => lib.act.setVis([image.id], 'private'))}>
-                  设为私有
-                </MenuItem>
-              ) : (
-                <MenuItem icon="globe" onClick={run(() => lib.act.setVis([image.id], 'public'))}>
-                  设为公开
-                </MenuItem>
-              )}
-              <div className="menu-sep" />
-              <MenuItem icon="trash" danger onClick={run(() => lib.act.trash([image.id]))}>
-                移到回收站
-              </MenuItem>
-            </>
-          );
-        }}
-      </Menu>
-    </span>
-  );
-}
-
-function CopyLink({ lib, image, className = 'btn-ghost' }) {
-  return <CopyButton iconOnly size="sm" className={className} text={image.links[lib.linkFormat]} label={`复制 ${fmtLabel(lib.linkFormat)}`} onCopied={() => lib.toast(`已复制 ${fmtLabel(lib.linkFormat)} 链接`)} />;
-}
-
-function LockMark({ image }) {
-  return image.visibility === 'private' ? (
-    <span className="lock-mark" role="img" aria-label="私有" title="私有">
-      <Icon name="lock" size={13} />
-    </span>
-  ) : null;
-}
-
-// ---------------------------------------------------------------- list (desktop and tablet)
-
-function ImageList({ lib, items }) {
-  const trash = lib.route === 'trash';
-  return (
-    <div className="list-wrap">
-      <div className={`list ${isSelecting(lib) ? 'selecting' : ''}`} role="grid" aria-multiselectable="true" aria-label={trash ? '回收站' : '图片'}>
-        {items.map((im, idx) => {
-          const on = lib.sel.has(im.id);
-          return (
-            <div
-              key={im.id}
-              className={`lrow ${trash ? 'trash' : ''} ${on ? 'selected' : ''} ${lib.activeId === im.id ? 'active' : ''}`}
-              role="row"
-              aria-selected={on}
-              tabIndex={0}
-              onClick={(e) => lib.clickItem(im.id, e)}
-              onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key === 'Enter') lib.open(im.id);
-                if (e.key === ' ') {
-                  e.preventDefault();
-                  lib.toggle(im.id);
-                }
-              }}
-            >
-              <span role="gridcell" className="l-check" onClick={stop}>
-                <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(im.id, e.shiftKey)} aria-label={`选择 ${im.filename}`} />
-              </span>
-              <span role="gridcell" className="l-thumb">
-                <Thumb image={im} className="thumb-sm" />
-              </span>
-              <span role="gridcell" className="l-name">
-                <span className="name truncate" title={im.filename}>
-                  {im.filename}
-                </span>
-                <LockMark image={im} />
-                {im.tags.length > 0 && (
-                  <span className="tags">
-                    {im.tags.map((t) => (
-                      <span key={t} className="tag">
-                        {t}
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </span>
-              {!trash && (
-                <span role="gridcell" className="l-dim">
-                  {im.width}
-                  {' × '}
-                  {im.height}
-                </span>
-              )}
-              <span role="gridcell" className="l-size">
-                {fmtBytes(im.size)}
-              </span>
-              {trash ? (
-                <>
-                  <span role="gridcell" className="l-time" title={fmtDate(im.trashedAt)}>
-                    {fmtRel(im.trashedAt)}
-                  </span>
-                  <span role="gridcell" className="l-time l-last">
-                    {daysLeft(im, lib.settings.trashRetentionDays)}
-                  </span>
-                </>
-              ) : (
-                <span role="gridcell" className="l-time l-last" title={fmtDate(im.createdAt)}>
-                  {fmtRel(im.createdAt)}
-                </span>
-              )}
-              <span role="gridcell" className="l-actions">
-                {trash ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      lib.act.restore([im.id]);
-                    }}
-                  >
-                    恢复
-                  </button>
-                ) : (
-                  <CopyLink lib={lib} image={im} />
-                )}
-                <RowMenu lib={lib} image={im} up={items.length > 5 && idx >= items.length - 3} />
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-// ---------------------------------------------------------------- grid
-
-function Tile({ lib, image }) {
-  const on = lib.sel.has(image.id);
-  const trash = image.state === 'trashed';
-  return (
-    <div
-      className={`tile ${on ? 'selected' : ''} ${lib.activeId === image.id ? 'active' : ''}`}
-      onClick={(e) => lib.clickItem(image.id, e)}
-      tabIndex={0}
-      role="button"
-      aria-label={image.filename}
-      aria-pressed={on}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter') lib.open(image.id);
-        if (e.key === ' ') {
-          e.preventDefault();
-          lib.toggle(image.id);
-        }
-      }}
-      {...longPress(lib, image.id)}
-    >
-      <span className="tile-media">
-        <Thumb image={image} />
-        <label className="tile-check" onClick={stop}>
-          <input type="checkbox" className="check" checked={on} onChange={() => {}} onClick={(e) => lib.toggle(image.id, e.shiftKey)} aria-label={`选择 ${image.filename}`} />
-        </label>
-        <span className="tile-badges">
-          {image.frames > 1 && <span className="chip-overlay">GIF</span>}
-          {image.visibility === 'private' && (
-            <span className="chip-overlay" role="img" aria-label="私有" title="私有">
-              <Icon name="lock" size={12} />
-            </span>
-          )}
-        </span>
-        {!trash && (
-          <span className="tile-copy" onClick={stop}>
-            <CopyLink lib={lib} image={image} className="btn-overlay" />
-          </span>
-        )}
-      </span>
-      <span className="name truncate" title={image.filename}>
-        {image.filename}
-      </span>
-    </div>
-  );
-}
-
-function ImageGrid({ lib, items }) {
-  return (
-    <div className={`grid ${isSelecting(lib) ? 'selecting' : ''}`}>
-      {items.map((im) => (
-        <Tile key={im.id} lib={lib} image={im} />
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- phone rows
-
-/** Touch long-press enters selection, mirroring the production gesture. */
-function longPress(lib, id) {
-  let timer = 0;
-  const cancel = () => clearTimeout(timer);
-  return {
-    onPointerDown: (e) => {
-      if (e.pointerType !== 'touch') return;
-      timer = setTimeout(() => {
-        lib.setSelectMode(true);
-        lib.toggle(id);
-        lib.suppressClick();
-        navigator.vibrate?.(10);
-      }, 450);
-    },
-    onPointerUp: cancel,
-    onPointerLeave: cancel,
-    onPointerMove: cancel,
-  };
-}
-
-function ImageRows({ lib, items }) {
-  const selecting = isSelecting(lib);
-  const trash = lib.route === 'trash';
-  return (
-    <div className={`rows ${selecting ? 'selecting' : ''}`}>
-      {items.map((im) => {
-        const on = lib.sel.has(im.id);
+    <div className={'grid' + (selecting ? ' selecting' : '')} role="listbox" aria-multiselectable="true" aria-label={mode === 'trash' ? '回收站' : '图片'}>
+      {list.map((im) => {
+        const on = sel.has(im.id);
         return (
-          <div key={im.id} className={`row ${on ? 'selected' : ''} ${lib.activeId === im.id ? 'active' : ''}`} {...longPress(lib, im.id)}>
-            <span className="row-check" aria-hidden={!selecting}>
-              <input type="checkbox" className="check" checked={on} tabIndex={selecting ? 0 : -1} onChange={() => lib.toggle(im.id)} aria-label={`选择 ${im.filename}`} />
-            </span>
-            <button type="button" className="row-btn" onClick={(e) => lib.clickItem(im.id, e)}>
-              <Thumb image={im} />
-              <span className="l-name">
-                <span className="name truncate">{im.filename}</span>
-                <LockMark image={im} />
-              </span>
-              <span className="row-time num">{trash ? daysLeft(im, lib.settings.trashRetentionDays) : fmtRel(im.createdAt)}</span>
-            </button>
-            {!selecting && (trash ? <RowMenu lib={lib} image={im} /> : <CopyLink lib={lib} image={im} />)}
+          <div
+            key={im.id}
+            className={'tile' + (openId === im.id ? ' is-open' : '')}
+            role="option"
+            aria-selected={on}
+            tabIndex={0}
+            data-id={im.id}
+            onClick={(e) => onRowClick(im, e)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onRowClick(im, e);
+              if (e.key === ' ') (e.preventDefault(), onToggle(im.id));
+            }}
+          >
+            <Thumb img={im} className="tile-img" />
+            <Check on={on} onChange={(e) => onToggle(im.id, e)} label={`选择 ${im.filename}`} />
+            <div className="tile-meta">
+              <span className="name ellipsis grow">{im.filename}</span>
+            </div>
+            <div className="tile-sub num">
+              <span>{fmtBytes(im.size)}</span>
+              <span>{mode === 'trash' ? purgeIn(im, retention) : fmtRel(im.createdAt)}</span>
+            </div>
           </div>
         );
       })}
@@ -731,513 +407,611 @@ function ImageRows({ lib, items }) {
   );
 }
 
-// ---------------------------------------------------------------- collection with states
-
-function LoadingList({ grid, mobile }) {
-  if (grid)
-    return (
-      <div className="grid" aria-busy="true" aria-label="正在加载">
-        {Array.from({ length: 12 }, (_, i) => (
-          <div key={i} className="tile is-skeleton">
-            <div className="skeleton" style={{ aspectRatio: '4 / 3', borderRadius: 0 }} />
-            <div className="skeleton" style={{ height: 12, width: '70%', margin: 8 }} />
-          </div>
-        ))}
-      </div>
-    );
+function LoadingRows() {
   return (
-    <div className={`rows rows-skeleton ${mobile ? '' : 'desk'}`} aria-busy="true" aria-label="正在加载">
+    <div aria-busy="true" aria-label="加载中">
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="row">
-          <div className="skeleton" style={{ width: mobile ? 36 : 28, height: mobile ? 36 : 28, flex: 'none', borderRadius: 'var(--r-xs)' }} />
-          <div className="skeleton" style={{ height: 12, width: `${30 + ((i * 17) % 35)}%` }} />
+        <div key={i} className="row" style={{ height: 48, padding: '0 20px', gap: 16, borderBottom: 'var(--bw) solid var(--hairline)' }}>
+          <div className="skeleton" style={{ width: 32, height: 32, marginLeft: 36 }} />
+          <div className="skeleton" style={{ width: `${30 + ((i * 17) % 30)}%`, height: 10 }} />
+          <span className="grow" />
+          <div className="skeleton" style={{ width: 56, height: 10 }} />
+          <div className="skeleton" style={{ width: 72, height: 10, marginRight: 96 }} />
         </div>
       ))}
     </div>
   );
 }
 
-function EmptyState({ lib }) {
-  if (lib.route === 'trash')
-    return (
-      <div className="empty">
-        <Icon name="trash" size={32} />
-        <strong>回收站是空的</strong>
-      </div>
-    );
-  return (
-    <div className="empty">
-      <Icon name="upload" size={32} />
-      <strong>还没有图片</strong>
-      <div className="actions">
-        <button type="button" className="btn btn-primary" onClick={lib.pick}>
-          <Icon name="upload" />
-          上传图片
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => lib.go('tokens')}>
-          <Icon name="key" />
-          新建令牌
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ImageCollection({ lib }) {
-  const grid = lib.view === 'grid';
-  if (lib.dataState === 'loading') return <LoadingList grid={grid} mobile={lib.isMobile} />;
-  if (lib.dataState === 'error')
-    return (
-      <div className="alert danger" role="alert" style={{ margin: 16 }}>
-        <Icon name="alert" />
-        <span className="grow">无法连接到服务器</span>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={lib.retry}>
-          <Icon name="refresh" />
-          重试
-        </button>
-      </div>
-    );
-  if (!lib.base.length) return <EmptyState lib={lib} />;
-  if (!lib.items.length)
-    return (
-      <div className="empty">
-        <Icon name="search" size={32} />
-        <strong>没有符合条件的图片</strong>
-        <div className="actions">
-          <button type="button" className="btn btn-secondary" onClick={() => lib.setFilters(EMPTY_FILTERS)}>
-            清除搜索和筛选
-          </button>
-        </div>
-      </div>
-    );
-  return grid ? <ImageGrid lib={lib} items={lib.items} /> : lib.isMobile ? <ImageRows lib={lib} items={lib.items} /> : <ImageList lib={lib} items={lib.items} />;
-}
-
-// ---------------------------------------------------------------- detail
-
-/** Filename heading; click it (or the pencil) to rename in place. */
-function DetailName({ image, editable, onSave }) {
-  const [edit, setEdit] = React.useState(false);
-  const [v, setV] = React.useState(image.filename);
-  const inputRef = React.useRef(null);
-  React.useEffect(() => {
-    setEdit(false);
-    setV(image.filename);
-  }, [image.id, image.filename]);
-  // Entering edit mode focuses the field and selects the name without its extension.
-  React.useEffect(() => {
-    const el = inputRef.current;
-    if (!edit || !el) return;
-    el.focus();
-    const dot = el.value.lastIndexOf('.');
-    el.setSelectionRange(0, dot > 0 ? dot : el.value.length);
-  }, [edit]);
-  const err = !v.trim() ? '请输入文件名' : v.length > 200 ? '文件名不能超过 200 个字符' : null;
-  if (!edit)
-    return (
-      <h2 className="d-name">
-        {editable ? (
-          <button type="button" className="d-name-btn" title="重命名" aria-label={`重命名 ${image.filename}`} onClick={() => setEdit(true)}>
-            <span>{image.filename}</span>
-            <Icon name="edit" size={14} />
-          </button>
-        ) : (
-          <span>{image.filename}</span>
-        )}
-      </h2>
-    );
-  const cancel = () => {
-    setEdit(false);
-    setV(image.filename);
-  };
-  const save = () => {
-    if (err) return;
-    onSave(v.trim());
-    setEdit(false);
+// ---------------------------------------------------------------- tag editor
+function TagEditor({ tags, all, onChange }) {
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const inRef = useRef(null);
+  const fRef = useRef(null);
+  const pos = useFloating(open, inRef, fRef, 'start');
+  useDismiss(open, [inRef, fRef], () => setOpen(false));
+  const clean = text.trim().replace(/^#/, '');
+  const suggestions = all.filter(([t]) => !tags.includes(t) && t.includes(clean)).slice(0, 6);
+  const add = (t) => {
+    t = t.trim().replace(/^#/, '').slice(0, 32);
+    if (!t || tags.includes(t) || tags.length >= 20) return;
+    onChange([...tags, t]);
+    setText('');
   };
   return (
-    <div className="d-rename">
-      <div className="rename">
-        <input
-          ref={inputRef}
-          className="input"
-          value={v}
-          aria-label="文件名"
-          aria-invalid={!!err}
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save();
-            if (e.key === 'Escape') {
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-              cancel();
-            }
-          }}
-        />
-        <button type="button" className="btn btn-secondary" disabled={!!err} onClick={save}>
-          保存
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={cancel}>
-          取消
-        </button>
-      </div>
-      {err && <p className="error-text">{err}</p>}
-    </div>
-  );
-}
-
-const normalizeTag = (s) => s.trim().replace(/^#+/, '').trim().slice(0, 32);
-
-/** Tag chips plus a `+` chip that opens the product combobox (existing tags with counts, or the typed text as a new tag). */
-function TagEditor({ image, onChange, known }) {
-  const tags = image.tags;
-  const full = tags.length >= 20;
-  const options = known.filter(([t]) => !tags.includes(t)).map(([t, n]) => ({ value: t, label: t, count: n }));
-  return (
-    <div className="tag-editor">
+    <>
       {tags.map((t) => (
-        <span key={t} className="tag tag-edit">
+        <span key={t} className="tag-edit">
           {t}
           <button type="button" aria-label={`移除标签 ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
-            <Icon name="x" size={12} />
+            <Icon name="x" size="s" />
           </button>
         </span>
       ))}
-      <Combobox
-        label="添加标签"
-        placeholder="添加标签"
-        options={options}
-        normalize={normalizeTag}
-        taken={(v) => tags.includes(v)}
-        onPick={(v) => !tags.includes(v) && tags.length < 20 && onChange([...tags, v])}
-        onEmptyBackspace={() => tags.length && onChange(tags.slice(0, -1))}
-        trigger={(open, toggle) => (
-          <button type="button" className="tag-add" aria-label="添加标签" aria-haspopup="listbox" aria-expanded={open} disabled={full} onClick={toggle}>
-            <Icon name="plus" size={12} />
-          </button>
+      {tags.length < 20 && (
+        <input
+          ref={inRef}
+          className="tag-add"
+          placeholder="添加"
+          aria-label="添加标签"
+          role="combobox"
+          aria-expanded={open && suggestions.length > 0}
+          maxLength={33}
+          value={text}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => (setText(e.target.value.replace(',', '')), setOpen(true))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.preventDefault(), add(text));
+            if (e.key === 'Backspace' && !text && tags.length) onChange(tags.slice(0, -1));
+            if (e.key === 'Escape') (e.stopPropagation(), setOpen(false));
+          }}
+        />
+      )}
+      {open &&
+        suggestions.length > 0 &&
+        ReactDOM.createPortal(
+          <div ref={fRef} className="menu" role="listbox" style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }}>
+            {suggestions.map(([t, c]) => (
+              <button key={t} type="button" role="option" className="menu-item" onMouseDown={(e) => e.preventDefault()} onClick={() => add(t)}>
+                {t}
+                <span className="end num">{c}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
         )}
-      />
-    </div>
-  );
-}
-
-function KeyValue({ k, children, top }) {
-  return (
-    <>
-      <dt className={top ? 'top' : ''}>{k}</dt>
-      <dd className={top ? 'top' : ''}>{children}</dd>
     </>
   );
 }
 
-/** `mode`: dock (column beside the list), drawer (overlay on tablets) or sheet (phones). */
-function DetailPanel({ lib, image, onClose, mode = 'drawer' }) {
-  const trash = image.state === 'trashed';
-  const [prev, next] = lib.neighbors(image.id);
-  const pub = image.visibility === 'public';
-  const fmt = lib.linkFormat;
-  return (
-    <div className={`detail detail-${mode}`}>
-      <div className="d-top">
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="上一张" title="上一张 (←)" disabled={!prev} onClick={() => prev && lib.open(prev.id)}>
-          <Icon name="chevron-left" />
+// ---------------------------------------------------------------- detail
+function Detail({ img, mode, index, total, variant, onClose, onPrev, onNext, onUpdate, onTrash, onRestore, onPurge, onCopyFormat, lastFormat, allTags, retention }) {
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(img.filename);
+  const [copied, setCopied] = useState('');
+  useEffect(() => {
+    setRenaming(false);
+    setName(img.filename);
+    setCopied('');
+  }, [img.id]);
+  const touch = useRef({});
+  const trashed = mode === 'trash';
+  const saveName = () => {
+    const n = name.trim();
+    setRenaming(false);
+    if (n && n !== img.filename) onUpdate({ filename: n }, '已重命名');
+    else setName(img.filename);
+  };
+  const body = (
+    <aside
+      className={'detail ' + (variant === 'docked' ? '' : variant)}
+      aria-label={img.filename}
+      onTouchStart={(e) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - touch.current.x;
+        const dy = e.changedTouches[0].clientY - touch.current.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) (dx < 0 ? onNext : onPrev)();
+      }}
+    >
+      <div className="detail-head">
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="上一张" title="上一张" disabled={index <= 0} onClick={onPrev}>
+          <Icon name="left" />
         </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="下一张" title="下一张 (→)" disabled={!next} onClick={() => next && lib.open(next.id)}>
-          <Icon name="chevron-right" />
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="下一张" title="下一张" disabled={index >= total - 1} onClick={onNext}>
+          <Icon name="right" />
         </button>
-        <span className="sp" />
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="关闭" title="关闭 (Esc)" onClick={onClose}>
+        <span className="pos">
+          {index + 1} / {total}
+        </span>
+        <span className="grow" />
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="关闭" title="关闭" onClick={onClose}>
           <Icon name="x" />
         </button>
       </div>
-      <div className="detail-scroll">
-        <div className={`preview ${hasAlpha(image) ? 'checker' : ''}`}>
-          <a
-            className="preview-img"
-            href={image.url}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="打开原图"
-            tabIndex={-1}
-            onClick={(e) => {
-              e.preventDefault();
-              lib.toast('已在新标签页打开原图');
-            }}
-          >
-            <img key={image.id} src={image.thumb} alt={image.filename} />
-          </a>
-          <a
-            className="preview-open"
-            href={image.url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => {
-              e.preventDefault();
-              lib.toast('已在新标签页打开原图');
-            }}
-          >
-            <Icon name="external" size={14} />
-            打开原图
-          </a>
+      <div className="detail-body">
+        <div className="preview">
+          <img src={img.thumb} alt={img.filename} />
         </div>
 
-        <div className="d-body">
-          <div>
-            <DetailName image={image} editable={!trash} onSave={(n) => lib.act.rename(image.id, n)} />
-            <div className="d-meta num">
-              <span>{FORMAT_LABEL[image.format]}</span>
-              <span>
-                {image.width} × {image.height}
-              </span>
-              <span>{fmtBytes(image.size)}</span>
-              {trash ? <span className="badge">{daysLeft(image, lib.settings.trashRetentionDays)}</span> : <time title={fmtDate(image.createdAt)}>{fmtRel(image.createdAt)}</time>}
-            </div>
-          </div>
-
-          {!trash && (
-            <div className="d-link">
-              <Tabs label="链接格式" value={fmt} onChange={lib.setLinkFormat} options={LINK_FORMATS} />
-              <div className="link-box">
-                <input className="input mono" readOnly value={image.links[fmt]} aria-label={`${fmtLabel(fmt)} 链接`} onFocus={(e) => e.target.select()} />
-                <CopyButton iconOnly className="btn-ghost" text={image.links[fmt]} label={`复制 ${fmtLabel(fmt)}`} />
-              </div>
-            </div>
+        <div className="title-edit">
+          {renaming ? (
+            <input
+              className="input title-input"
+              aria-label="文件名"
+              value={name}
+              autoFocus
+              onFocus={(e) => e.target.setSelectionRange(0, name.lastIndexOf('.') > 0 ? name.lastIndexOf('.') : name.length)}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveName();
+                if (e.key === 'Escape') (e.stopPropagation(), setName(img.filename), setRenaming(false));
+              }}
+            />
+          ) : (
+            <h2>
+              <button type="button" className="title-btn" title="重命名" aria-label={`${img.filename}，重命名`} onClick={() => !trashed && setRenaming(true)} disabled={trashed}>
+                {img.filename}
+              </button>
+            </h2>
           )}
-
-          <dl className="kv">
-            {!trash && (
-              <KeyValue k="公开">
-                <Switch checked={pub} label="公开" onChange={(v) => lib.act.setVis([image.id], v ? 'public' : 'private')} />
-              </KeyValue>
-            )}
-            {!trash && (
-              <KeyValue k="标签" top>
-                <TagEditor image={image} known={lib.knownTags} onChange={(tags) => lib.act.setTags(image.id, tags)} />
-              </KeyValue>
-            )}
-            <KeyValue k="来源">{sourceLabel(image.source)}</KeyValue>
-            <KeyValue k="上传时间">
-              <span className="num">{fmtDate(image.createdAt)}</span>
-            </KeyValue>
-            {trash && (
-              <KeyValue k="删除时间">
-                <span className="num">{fmtDate(image.trashedAt)}</span>
-              </KeyValue>
-            )}
-            <KeyValue k="ID">
-              <span className="mono truncate">{image.id}</span>
-              <CopyButton iconOnly size="sm" className="btn-ghost" text={image.id} label="复制 ID" />
-            </KeyValue>
-            <KeyValue k="SHA-256">
-              <span className="mono truncate" title={image.sha256}>
-                {image.sha256}
-              </span>
-              <CopyButton iconOnly size="sm" className="btn-ghost" text={image.sha256} label="复制 SHA-256" />
-            </KeyValue>
-          </dl>
+          <div className="facts num">
+            <span>
+              {img.width} × {img.height}
+            </span>
+            <span>{fmtBytes(img.size)}</span>
+            <span>{FORMAT_LABEL[img.format]}</span>
+            {img.frames > 1 && <span>动图 {img.frames} 帧</span>}
+            {trashed && <span className="text-warning">{purgeIn(img, retention)}</span>}
+          </div>
         </div>
-      </div>
 
+        {!trashed && (
+          <div className="links" role="group" aria-label="复制链接">
+            {LINK_FORMATS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={'link-row' + (copied === f.key ? ' copied' : '')}
+                aria-label={`复制 ${f.label}`}
+                onClick={() => {
+                  onCopyFormat(img, f.key);
+                  setCopied(f.key);
+                }}
+              >
+                <span className="k">{f.label}</span>
+                <span className="v mono ellipsis">{img.links[f.key]}</span>
+                <Icon name={copied === f.key ? 'check' : 'copy'} size="s" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <dl className="props">
+          <dt>标签</dt>
+          {trashed ? (
+            <dd className="flex">{img.tags.length ? img.tags.map((t) => <span key={t} className="tag">{t}</span>) : <span className="muted">无</span>}</dd>
+          ) : (
+            <dd className="flex">
+              <TagEditor tags={img.tags} all={allTags} onChange={(tags) => onUpdate({ tags })} />
+            </dd>
+          )}
+        </dl>
+
+        <div className="props-divide" />
+
+        <dl className="props">
+          <dt>来源</dt>
+          <dd className="ellipsis">{sourceLabel(img.source)}</dd>
+          <dt>上传时间</dt>
+          <dd className="num">{fmtDate(img.createdAt)}</dd>
+          {trashed && (
+            <>
+              <dt>删除时间</dt>
+              <dd className="num">{fmtDate(img.trashedAt)}</dd>
+            </>
+          )}
+          <dt>ID</dt>
+          <dd>
+            <button type="button" className="copy-inline" aria-label="复制 ID" title="复制" onClick={() => onCopyFormat(img, 'id')}>
+              <span className="mono ellipsis">{img.id}</span>
+            </button>
+          </dd>
+          <dt>SHA-256</dt>
+          <dd>
+            <button type="button" className="copy-inline" aria-label="复制 SHA-256" title="复制" onClick={() => onCopyFormat(img, 'sha256')}>
+              <span className="mono ellipsis">{img.sha256}</span>
+            </button>
+          </dd>
+        </dl>
+      </div>
       <div className="detail-foot">
-        {trash ? (
+        {trashed ? (
           <>
-            <button type="button" className="btn btn-ghost" onClick={() => lib.act.restore([image.id])}>
+            <button type="button" className="btn btn-secondary" onClick={() => onRestore([img.id])}>
               <Icon name="restore" />
               恢复
             </button>
-            <button type="button" className="btn btn-danger-ghost" onClick={() => lib.act.purge([image.id])}>
+            <button type="button" className="btn btn-ghost btn-danger-text" onClick={() => onPurge([img.id])}>
               永久删除
             </button>
           </>
         ) : (
           <>
-            <button type="button" className="btn btn-ghost" onClick={() => lib.act.download(image)}>
+            <button type="button" className="btn btn-ghost">
               <Icon name="download" />
               下载
             </button>
-            <button type="button" className="btn btn-danger-ghost" onClick={() => lib.act.trash([image.id])}>
+            <button type="button" className="btn btn-ghost btn-danger-text" onClick={() => onTrash([img.id])}>
               <Icon name="trash" />
               移到回收站
             </button>
           </>
         )}
       </div>
-    </div>
+    </aside>
   );
-}
-// ---------------------------------------------------------------- upload
-
-function Dropzone({ lib }) {
-  return (
-    <button type="button" className="dropzone" onClick={lib.pick}>
-      <span className="dz-icon">
-        <Icon name="upload" size={22} />
-      </span>
-      <span className="dz-main">
-        拖放或粘贴图片，或 <span className="dz-link">选择文件</span>
-      </span>
-    </button>
+  if (variant === 'docked') return body;
+  return ReactDOM.createPortal(
+    <>
+      <div className="detail-overlay" onClick={onClose} />
+      {body}
+    </>,
+    document.body,
   );
 }
 
-function UploadList({ lib }) {
-  return (
-    <ul className="up-list">
-      {lib.uploads.map((u) => {
-        const img = u.imageId ? lib.byId[u.imageId] : null;
-        const thumbSrc = { thumb: u.thumb, format: u.format };
-        return (
-          <li className={`up-row up-${u.status}`} key={u.id}>
-            <Thumb image={img ?? thumbSrc} />
-            <div className="up-info">
-              <span className="up-name">
-                <span className="name truncate" title={u.name}>
-                  {u.name}
-                </span>
-                {img && <LockMark image={img} />}
-              </span>
-              {u.status === 'uploading' && (
-                <>
-                  <div className="progress" role="progressbar" aria-valuenow={u.progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${u.name} 上传进度`}>
-                    <span style={{ width: `${u.progress}%` }} />
-                  </div>
-                  <span className="sub num">
-                    {fmtBytes(Math.round((u.size * u.progress) / 100))} / {fmtBytes(u.size)}
-                  </span>
-                </>
-              )}
-              {u.status === 'queued' && <span className="sub">等待上传</span>}
-              {u.status === 'processing' && (
-                <>
-                  <div className="progress indeterminate">
-                    <span />
-                  </div>
-                  <span className="sub">处理中</span>
-                </>
-              )}
-              {u.status === 'done' && (
-                <span className="sub ok">
-                  <Icon name="check" size={12} />
-                  已上传
-                </span>
-              )}
-              {u.status === 'duplicate' && <span className="sub">已存在，使用原链接</span>}
-              {u.status === 'error' && <span className="sub err">{u.error}</span>}
-            </div>
-            <div className="up-act">
-              {(u.status === 'uploading' || u.status === 'queued' || u.status === 'processing') && (
-                <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`取消上传 ${u.name}`} title="取消上传" onClick={() => lib.cancelUpload(u.id)}>
-                  <Icon name="x" />
-                </button>
-              )}
-              {(u.status === 'done' || u.status === 'duplicate') && img && <CopyButton iconOnly size="sm" className="btn-ghost" text={img.links[lib.linkFormat]} label={`复制 ${fmtLabel(lib.linkFormat)}`} />}
-              {u.status === 'error' &&
-                (u.retryable ? (
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => lib.retryUpload(u.id)}>
-                    <Icon name="refresh" />
-                    重试
-                  </button>
-                ) : (
-                  <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label={`移除 ${u.name}`} title="移除" onClick={() => lib.removeUpload(u.id)}>
-                    <Icon name="x" />
-                  </button>
-                ))}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
+// ---------------------------------------------------------------- page
+function Library({ mode, images, setImages, uploads, uploadApi, settings, dataState, onRetryLoad, initialOpen }) {
+  const toast = useToast();
+  const phone = useMedia('(max-width: 720px)');
+  const wide = useMedia('(min-width: 1280px)');
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [sort, setSort] = useState('new');
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem('picberth.view') || 'table';
+    } catch (e) {
+      return 'table';
+    }
+  });
+  const [sel, setSel] = useState(() => new Set());
+  const [anchor, setAnchor] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [openId, setOpenId] = useState(initialOpen ?? null);
+  const [searching, setSearching] = useState(false);
+  const [purge, setPurge] = useState(null);
+  const [lastFormat, setLastFormat] = useState('url');
+  const searchRef = useRef(null);
+  const fileRef = useRef(null);
 
-function uploadSummary(uploads) {
-  const active = countWhere(uploads, (u) => u.status === 'uploading' || u.status === 'queued' || u.status === 'processing');
-  const done = countWhere(uploads, (u) => u.status === 'done' || u.status === 'duplicate');
-  const failed = countWhere(uploads, (u) => u.status === 'error');
-  return { active, done, failed, total: uploads.length };
-}
+  useEffect(() => {
+    try {
+      localStorage.setItem('picberth.view', view);
+    } catch (e) {}
+  }, [view]);
+  useEffect(() => {
+    setSel(new Set());
+    setSelectMode(false);
+    setFilters(EMPTY_FILTERS);
+    setOpenId(initialOpen ?? null);
+  }, [mode]);
 
-function copyFinished(lib) {
-  const imgs = lib.uploads.filter((u) => u.imageId && lib.byId[u.imageId]).map((u) => lib.byId[u.imageId]);
-  if (imgs.length) copyMany(lib, imgs);
-}
+  const state = mode === 'trash' ? 'trashed' : 'active';
+  const pool = useMemo(() => images.filter((im) => im.state === state), [images, state]);
+  const list = useMemo(() => applyFilters(pool, filters, sort), [pool, filters, sort]);
+  const allTags = useMemo(() => tagCounts(pool), [pool]);
+  const openIdx = list.findIndex((im) => im.id === openId);
+  const openImg = openIdx >= 0 ? list[openIdx] : null;
+  const filtered = filters.q || filterCount(filters) > 0;
+  const selecting = sel.size > 0 || selectMode;
+  const selectedList = list.filter((im) => sel.has(im.id));
 
-function UploadDialog({ lib, onClose }) {
-  const s = uploadSummary(lib.uploads);
-  const counted = lib.uploads.filter((u) => u.status !== 'error');
-  const pct = counted.length ? Math.round(counted.reduce((n, u) => n + (u.status === 'uploading' ? u.progress : u.status === 'queued' ? 0 : 100), 0) / counted.length) : 0;
-  return (
-    <Modal
-      title="上传图片"
-      onClose={onClose}
-      width="560px"
-      className="full-sm"
-      footer={(close) => (
-        <>
-          <Seg label="上传后可见性" value={lib.uploadVis} onChange={lib.setUploadVis} options={VIS_OPTS} className="foot-start" />
-          {s.done > 1 && (
-            <button type="button" className="btn btn-secondary" onClick={() => copyFinished(lib)}>
-              <Icon name="copy" />
-              复制全部链接
-            </button>
-          )}
-          <button type="button" className="btn btn-primary" onClick={close}>
-            {s.active ? '在后台继续' : '完成'}
+  // keyboard
+  useEffect(() => {
+    const key = (e) => {
+      const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName) || document.querySelector('.scrim');
+      if (e.key === 'Escape' && !typing) {
+        if (openImg) setOpenId(null);
+        else if (selecting) (setSel(new Set()), setSelectMode(false));
+      }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '/') {
+        e.preventDefault();
+        phone ? setSearching(true) : searchRef.current?.focus();
+      }
+      if ((e.key === 'u' || e.key === 'U') && mode === 'active') fileRef.current?.click();
+      if (openImg && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const n = openIdx + (e.key === 'ArrowLeft' ? -1 : 1);
+        if (list[n]) setOpenId(list[n].id);
+      }
+    };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  });
+  useEffect(() => {
+    if (searching) searchRef.current?.focus();
+  }, [searching]);
+
+  const fmtName = (k) => LINK_FORMATS.find((f) => f.key === k)?.label;
+  const copyImg = (im, fmt = lastFormat) => {
+    if (fmt === 'id' || fmt === 'sha256') {
+      copyText(im[fmt]);
+      toast(fmt === 'id' ? '已复制 ID' : '已复制 SHA-256');
+      return;
+    }
+    setLastFormat(fmt);
+    copyText(im.links[fmt]);
+    toast(`已复制 ${fmtName(fmt)}`);
+  };
+  const copyMany = (ims) => {
+    copyText(ims.map((im) => im.links[lastFormat]).join('\n'));
+    toast(`已复制 ${ims.length} 条 ${fmtName(lastFormat)}`);
+  };
+
+  const toggle = (id, e) => {
+    setSel((s) => {
+      const n = new Set(s);
+      if (e?.shiftKey && anchor) {
+        const a = list.findIndex((im) => im.id === anchor);
+        const b = list.findIndex((im) => im.id === id);
+        list.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((im) => n.add(im.id));
+      } else n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+    setAnchor(id);
+  };
+  const toggleAll = () => setSel((s) => (list.every((im) => s.has(im.id)) ? new Set() : new Set(list.map((im) => im.id))));
+  const onRowClick = (im, e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || selecting) return toggle(im.id, e);
+    setOpenId(openId === im.id && !wide ? null : im.id);
+  };
+
+  const patch = (ids, fn) => setImages((xs) => xs.map((im) => (ids.includes(im.id) ? fn(im) : im)));
+  const advanceFrom = (ids) => {
+    if (openId && ids.includes(openId)) {
+      const rest = list.filter((im) => !ids.includes(im.id));
+      const next = rest[Math.min(openIdx, rest.length - 1)];
+      setOpenId(next ? next.id : null);
+    }
+  };
+  const trash = (ids) => {
+    const before = images;
+    advanceFrom(ids);
+    patch(ids, (im) => ({ ...im, state: 'trashed', trashedAt: NOW }));
+    setSel(new Set());
+    setSelectMode(false);
+    toast(ids.length > 1 ? `已将 ${ids.length} 张图片移到回收站` : '已移到回收站', { label: '撤销', run: () => setImages(before) });
+  };
+  const restore = (ids) => {
+    const before = images;
+    advanceFrom(ids);
+    patch(ids, (im) => ({ ...im, state: 'active', trashedAt: null }));
+    setSel(new Set());
+    setSelectMode(false);
+    toast(ids.length > 1 ? `已恢复 ${ids.length} 张图片` : '已恢复', { label: '撤销', run: () => setImages(before) });
+  };
+  const doPurge = () => {
+    const ids = purge;
+    advanceFrom(ids);
+    setImages((xs) => xs.filter((im) => !ids.includes(im.id)));
+    setSel(new Set());
+    setSelectMode(false);
+    setPurge(null);
+    toast(ids.length > 1 ? `已永久删除 ${ids.length} 张图片` : '已永久删除');
+  };
+  const update = (p, msg) => {
+    patch([openImg.id], (im) => ({ ...im, ...p, links: p.filename ? makeLinks(im.id, im.ext, p.filename) : im.links }));
+    if (msg) toast(msg);
+  };
+
+  const title = mode === 'trash' ? '回收站' : '图片';
+  const ids = [...sel];
+
+  // header
+  let head;
+  if (phone && searching) {
+    head = (
+      <div className="head">
+        <div className="field-wrap grow">
+          <Icon name="search" />
+          <input ref={searchRef} className="input" type="search" placeholder="搜索" aria-label="搜索" value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))} />
+        </div>
+        <button type="button" className="btn btn-ghost" onClick={() => (setSearching(false), setFilters((f) => ({ ...f, q: '' })))}>
+          取消
+        </button>
+      </div>
+    );
+  } else if (selecting) {
+    head = (
+      <div className="head" style={{ paddingLeft: phone ? 8 : 12 }}>
+        <div className="bulk">
+          <Check on={list.length && list.every((im) => sel.has(im.id)) ? true : sel.size ? 'mixed' : false} onChange={toggleAll} label="全选" />
+          <span className="n">已选 {sel.size} 张</span>
+          {!phone && sel.size > 0 && <BulkActions mode={mode} ids={ids} selected={selectedList} onCopy={copyMany} onTrash={trash} onRestore={restore} onPurge={setPurge} />}
+          <span className="grow" />
+          <button type="button" className="btn btn-ghost" onClick={() => (setSel(new Set()), setSelectMode(false))}>
+            {phone ? '完成' : '取消选择'}
           </button>
-        </>
-      )}
-    >
-      <Dropzone lib={lib} />
-      {lib.uploads.length > 0 && (
-        <div className="up-summary">
-          <div className="up-summary-row num">
-            <span>
-              已上传 {s.done} / {s.total}
-            </span>
-            {s.active > 0 && <span>{pct}%</span>}
+        </div>
+      </div>
+    );
+  } else {
+    head = (
+      <div className="head">
+        <div className="head-title">
+          <h1>{title}</h1>
+          {dataState === 'ready' && <span className="count">{filtered ? `${list.length} / ${pool.length}` : pool.length}</span>}
+        </div>
+        {phone ? (
+          <button type="button" className="btn btn-ghost btn-icon" aria-label="搜索" title="搜索" onClick={() => setSearching(true)}>
+            <Icon name="search" />
+          </button>
+        ) : (
+          <div className="field-wrap search">
+            <Icon name="search" />
+            <input ref={searchRef} className="input" type="search" placeholder="搜索" aria-label="搜索" value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))} />
+            {!filters.q && <kbd>/</kbd>}
           </div>
-          <UploadList lib={lib} />
+        )}
+        <FilterPopover filters={filters} setFilters={setFilters} pool={pool} />
+        <DisplayMenu view={view} setView={setView} sort={sort} setSort={setSort} phone={phone} onSelectMode={() => setSelectMode(true)} />
+        {mode === 'active' && (
+          <button type="button" className={'btn btn-primary' + (phone ? ' btn-icon' : '')} style={phone ? { color: 'var(--accent-ink)' } : null} aria-label="上传" title="上传 (U)" onClick={() => fileRef.current?.click()}>
+            <Icon name="upload" />
+            {!phone && '上传'}
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => (uploadApi.add([...e.target.files]), (e.target.value = ''))} />
+      </div>
+    );
+  }
+
+  let content;
+  if (dataState === 'loading') content = <LoadingRows />;
+  else if (dataState === 'error')
+    content = (
+      <div className="state" role="alert">
+        <span className="t">图片加载失败</span>
+        <span className="d">网络连接中断</span>
+        <button type="button" className="btn btn-secondary" onClick={onRetryLoad}>
+          重试
+        </button>
+      </div>
+    );
+  else if (!pool.length)
+    content =
+      mode === 'trash' ? (
+        <div className="state">
+          <span className="t">回收站是空的</span>
+        </div>
+      ) : (
+        <div className="state">
+          <span className="t">还没有图片</span>
+          <span className="d">拖入、粘贴或选择文件上传</span>
+          <button type="button" className="btn btn-secondary" onClick={() => fileRef.current?.click()}>
+            选择文件
+          </button>
+        </div>
+      );
+  else if (!list.length)
+    content = (
+      <div className="state">
+        <span className="t">没有匹配的图片</span>
+        <button type="button" className="btn btn-secondary" onClick={() => setFilters(EMPTY_FILTERS)}>
+          清除筛选
+        </button>
+      </div>
+    );
+  else {
+    const p = { list, mode, sel, openId, onRowClick, onToggle: toggle, retention: settings.trashRetentionDays, selecting };
+    content =
+      view === 'grid' ? (
+        <ImageGrid {...p} />
+      ) : (
+        <ImageTable {...p} onToggleAll={toggleAll} onCopy={copyImg} onRestore={restore} onTrash={trash} onPurge={setPurge} />
+      );
+  }
+
+  const variant = wide && !phone ? 'docked' : phone ? 'sheet' : 'drawer';
+
+  return (
+    <>
+      <div className="panel-main">
+        {head}
+        <ActiveFilters filters={phone && searching ? { ...filters, q: '' } : filters} setFilters={setFilters} />
+        <div className="scroll">
+          {mode === 'active' && (
+            <UploadTray
+              items={uploads}
+              onCancel={uploadApi.cancel}
+              onRetry={uploadApi.retry}
+              onRemove={uploadApi.remove}
+              onClear={uploadApi.clear}
+              onOpen={(id) => setOpenId(id)}
+              onCopy={(id) => copyImg(images.find((im) => im.id === id))}
+              onCopyAll={() => copyMany(uploads.filter((u) => u.imageId).map((u) => images.find((im) => im.id === u.imageId)).filter(Boolean))}
+            />
+          )}
+          {content}
+          {dataState === 'ready' && list.length > 12 && <div className="loadmore">已显示全部</div>}
+        </div>
+      </div>
+      {openImg && (
+        <Detail
+          img={openImg}
+          mode={mode}
+          index={openIdx}
+          total={list.length}
+          variant={variant}
+          retention={settings.trashRetentionDays}
+          onClose={() => setOpenId(null)}
+          onPrev={() => list[openIdx - 1] && setOpenId(list[openIdx - 1].id)}
+          onNext={() => list[openIdx + 1] && setOpenId(list[openIdx + 1].id)}
+          onUpdate={update}
+          onTrash={trash}
+          onRestore={restore}
+          onPurge={setPurge}
+          onCopyFormat={copyImg}
+          lastFormat={lastFormat}
+          allTags={allTags}
+        />
+      )}
+      {phone && sel.size > 0 && (
+        <div className="float-bar" role="toolbar" aria-label="批量操作">
+          <BulkActions mode={mode} ids={ids} selected={selectedList} onCopy={copyMany} onTrash={trash} onRestore={restore} onPurge={setPurge} compact />
         </div>
       )}
-    </Modal>
-  );
-}
-
-function PurgeConfirm({ count, onCancel, onConfirm }) {
-  return (
-    <Modal
-      title={count === 1 ? '永久删除这张图片？' : `永久删除 ${count} 张图片？`}
-      onClose={onCancel}
-      width="420px"
-      footer={(close) => (
-        <>
-          <button type="button" className="btn btn-secondary" onClick={close} autoFocus>
-            取消
-          </button>
-          <button type="button" className="btn btn-danger-solid" onClick={onConfirm}>
-            永久删除
-          </button>
-        </>
+      {purge && (
+        <Dialog
+          title={purge.length > 1 ? `永久删除 ${purge.length} 张图片？` : `永久删除“${images.find((im) => im.id === purge[0])?.filename}”？`}
+          onClose={() => setPurge(null)}
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" data-autofocus onClick={() => setPurge(null)}>
+                取消
+              </button>
+              <button type="button" className="btn btn-danger" onClick={doPurge}>
+                永久删除
+              </button>
+            </>
+          }
+        >
+          <p>文件和链接会立即失效，无法恢复。</p>
+        </Dialog>
       )}
-    >
-      <p>链接会立即失效，且无法撤销。</p>
-    </Modal>
+    </>
   );
 }
 
-function DropOverlay() {
+function BulkActions({ mode, ids, selected, onCopy, onTrash, onRestore, onPurge, compact }) {
+  if (mode === 'trash')
+    return (
+      <>
+        <button type="button" className="btn btn-ghost" onClick={() => onRestore(ids)}>
+          <Icon name="restore" />
+          恢复
+        </button>
+        {compact && <span className="grow" />}
+        <button type="button" className="btn btn-ghost btn-danger-text" onClick={() => onPurge(ids)}>
+          永久删除
+        </button>
+      </>
+    );
   return (
-    <div className="drop-overlay" aria-hidden="true">
-      <div>
-        <span className="dz-icon">
-          <Icon name="upload" size={22} />
-        </span>
-        <strong>松开以上传</strong>
-      </div>
-    </div>
+    <>
+      <button type="button" className="btn btn-ghost" onClick={() => onCopy(selected)}>
+        <Icon name="copy" />
+        复制链接
+      </button>
+      {compact && <span className="grow" />}
+      <button type="button" className={'btn btn-ghost' + (compact ? ' btn-icon' : '')} aria-label="移到回收站" title="移到回收站" onClick={() => onTrash(ids)}>
+        <Icon name="trash" />
+        {!compact && '移到回收站'}
+      </button>
+    </>
   );
 }
 
-Object.assign(window, {
-  VIS_OPTS, countWhere, fmtLabel, FilterChips, AdjustSheet, LibraryHead, BulkBar, ImageCollection, DetailPanel, UploadDialog, PurgeConfirm, DropOverlay, copyMany,
-});
+Object.assign(window, { Library });

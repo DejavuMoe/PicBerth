@@ -9,7 +9,7 @@
           "path": "index.html",
           "createdAt": "2026-10-21T12:27:29.586Z",
           "status": "approved",
-          "subtitle": "DESIGN.md 修订：Radix 色彩、三种字号、0.5px 线条、精简文案与动效",
+          "subtitle": "从头重设计：工作区布局、上传托盘、链接复制、批量操作；Radix 色彩、三种字号、0.5px 线条",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -26,11 +26,12 @@
           "viewport": {
             "width": 1440,
             "height": 900
-          }
+          },
+          "subtitle": "从头重设计：单列表单，无装饰"
         }
       ]
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-10-24T13:57:36.835Z"
+  "updatedAt": "2026-11-08T09:54:26.541Z"
 }
