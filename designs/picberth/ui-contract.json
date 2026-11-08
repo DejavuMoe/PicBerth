@@ -101,29 +101,24 @@
           "web/src/components/Drawer.svelte",
           "web/src/components/Sheet.svelte",
           "web/src/components/Menu.svelte",
+          "web/src/components/MenuItem.svelte",
           "web/src/components/Select.svelte",
-          "web/src/components/Combobox.svelte",
-          "web/src/components/Floating.svelte",
-          "web/src/components/PanelHeader.svelte",
-          "web/src/lib/floating.ts",
-          "web/src/lib/theme.svelte.ts",
-          "web/src/library.css",
-          "web/src/admin.css",
-          "web/src/screens/Library.svelte",
+          "web/src/components/Seg.svelte",
+          "web/src/components/Switch.svelte",
+          "web/src/components/Check.svelte",
+          "web/src/components/Toasts.svelte",
+          "web/src/components/DropOverlay.svelte",
           "web/src/components/library",
-          "web/src/components/UploadDialog.svelte",
-          "web/src/lib/leave.svelte.ts",
-          "web/src/lib/media.svelte.ts",
-          "web/src/lib/modal.ts",
+          "web/src/components/admin",
+          "web/src/screens/Library.svelte",
           "web/src/screens/Tokens.svelte",
-          "web/src/screens/TokenDialog.svelte",
           "web/src/screens/Settings.svelte",
           "web/src/screens/Status.svelte",
+          "web/src/screens/NotFound.svelte",
+          "web/src/lib/icons.ts",
           "web/src/lib/library.svelte.ts",
-          "web/src/lib/facets.svelte.ts",
-          "web/src/lib/api.ts",
-          "internal/httpapi/handlers_images.go",
-          "internal/core/tags.go"
+          "web/src/lib/upload.svelte.ts",
+          "web/src/lib/api.ts"
         ],
         "interfaces": [
           "GET /api/v1/images",
@@ -141,7 +136,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "approved"
+      "status": "implemented"
     },
     {
       "id": "auth",
@@ -179,8 +174,6 @@
         "files": [
           "web/src/screens/Login.svelte",
           "web/src/screens/Setup.svelte",
-          "web/src/screens/NotFound.svelte",
-          "web/src/components/AuthCard.svelte",
           "web/src/app.css"
         ],
         "interfaces": [
@@ -189,7 +182,7 @@
         ],
         "tests": []
       },
-      "status": "approved"
+      "status": "implemented"
     }
   ]
 }
