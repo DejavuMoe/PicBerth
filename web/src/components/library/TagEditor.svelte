@@ -1,53 +1,90 @@
 <script lang="ts">
-  import type { Facets } from '../../lib/types';
-  import Combobox from '../Combobox.svelte';
+  import Floating from '../Floating.svelte';
   import Icon from '../Icon.svelte';
 
   interface Props {
     tags: string[];
-    /** Tags in use elsewhere, with how many images carry each. */
-    known: Facets['tags'];
+    /** Every tag in use on this side of the library, with how many images carry it. */
+    all: { tag: string; count: number }[];
     onchange: (tags: string[]) => void;
   }
-  let { tags, known, onchange }: Props = $props();
+  let { tags, all, onchange }: Props = $props();
 
   // Same limits as the server: 20 tags per image, 32 characters each.
   const MAX_TAGS = 20;
   const MAX_LEN = 32;
 
-  const full = $derived(tags.length >= MAX_TAGS);
-  const options = $derived(known.filter((t) => !tags.includes(t.tag)).map((t) => ({ value: t.tag, label: t.tag, count: t.count })));
+  const uid = $props.id();
+  const listId = `${uid}-tags`;
+  let text = $state('');
+  let open = $state(false);
+  let input = $state<HTMLInputElement | null>(null);
 
-  const normalize = (s: string) => s.trim().replace(/^#+/, '').trim().slice(0, MAX_LEN);
+  const clean = $derived(text.trim().replace(/^#/, ''));
+  const suggestions = $derived(all.filter((t) => !tags.includes(t.tag) && t.tag.includes(clean)).slice(0, 6));
+  const show = $derived(open && suggestions.length > 0);
+
+  function add(value: string) {
+    const t = value.trim().replace(/^#/, '').slice(0, MAX_LEN);
+    if (!t || tags.includes(t) || tags.length >= MAX_TAGS) return;
+    onchange([...tags, t]);
+    text = '';
+  }
 </script>
 
-<div class="tag-editor">
-  {#each tags as t (t)}
-    <span class="tag tag-edit">
-      {t}
-      <button type="button" aria-label={`移除标签 ${t}`} onclick={() => onchange(tags.filter((x) => x !== t))}>
-        <Icon name="x" size={12} />
-      </button>
-    </span>
-  {/each}
-  <Combobox
-    label="添加标签"
-    placeholder="添加标签"
-    {options}
-    {normalize}
-    taken={(v) => tags.includes(v)}
-    maxlength={MAX_LEN + 8}
-    onpick={(v) => {
-      if (!tags.includes(v) && tags.length < MAX_TAGS) onchange([...tags, v]);
+{#each tags as t (t)}
+  <span class="tag-edit">
+    {t}
+    <button type="button" aria-label={`移除标签 ${t}`} onclick={() => onchange(tags.filter((x) => x !== t))}>
+      <Icon name="x" size="s" />
+    </button>
+  </span>
+{/each}
+{#if tags.length < MAX_TAGS}
+  <input
+    bind:this={input}
+    class="tag-add"
+    placeholder="添加"
+    aria-label="添加标签"
+    role="combobox"
+    aria-expanded={show}
+    aria-controls={show ? listId : undefined}
+    maxlength={MAX_LEN + 1}
+    autocomplete="off"
+    spellcheck="false"
+    value={text}
+    onfocus={() => (open = true)}
+    oninput={(e) => {
+      text = e.currentTarget.value.replace(',', '');
+      open = true;
     }}
-    onemptybackspace={() => {
-      if (tags.length) onchange(tags.slice(0, -1));
+    onkeydown={(e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        add(text);
+      } else if (e.key === 'Backspace' && !text && tags.length) {
+        onchange(tags.slice(0, -1));
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        open = false;
+      }
     }}
-  >
-    {#snippet trigger(open, toggle)}
-      <button type="button" class="tag-add" aria-label="添加标签" aria-haspopup="listbox" aria-expanded={open} disabled={full} onclick={toggle}>
-        <Icon name="plus" size={12} />
+  />
+{/if}
+{#if show && input}
+  <Floating anchor={input} class="menu" id={listId} role="listbox" aria-label="标签建议" onclose={() => (open = false)}>
+    {#each suggestions as s (s.tag)}
+      <button
+        type="button"
+        role="option"
+        aria-selected="false"
+        class="menu-item"
+        onmousedown={(e) => e.preventDefault()}
+        onclick={() => add(s.tag)}
+      >
+        {s.tag}
+        <span class="end num">{s.count}</span>
       </button>
-    {/snippet}
-  </Combobox>
-</div>
+    {/each}
+  </Floating>
+{/if}

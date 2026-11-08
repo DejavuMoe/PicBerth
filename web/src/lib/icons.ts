@@ -1,57 +1,132 @@
-// Stroke icons on a 24 px grid (1.5 px stroke, round caps), drawn as plain paths in currentColor.
+// Stroke icons on a 16 px grid (1.5 px stroke, round caps), from the approved prototype (ui.jsx PATHS).
+// Shapes are drawn by components/Icon.svelte with styling from CSS (.icon, .icon-s).
+
+export type IconShape =
+  | { t: 'path'; d: string }
+  | { t: 'circle'; cx: number; cy: number; r: number }
+  | { t: 'rect'; x: number; y: number; w: number; h: number; rx?: number };
 
 export const ICONS = {
-  upload: ['M12 15V4', 'M7.5 8.5 12 4l4.5 4.5', 'M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
-  download: ['M12 4v11', 'M7.5 10.5 12 15l4.5-4.5', 'M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
-  search: ['M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z', 'm16 16 4 4'],
-  filter: ['M4 6h16', 'M7 12h10', 'M10 18h4'],
-  grid: ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M4 13h7v7H4z', 'M13 13h7v7h-7z'],
-  list: ['M9 6h11', 'M9 12h11', 'M9 18h11', 'M4.5 6h.01', 'M4.5 12h.01', 'M4.5 18h.01'],
-  copy: ['M9 9h10v11H9z', 'M5 15H4V4h11v1'],
-  check: ['m5 12.5 4.5 4.5L19 7.5'],
-  more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
-  trash: ['M4 7h16', 'M9.5 7V4.5h5V7', 'M6 7l1 13h10l1-13', 'M10 11v6', 'M14 11v6'],
-  restore: ['M4 12a8 8 0 1 0 2.4-5.7', 'M4 4v4.5h4.5'],
-  lock: ['M5.5 11h13v9h-13z', 'M8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
-  globe: [
-    'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z',
-    'M3.5 12h17',
-    'M12 3.5c2.5 2.6 2.5 14.4 0 17',
-    'M12 3.5c-2.5 2.6-2.5 14.4 0 17',
+  image: [
+    { t: 'rect', x: 2.5, y: 2.5, w: 11, h: 11, rx: 2 },
+    { t: 'circle', cx: 6, cy: 6.25, r: 1.1 },
+    { t: 'path', d: 'M13.5 10.5 10.5 7.5 3.5 13.5' },
   ],
-  x: ['m6 6 12 12', 'M18 6 6 18'],
-  'chevron-down': ['m6.5 9.5 5.5 5.5 5.5-5.5'],
-  'chevron-up': ['m6.5 14.5 5.5-5.5 5.5 5.5'],
-  'chevron-left': ['m14.5 6.5-5.5 5.5 5.5 5.5'],
-  'chevron-right': ['m9.5 6.5 5.5 5.5-5.5 5.5'],
-  image: ['M4 5h16v14H4z', 'm4 16 4.5-4.5 4 4 2.5-2.5L20 18', 'M15.5 9.5h.01'],
-  images: ['M7 7h13v11H7z', 'M4 4h13', 'M4 4v11'],
-  key: ['M8 11.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z', 'm10.5 12.5 8-8', 'm16 7 2.5 2.5'],
-  gear: [
-    'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
-    'M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+  trash: [
+    { t: 'path', d: 'M3 4.5h10' },
+    { t: 'path', d: 'M6.5 4.5V3h3v1.5' },
+    { t: 'path', d: 'M4.5 4.5l.5 8.5h6l.5-8.5' },
   ],
-  activity: ['M3 12h4l2.5-6 5 12 2.5-6h4'],
-  menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
-  external: ['M14 4h6v6', 'm20 4-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'],
-  sort: ['M7 4v16', 'm4 7 3-3 3 3', 'M17 20V4', 'm14 17 3 3 3-3'],
-  plus: ['M12 5v14', 'M5 12h14'],
-  alert: ['M12 3.5 21 19.5H3z', 'M12 10v4', 'M12 17h.01'],
+  key: [
+    { t: 'circle', cx: 5.5, cy: 10.5, r: 2.5 },
+    { t: 'path', d: 'M7.3 8.7 13 3' },
+    { t: 'path', d: 'M11 5l1.5 1.5' },
+    { t: 'path', d: 'M9.5 6.5l1.2 1.2' },
+  ],
+  sliders: [
+    { t: 'path', d: 'M3 5h6' },
+    { t: 'path', d: 'M12 5h1' },
+    { t: 'path', d: 'M3 11h1' },
+    { t: 'path', d: 'M7 11h6' },
+    { t: 'circle', cx: 10.5, cy: 5, r: 1.5 },
+    { t: 'circle', cx: 5.5, cy: 11, r: 1.5 },
+  ],
+  pulse: [{ t: 'path', d: 'M2 8h2.5L6 4.5l3 7L10.5 8H14' }],
+  search: [
+    { t: 'circle', cx: 7, cy: 7, r: 4.25 },
+    { t: 'path', d: 'm10.25 10.25 3.25 3.25' },
+  ],
+  filter: [
+    { t: 'path', d: 'M2.5 4h11' },
+    { t: 'path', d: 'M4.5 8h7' },
+    { t: 'path', d: 'M6.5 12h3' },
+  ],
+  upload: [
+    { t: 'path', d: 'M8 10.5V2.75' },
+    { t: 'path', d: 'M4.75 6 8 2.75 11.25 6' },
+    { t: 'path', d: 'M3 10v2.5c0 .55.45 1 1 1h8c.55 0 1-.45 1-1V10' },
+  ],
+  copy: [
+    { t: 'rect', x: 5.5, y: 5.5, w: 8, h: 8, rx: 1.5 },
+    { t: 'path', d: 'M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5' },
+  ],
+  check: [{ t: 'path', d: 'm3.5 8.5 3 3 6-7' }],
+  minus: [{ t: 'path', d: 'M4 8h8' }],
+  x: [
+    { t: 'path', d: 'm4 4 8 8' },
+    { t: 'path', d: 'M12 4l-8 8' },
+  ],
+  more: [
+    { t: 'circle', cx: 3.5, cy: 8, r: 0.6 },
+    { t: 'circle', cx: 8, cy: 8, r: 0.6 },
+    { t: 'circle', cx: 12.5, cy: 8, r: 0.6 },
+  ],
+  left: [{ t: 'path', d: 'M10 3.5 5.5 8l4.5 4.5' }],
+  right: [{ t: 'path', d: 'M6 3.5 10.5 8 6 12.5' }],
+  down: [{ t: 'path', d: 'M4 6l4 4 4-4' }],
+  list: [
+    { t: 'path', d: 'M5.5 4h8' },
+    { t: 'path', d: 'M5.5 8h8' },
+    { t: 'path', d: 'M5.5 12h8' },
+    { t: 'path', d: 'M2.5 4h.01' },
+    { t: 'path', d: 'M2.5 8h.01' },
+    { t: 'path', d: 'M2.5 12h.01' },
+  ],
+  grid: [
+    { t: 'rect', x: 2.5, y: 2.5, w: 4.5, h: 4.5, rx: 1 },
+    { t: 'rect', x: 9, y: 2.5, w: 4.5, h: 4.5, rx: 1 },
+    { t: 'rect', x: 2.5, y: 9, w: 4.5, h: 4.5, rx: 1 },
+    { t: 'rect', x: 9, y: 9, w: 4.5, h: 4.5, rx: 1 },
+  ],
+  sort: [
+    { t: 'path', d: 'M5 3v10' },
+    { t: 'path', d: 'M2.5 10.5 5 13l2.5-2.5' },
+    { t: 'path', d: 'M11 13V3' },
+    { t: 'path', d: 'M8.5 5.5 11 3l2.5 2.5' },
+  ],
+  download: [
+    { t: 'path', d: 'M8 2.75v7.75' },
+    { t: 'path', d: 'M4.75 7.25 8 10.5l3.25-3.25' },
+    { t: 'path', d: 'M3 13.25h10' },
+  ],
+  restore: [
+    { t: 'path', d: 'M3 8a5 5 0 1 0 1.5-3.55' },
+    { t: 'path', d: 'M3 2.75V5h2.25' },
+  ],
+  plus: [
+    { t: 'path', d: 'M8 3v10' },
+    { t: 'path', d: 'M3 8h10' },
+  ],
+  select: [
+    { t: 'rect', x: 2.5, y: 2.5, w: 11, h: 11, rx: 2 },
+    { t: 'path', d: 'm5.5 8 1.75 1.75L10.75 6' },
+  ],
   sun: [
-    'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
-    'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+    { t: 'circle', cx: 8, cy: 8, r: 2.75 },
+    { t: 'path', d: 'M8 1.75v1.5' },
+    { t: 'path', d: 'M8 12.75v1.5' },
+    { t: 'path', d: 'M1.75 8h1.5' },
+    { t: 'path', d: 'M12.75 8h1.5' },
+    { t: 'path', d: 'M3.6 3.6l1 1' },
+    { t: 'path', d: 'M11.4 11.4l1 1' },
+    { t: 'path', d: 'M3.6 12.4l1-1' },
+    { t: 'path', d: 'M11.4 4.6l1-1' },
   ],
-  moon: ['M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z'],
-  logout: ['M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5', 'M10 8l-4 4 4 4', 'M6 12h10'],
-  edit: ['M4 20h4L19 9l-4-4L4 16z', 'm13.5 6.5 4 4'],
-  clipboard: ['M9 4h6v3H9z', 'M15 5.5h3v14.5H6V5.5h3'],
-  refresh: ['M20 11a8 8 0 0 0-14.5-4.5', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.5 4.5', 'M20 20v-4h-4'],
-  tag: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5z', 'M8.5 8.5h.01'],
-  info: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z', 'M12 11v5', 'M12 8h.01'],
-  select: ['M4.5 4.5h15v15h-15z', 'm8.5 12 2.5 2.5 4.5-5'],
-} satisfies Record<string, string[]>;
+  logout: [
+    { t: 'path', d: 'M9.5 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h5.5' },
+    { t: 'path', d: 'M7 8h6.5' },
+    { t: 'path', d: 'M11 5.5 13.5 8 11 10.5' },
+  ],
+  alert: [
+    { t: 'circle', cx: 8, cy: 8, r: 5.5 },
+    { t: 'path', d: 'M8 5v3.25' },
+    { t: 'path', d: 'M8 10.75h.01' },
+  ],
+  refresh: [
+    { t: 'path', d: 'M13 8a5 5 0 1 1-1.5-3.55' },
+    { t: 'path', d: 'M13 2.75V5h-2.25' },
+  ],
+  edit: [{ t: 'path', d: 'M10.5 3 13 5.5 6 12.5H3.5V10Z' }],
+} satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;
-
-/** Dot glyphs need a heavier stroke to carry the same visual weight as line icons. */
-export const ICON_STROKE: Partial<Record<IconName, number>> = { more: 3 };

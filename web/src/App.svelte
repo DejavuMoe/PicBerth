@@ -1,10 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import BrandMark from './components/BrandMark.svelte';
   import DropOverlay from './components/DropOverlay.svelte';
   import Shell from './components/Shell.svelte';
   import Toasts from './components/Toasts.svelte';
-  import UploadDialog from './components/UploadDialog.svelte';
   import { errorMessage } from './lib/api';
   import { refreshFacets } from './lib/facets.svelte';
   import { watchHealth } from './lib/health.svelte';
@@ -12,7 +10,7 @@
   import { openPicker, registerPicker } from './lib/picker';
   import { isKnownPath, navigate, router, safeNext } from './lib/router.svelte';
   import { loadSession, session } from './lib/session.svelte';
-  import { acceptAttr, addFiles, installGlobalInput, uploadDialog } from './lib/upload.svelte';
+  import { acceptAttr, addFiles, installGlobalInput } from './lib/upload.svelte';
   import Library from './screens/Library.svelte';
   import Login from './screens/Login.svelte';
   import NotFound from './screens/NotFound.svelte';
@@ -95,6 +93,7 @@
   function onkeydown(e: KeyboardEvent) {
     if (view !== 'app' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTypingTarget(e.target) || modalOpen()) return;
+    if (router.path !== '/' && router.path !== '/library') return;
     if (e.key === 'u' || e.key === 'U') {
       e.preventDefault();
       openPicker();
@@ -124,23 +123,30 @@
     {:else}
       <NotFound />
     {/if}
+    <DropOverlay />
   </Shell>
   <input bind:this={picker} type="file" multiple hidden accept={acceptAttr()} onchange={onpicked} />
-  {#if uploadDialog.open}<UploadDialog />{/if}
-  <DropOverlay />
 {:else if view === 'login'}
   <Login />
 {:else if view === 'setup'}
   <Setup />
 {:else if view === 'error'}
   <div class="boot">
-    <span role="img" aria-label="PicBerth"><BrandMark large /></span>
-    <p><strong>无法连接到 PicBerth</strong></p>
-    <p class="subtle">{session.failure ? errorMessage(session.failure) : ''}</p>
-    <button type="button" class="btn btn-primary" onclick={retryBoot}>重试</button>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      PicBerth
+    </div>
+    <strong class="strong">无法连接到 PicBerth</strong>
+    <p class="muted">{session.failure ? errorMessage(session.failure) : ''}</p>
+    <button type="button" class="btn btn-secondary" onclick={retryBoot}>重试</button>
   </div>
 {:else}
-  <div class="boot" aria-busy="true"><span class="pulse" role="img" aria-label="PicBerth"><BrandMark large /></span></div>
+  <div class="boot" aria-busy="true">
+    <div class="brand pulse">
+      <span class="brand-mark" aria-hidden="true"></span>
+      PicBerth
+    </div>
+  </div>
 {/if}
 
 <Toasts />
