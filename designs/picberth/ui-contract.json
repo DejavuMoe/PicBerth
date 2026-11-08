@@ -31,7 +31,6 @@
           "sidebar-desktop",
           "icon-rail-tablet",
           "tab-bar-mobile",
-          "more-sheet-mobile",
           "library-table",
           "library-table-narrow-columns",
           "library-grid",
@@ -40,30 +39,46 @@
           "library-empty",
           "library-loading",
           "library-error",
-          "toolbar-filter-menus",
-          "toolbar-filter-popover",
+          "filter-popover",
+          "display-menu",
           "row-menu-copy-as",
-          "selection-bulk-actions",
+          "active-filter-chips",
+          "selection-bulk-header",
+          "selection-phone-float-bar",
+          "grid-selection",
           "image-detail-docked",
           "image-detail-drawer",
           "image-detail-sheet",
           "image-detail-trashed",
-          "upload-progress-error-duplicate",
+          "image-rename-inline",
+          "tag-combobox",
+          "link-copy-last-format",
+          "upload-tray-progress-error-duplicate",
+          "upload-copy-all",
+          "drop-overlay",
           "purge-confirm",
           "trash",
+          "trash-empty",
           "tokens",
-          "token-create-reveal",
+          "tokens-empty",
+          "tokens-error",
+          "token-create-validation",
+          "token-reveal-clients",
+          "token-revoke-inline",
           "settings-unsaved",
+          "settings-validation",
+          "settings-leave-guard",
           "status",
+          "status-running",
+          "status-error",
+          "not-found",
+          "account-theme-menu",
           "light-dark",
           "desktop-1440",
           "tablet-1024",
           "mobile-390",
           "reduced-motion",
-          "theme-follow-system",
-          "tag-combobox",
-          "custom-select",
-          "disabled-primary"
+          "theme-follow-system"
         ],
         "stableIds": [
           "library",
@@ -72,7 +87,8 @@
           "trash",
           "tokens",
           "settings",
-          "status"
+          "status",
+          "not-found"
         ]
       },
       "production": {
@@ -125,7 +141,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "implemented"
+      "status": "approved"
     },
     {
       "id": "auth",
@@ -150,16 +166,12 @@
           "login-error",
           "login-offline",
           "login-busy",
-          "not-found",
-          "not-found-tablet-rail",
-          "not-found-mobile-tab-bar",
           "light-dark",
           "mobile-390"
         ],
         "stableIds": [
           "setup",
-          "login",
-          "not-found"
+          "login"
         ]
       },
       "production": {
@@ -177,7 +189,7 @@
         ],
         "tests": []
       },
-      "status": "implemented"
+      "status": "approved"
     }
   ]
 }

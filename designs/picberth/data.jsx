@@ -1,7 +1,9 @@
-// Sanitized fixture data and pure helpers.
+// Sanitized fixtures and pure helpers for the prototype.
 
-const NOW = new Date('2026-10-21T15:30:00+08:00').getTime();
-const DAY = 86400000;
+const NOW = new Date('2026-11-08T15:30:00+08:00').getTime();
+const MIN = 60000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
 const IMG_HOST = 'https://img.example.com';
 
 const PICS = {
@@ -24,9 +26,10 @@ const PICS = {
 };
 
 const TOKENS = [
-  { id: 1, name: 'PicGo 笔记本', prefix: 'pb_7KQ2M', scopes: ['upload'], createdAt: NOW - 62 * DAY, lastUsedAt: NOW - 2 * 3600000, expiresAt: null, revokedAt: null },
-  { id: 2, name: 'ShareX 工作机', prefix: 'pb_X4D9R', scopes: ['upload'], createdAt: NOW - 30 * DAY, lastUsedAt: NOW - 1 * DAY, expiresAt: NOW + 60 * DAY, revokedAt: null },
+  { id: 1, name: 'PicGo 笔记本', prefix: 'pb_7KQ2M', scopes: ['upload'], createdAt: NOW - 62 * DAY, lastUsedAt: NOW - 2 * HOUR, expiresAt: null, revokedAt: null },
+  { id: 2, name: 'ShareX 工作机', prefix: 'pb_X4D9R', scopes: ['upload'], createdAt: NOW - 30 * DAY, lastUsedAt: NOW - 8 * MIN, expiresAt: NOW + 60 * DAY, revokedAt: null },
   { id: 3, name: '备份脚本', prefix: 'pb_A0N3T', scopes: ['read'], createdAt: NOW - 120 * DAY, lastUsedAt: NOW - 9 * DAY, expiresAt: null, revokedAt: null },
+  { id: 5, name: '博客构建', prefix: 'pb_M2V6C', scopes: ['upload', 'read'], createdAt: NOW - 10 * DAY, lastUsedAt: null, expiresAt: NOW + 20 * DAY, revokedAt: null },
   { id: 4, name: '旧手机', prefix: 'pb_Q8W1Z', scopes: ['upload', 'manage'], createdAt: NOW - 200 * DAY, lastUsedAt: NOW - 90 * DAY, expiresAt: null, revokedAt: NOW - 40 * DAY },
 ];
 
@@ -37,40 +40,39 @@ const SOURCES = [
   { key: 'cli', label: '命令行' },
 ];
 
-// [file, displayName, minutesAgo, source, visibility, tags, gps, frames]
+// [fixture, filename, minutesAgo, source, tags, frames]
 const ROWS = [
-  ['dashboard-light.png', 'screenshot-2026-10-21-152210.png', 8, 'token:2', 'public', ['截图'], false, 1],
-  ['code-snippet.png', 'handler-retry.png', 24, 'token:1', 'public', ['截图', '博客'], false, 1],
-  ['architecture.png', '上传流程-v3.png', 70, 'web', 'public', ['文档', '架构'], false, 1],
-  ['mountain-dusk.jpg', 'IMG_4821.jpg', 150, 'web', 'private', ['旅行'], true, 1],
-  ['bar-chart.png', 'weekly-traffic.png', 300, 'token:1', 'public', ['博客'], false, 1],
-  ['banner-wide.webp', 'post-cover-dark.webp', 1440 + 40, 'web', 'public', ['博客', '封面'], false, 1],
-  ['dashboard-dark.png', 'screenshot-2026-10-20-221503.png', 1440 + 300, 'token:2', 'public', ['截图'], false, 1],
-  ['receipt-scan.jpg', 'receipt-2026-10.jpg', 1440 + 600, 'web', 'private', ['票据'], false, 1],
-  ['line-chart.png', 'latency-p95.png', 2 * 1440 + 100, 'token:1', 'public', ['博客'], false, 1],
-  ['lake-morning.jpg', 'IMG_4790.jpg', 3 * 1440, 'web', 'private', ['旅行'], true, 1],
-  ['logo-mark.png', 'logo-mark.png', 4 * 1440, 'cli', 'public', ['品牌'], false, 1],
-  ['settings-panel.png', 'settings-before.png', 5 * 1440, 'token:2', 'public', ['截图', '文档'], false, 1],
-  ['mobile-login.png', 'mobile-login.png', 6 * 1440, 'token:2', 'public', ['截图'], false, 1],
-  ['avatar.png', 'avatar-2026.png', 9 * 1440, 'web', 'public', ['品牌'], false, 1],
-  ['city-night.jpg', 'DSC_0112.jpg', 12 * 1440, 'web', 'public', ['旅行'], true, 1],
-  ['desert-noon.jpg', 'DSC_0098.jpg', 12 * 1440 + 20, 'web', 'private', ['旅行'], true, 1],
-  ['bar-chart.png', 'monthly-uploads.png', 18 * 1440, 'cli', 'public', ['文档'], false, 1],
-  ['code-snippet.png', 'loading-spinner.gif', 22 * 1440, 'token:1', 'public', ['博客'], false, 24],
-  ['architecture.png', '数据目录结构.png', 27 * 1440, 'web', 'public', ['文档', '架构'], false, 1],
-  ['dashboard-light.png', 'screenshot-2026-09-22-101144.png', 29 * 1440, 'token:2', 'public', ['截图'], false, 1],
-  ['banner-wide.webp', 'post-cover-light.webp', 35 * 1440, 'web', 'public', ['博客', '封面'], false, 1],
-  ['lake-morning.jpg', 'IMG_4402.jpg', 41 * 1440, 'web', 'public', ['旅行'], false, 1],
-  ['line-chart.png', 'error-rate.png', 48 * 1440, 'token:1', 'public', ['博客'], false, 1],
-  ['receipt-scan.jpg', 'invoice-0912.jpg', 52 * 1440, 'web', 'private', ['票据'], false, 1],
-  ['settings-panel.png', 'settings-after.png', 60 * 1440, 'token:2', 'public', ['截图', '文档'], false, 1],
-  ['avatar.png', 'avatar-2025.png', 95 * 1440, 'web', 'public', ['品牌'], false, 1],
+  ['dashboard-light.png', 'screenshot-2026-11-08-152210.png', 8, 'token:2', ['截图'], 1],
+  ['code-snippet.png', 'handler-retry.png', 24, 'token:1', ['截图', '博客'], 1],
+  ['architecture.png', '上传流程-v3.png', 70, 'web', ['文档', '架构'], 1],
+  ['mountain-dusk.jpg', 'IMG_4821.jpg', 150, 'web', ['旅行'], 1],
+  ['bar-chart.png', 'weekly-traffic.png', 300, 'token:1', ['博客'], 1],
+  ['banner-wide.webp', 'post-cover-dark.webp', 1440 + 40, 'web', ['博客', '封面'], 1],
+  ['dashboard-dark.png', 'screenshot-2026-11-07-221503.png', 1440 + 300, 'token:2', ['截图'], 1],
+  ['receipt-scan.jpg', 'receipt-2026-11.jpg', 1440 + 600, 'web', ['票据'], 1],
+  ['line-chart.png', 'latency-p95.png', 2 * 1440 + 100, 'token:1', ['博客'], 1],
+  ['lake-morning.jpg', 'IMG_4790.jpg', 3 * 1440, 'web', ['旅行'], 1],
+  ['logo-mark.png', 'logo-mark.png', 4 * 1440, 'cli', ['品牌'], 1],
+  ['settings-panel.png', 'settings-before.png', 5 * 1440, 'token:2', ['截图', '文档'], 1],
+  ['mobile-login.png', 'mobile-login.png', 6 * 1440, 'token:2', ['截图'], 1],
+  ['avatar.png', 'avatar-2026.png', 9 * 1440, 'web', ['品牌'], 1],
+  ['city-night.jpg', 'DSC_0112.jpg', 12 * 1440, 'web', ['旅行'], 1],
+  ['desert-noon.jpg', 'DSC_0098.jpg', 12 * 1440 + 20, 'web', ['旅行'], 1],
+  ['bar-chart.png', 'monthly-uploads.png', 18 * 1440, 'cli', ['文档'], 1],
+  ['code-snippet.png', 'loading-spinner.gif', 22 * 1440, 'token:1', ['博客'], 24],
+  ['architecture.png', '数据目录结构.png', 27 * 1440, 'web', ['文档', '架构'], 1],
+  ['dashboard-light.png', 'screenshot-2026-10-10-101144.png', 29 * 1440, 'token:2', ['截图'], 1],
+  ['banner-wide.webp', 'post-cover-light.webp', 35 * 1440, 'web', ['博客', '封面'], 1],
+  ['lake-morning.jpg', 'IMG_4402.jpg', 41 * 1440, 'web', ['旅行'], 1],
+  ['line-chart.png', 'error-rate.png', 48 * 1440, 'token:1', ['博客'], 1],
+  ['receipt-scan.jpg', 'invoice-0912.jpg', 52 * 1440, 'web', ['票据'], 1],
 ];
 
+// [..., trashedDaysAgo]
 const TRASH_ROWS = [
-  ['dashboard-dark.png', 'screenshot-old-draft.png', 3 * 1440, 'token:2', 'public', ['截图'], false, 1, 2],
-  ['city-night.jpg', 'blurry-night.jpg', 20 * 1440, 'web', 'private', ['旅行'], true, 1, 11],
-  ['code-snippet.png', 'typo-version.png', 7 * 1440, 'token:1', 'public', ['博客'], false, 1, 26],
+  ['dashboard-dark.png', 'screenshot-old-draft.png', 3 * 1440, 'token:2', ['截图'], 1, 2],
+  ['code-snippet.png', 'typo-version.png', 7 * 1440, 'token:1', ['博客'], 1, 26],
+  ['city-night.jpg', 'blurry-night.jpg', 20 * 1440, 'web', ['旅行'], 1, 11],
 ];
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
@@ -87,42 +89,31 @@ function fakeId(seed) {
   return out;
 }
 
-const MIME = { png: 'image/png', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif' };
 const FORMAT_LABEL = { jpeg: 'JPEG', png: 'PNG', gif: 'GIF', webp: 'WebP', avif: 'AVIF' };
 
-function makeImage(row, i, trashed) {
-  const [file, name, minutesAgo, source, visibility, tags, gps, frames, trashedDaysAgo] = row;
-  const [w, h, fmt0] = PICS[file];
-  const fmt = frames > 1 ? 'gif' : fmt0;
-  const ext = fmt === 'jpeg' ? 'jpg' : fmt;
-  const id = fakeId(i + (trashed ? 500 : 1));
+function makeLinks(id, ext, name) {
   const url = `${IMG_HOST}/i/${id}.${ext}`;
-  const size = Math.round((w * h * (fmt === 'png' ? 0.55 : fmt === 'webp' ? 0.12 : 0.22) * (0.7 + ((i * 37) % 60) / 100)) / 1);
   return {
-    id,
-    filename: name,
-    thumb: `assets/fixtures/${file}`,
-    format: fmt,
-    mime: MIME[fmt],
-    ext,
-    width: w,
-    height: h,
-    size,
-    frames,
-    visibility,
-    source,
-    tags: [...tags],
-    sha256: (id + id + id + id).slice(0, 64).replace(/[^0-9a-f]/g, (c) => B32.indexOf(c).toString(16).slice(-1)),
-    createdAt: NOW - minutesAgo * 60000,
-    trashedAt: trashed ? NOW - trashedDaysAgo * DAY : null,
-    state: trashed ? 'trashed' : 'active',
     url,
-    links: {
-      url,
-      markdown: `![${name}](${url})`,
-      html: `<img src="${url}" alt="${name}">`,
-      bbcode: `[img]${url}[/img]`,
-    },
+    markdown: `![${name}](${url})`,
+    html: `<img src="${url}" alt="${name}">`,
+    bbcode: `[img]${url}[/img]`,
+  };
+}
+
+function makeImage(row, i, trashed) {
+  const [file, name, minutesAgo, source, tags, frames, trashedDaysAgo] = row;
+  const [w, h, fmt0] = PICS[file];
+  const format = frames > 1 ? 'gif' : fmt0;
+  const ext = format === 'jpeg' ? 'jpg' : format;
+  const id = fakeId(i + (trashed ? 500 : 1));
+  const size = Math.round(w * h * (format === 'png' ? 0.55 : format === 'webp' ? 0.12 : 0.22) * (0.7 + ((i * 37) % 60) / 100));
+  const sha = Array.from({ length: 64 }, (_, k) => '0123456789abcdef'[(id.charCodeAt(k % 20) * (k + 7)) % 16]).join('');
+  return {
+    id, filename: name, thumb: `assets/fixtures/${file}`, format, ext, width: w, height: h, size, frames,
+    source, tags: [...tags], sha256: sha, createdAt: NOW - minutesAgo * MIN,
+    trashedAt: trashed ? NOW - trashedDaysAgo * DAY : null, state: trashed ? 'trashed' : 'active',
+    links: makeLinks(id, ext, name),
   };
 }
 
@@ -135,10 +126,9 @@ const SETTINGS = {
   hardMaxMB: 100,
   maxPixelsM: 50,
   allowedFormats: ['jpeg', 'png', 'gif', 'webp', 'avif'],
-  defaultVisibility: 'public',
+  uploadsPerMinute: 60,
   dedupe: true,
   trashRetentionDays: 30,
-  uploadsPerMinute: 60,
   sessionIdleMinutes: 30,
   sessionAbsoluteHours: 12,
   publicUrl: 'https://pics.example.com',
@@ -146,26 +136,32 @@ const SETTINGS = {
 };
 
 const STATUS = {
-  version: '0.2.0',
+  version: '0.3.0',
   commit: '4f1c2ab',
   goVersion: 'go1.27.3',
   sqliteVersion: '3.53.4',
-  uptimeSeconds: 6 * 86400 + 4 * 3600,
+  uptime: '6 天',
   dataDir: '/var/lib/picberth',
-  db: { bytes: 1.4 * 1048576 },
-  disk: { freeBytes: 182 * 1073741824, totalBytes: 250 * 1073741824 },
-  lastSnapshot: { at: NOW - 9 * DAY, path: '/var/lib/picberth/snapshots/20261012T030000Z' },
-  lastCheck: { at: NOW - 20 * 3600000, mode: 'quick', ok: true, issues: 0 },
-  warnings: [{ code: 'snapshot-stale', title: '超过 7 天没有创建快照' }],
+  images: { active: 1284, trashed: 3, bytes: 2.31 * 1073741824, broken: 0 },
+  dbBytes: 1.4 * 1048576,
+  disk: { free: 182 * 1073741824, total: 250 * 1073741824 },
+  lastSnapshot: NOW - 9 * DAY,
+  lastQuick: { at: NOW - 20 * HOUR, ok: true },
+  lastFull: { at: NOW - 16 * DAY, ok: true, checked: 1287 },
+  warnings: [
+    { code: 'snapshot-stale', title: '近期没有快照', help: '上次快照在 9 天前' },
+  ],
 };
 
 const AUDIT = [
-  { at: NOW - 8 * 60000, actor: 'ShareX 工作机', action: '上传', target: 'screenshot-2026-10-21-152210.png' },
-  { at: NOW - 24 * 60000, actor: 'PicGo 笔记本', action: '上传', target: 'handler-retry.png' },
-  { at: NOW - 3 * 3600000, actor: 'admin', action: '设为私有', target: 'IMG_4821.jpg' },
+  { at: NOW - 8 * MIN, actor: 'ShareX 工作机（#2）', action: '上传', target: 'screenshot-2026-11-08-152210.png' },
+  { at: NOW - 24 * MIN, actor: 'PicGo 笔记本（#1）', action: '上传', target: 'handler-retry.png' },
+  { at: NOW - 3 * HOUR, actor: 'admin', action: '重命名', target: 'IMG_4821.jpg' },
+  { at: NOW - 20 * HOUR, actor: '系统', action: '快速检查', target: '1287 张图片' },
   { at: NOW - 1 * DAY, actor: 'admin', action: '移到回收站', target: 'screenshot-old-draft.png' },
-  { at: NOW - 2 * DAY, actor: 'admin', action: '修改设置', target: '回收站保留天数' },
-  { at: NOW - 9 * DAY, actor: 'admin', action: '创建快照', target: '20261012T030000Z' },
+  { at: NOW - 2 * DAY, actor: 'admin', action: '修改设置', target: '回收站保留时间' },
+  { at: NOW - 9 * DAY, actor: 'admin', action: '创建快照', target: '20261030T030000Z' },
+  { at: NOW - 10 * DAY, actor: 'admin', action: '创建令牌', target: '博客构建' },
 ];
 
 // ---------------------------------------------------------------- formatting
@@ -186,28 +182,25 @@ function fmtDate(t) {
   const d = new Date(t);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
-function fmtRel(t) {
-  const diff = NOW - t;
-  if (diff < 0) {
-    const days = Math.round(-diff / DAY);
-    return `${days} 天后`;
-  }
-  if (diff < 60000) return '刚刚';
-  if (diff < 3600000) return `${Math.round(diff / 60000)} 分钟前`;
-  if (diff < DAY) return `${Math.round(diff / 3600000)} 小时前`;
-  const days = Math.floor((startOfDay(NOW) - startOfDay(t)) / DAY);
-  if (days <= 1) return '昨天';
-  if (days < 7) return `${days} 天前`;
-  return fmtDate(t).slice(0, 10);
-}
 function startOfDay(t) {
   const d = new Date(t);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
+function fmtRel(t) {
+  const diff = NOW - t;
+  if (diff < 0) return `${Math.round(-diff / DAY)} 天后`;
+  if (diff < MIN) return '刚刚';
+  if (diff < HOUR) return `${Math.round(diff / MIN)} 分钟前`;
+  if (diff < DAY) return `${Math.round(diff / HOUR)} 小时前`;
+  const days = Math.round((startOfDay(NOW) - startOfDay(t)) / DAY);
+  if (days <= 1) return '昨天';
+  if (days < 7) return `${days} 天前`;
+  return fmtDate(t).slice(0, 10);
+}
 function sourceLabel(key) {
   return SOURCES.find((s) => s.key === key)?.label ?? key;
 }
-function daysLeft(img, retention) {
+function purgeIn(img, retention) {
   const left = Math.ceil((img.trashedAt + retention * DAY - NOW) / DAY);
   return left <= 0 ? '即将清除' : `${left} 天后清除`;
 }
@@ -220,24 +213,20 @@ const DATE_RANGES = [
   { key: '30d', label: '最近 30 天', since: () => NOW - 30 * DAY },
   { key: 'older', label: '30 天以前', until: () => NOW - 30 * DAY },
 ];
+const EMPTY_FILTERS = { q: '', formats: [], date: '', sources: [], tags: [] };
 
-const EMPTY_FILTERS = { q: '', formats: [], vis: '', date: '', sources: [], tags: [] };
-
-function applyFilters(list, f, sort, ext) {
+function applyFilters(list, f, sort) {
   const q = f.q.trim().toLowerCase();
-  let out = list.filter((im) => {
-    if (q && !(im.filename.toLowerCase().includes(q) || im.id.includes(q) || im.sha256.startsWith(q) || (ext && im.tags.some((t) => t.includes(q))))) return false;
+  const out = list.filter((im) => {
+    if (q && !(im.filename.toLowerCase().includes(q) || im.id.startsWith(q) || im.sha256.startsWith(q) || im.tags.some((t) => t.includes(q)))) return false;
     if (f.formats.length && !f.formats.includes(im.format)) return false;
-    if (f.vis && im.visibility !== f.vis) return false;
-    if (ext) {
-      if (f.date) {
-        const r = DATE_RANGES.find((d) => d.key === f.date);
-        if (r?.since && im.createdAt < r.since()) return false;
-        if (r?.until && im.createdAt >= r.until()) return false;
-      }
-      if (f.sources.length && !f.sources.includes(im.source)) return false;
-      if (f.tags.length && !f.tags.every((t) => im.tags.includes(t))) return false;
+    if (f.date) {
+      const r = DATE_RANGES.find((d) => d.key === f.date);
+      if (r?.since && im.createdAt < r.since()) return false;
+      if (r?.until && im.createdAt >= r.until()) return false;
     }
+    if (f.sources.length && !f.sources.includes(im.source)) return false;
+    if (f.tags.length && !f.tags.every((t) => im.tags.includes(t))) return false;
     return true;
   });
   const by = {
@@ -246,18 +235,18 @@ function applyFilters(list, f, sort, ext) {
     large: (a, b) => b.size - a.size,
     small: (a, b) => a.size - b.size,
     name: (a, b) => a.filename.localeCompare(b.filename),
-  }[sort] ?? ((a, b) => b.createdAt - a.createdAt);
+  }[sort];
   return [...out].sort(by);
 }
 
-function activeFilterCount(f, ext) {
-  return (f.q ? 1 : 0) + f.formats.length + (f.vis ? 1 : 0) + (ext ? (f.date ? 1 : 0) + f.sources.length + f.tags.length : 0);
+function filterCount(f) {
+  return f.formats.length + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
 }
 
-function allTags(list) {
+function tagCounts(list) {
   const m = new Map();
   for (const im of list) for (const t of im.tags) m.set(t, (m.get(t) ?? 0) + 1);
-  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
 const LINK_FORMATS = [
@@ -273,9 +262,14 @@ const SORTS = [
   { key: 'small', label: '文件最小' },
   { key: 'name', label: '文件名' },
 ];
+const SCOPES = [
+  { key: 'upload', label: '上传' },
+  { key: 'read', label: '只读' },
+  { key: 'manage', label: '管理' },
+];
 
 Object.assign(window, {
-  NOW, DAY, TOKENS, SOURCES, SETTINGS, STATUS, AUDIT, FORMAT_LABEL, MIME, LINK_FORMATS, SORTS, DATE_RANGES,
-  EMPTY_FILTERS, initialImages, fmtBytes, fmtDate, fmtRel, sourceLabel, daysLeft, applyFilters,
-  activeFilterCount, allTags, fakeId,
+  NOW, MIN, HOUR, DAY, IMG_HOST, TOKENS, SOURCES, SETTINGS, STATUS, AUDIT, FORMAT_LABEL, LINK_FORMATS, SORTS, SCOPES,
+  DATE_RANGES, EMPTY_FILTERS, initialImages, makeLinks, fakeId, fmtBytes, fmtDate, fmtRel, sourceLabel, purgeIn,
+  applyFilters, filterCount, tagCounts,
 });

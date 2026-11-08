@@ -1,125 +1,40 @@
-// Admin pages: tokens, settings, status. Page content only; the shell is provided elsewhere.
+// 令牌, 设置, 状态.
+
+function Head({ title, children }) {
+  return (
+    <div className="head">
+      <div className="head-title">
+        <h1>{title}</h1>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------- tokens
-
-const ADM_API_URL = 'https://pics.example.com/api/v1/images';
-const ADM_SCOPE_LABEL = { upload: '上传', read: '只读', manage: '管理' };
-const ADM_SCOPE_KEYS = ['upload', 'read', 'manage'];
-const ADM_EXPIRY_OPTIONS = [
-  { value: '0', label: '永不过期' },
+const EXPIRY = [
+  { value: '', label: '永不过期' },
   { value: '30', label: '30 天' },
   { value: '90', label: '90 天' },
   { value: '365', label: '1 年' },
 ];
-const ADM_B32 = 'abcdefghijklmnopqrstuvwxyz234567';
 
-function admNewSecret() {
-  const bytes = new Uint8Array(32);
-  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
-  else for (let i = 0; i < 32; i++) bytes[i] = Math.floor(Math.random() * 256);
-  let out = 'pb_';
-  for (let i = 0; i < 32; i++) out += ADM_B32[bytes[i] % 32];
-  return out;
-}
-
-function admSnippet(kind, secret) {
-  if (kind === 'curl') {
-    return `curl -H "Authorization: Bearer ${secret}" -F file=@shot.png ${ADM_API_URL}`;
-  }
-  if (kind === 'picgo') {
-    return [`API 地址: ${ADM_API_URL}`, 'POST 参数名: file', 'JSON 路径: url', `自定义请求头: {"Authorization":"Bearer ${secret}"}`].join('\n');
-  }
-  return [`RequestURL: ${ADM_API_URL}`, 'FileFormName: file', 'URL: {json:url}', `Headers: Authorization: Bearer ${secret}`].join('\n');
-}
-
-function AdmTokenModal({ onClose, onDone, toast }) {
-  const [name, setName] = React.useState('');
-  const [scopes, setScopes] = React.useState({ upload: true, read: false, manage: false });
-  const [days, setDays] = React.useState('0');
-  const [tried, setTried] = React.useState(false);
-  const [created, setCreated] = React.useState(null);
-  const [kind, setKind] = React.useState('curl');
-
-  const nameErr = name.trim() ? '' : '请输入名称';
-  const scopeErr = Object.values(scopes).some(Boolean) ? '' : '请选择至少一项权限';
-
-  const submit = () => {
+function TokenCreate({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [scopes, setScopes] = useState(['upload']);
+  const [exp, setExp] = useState('');
+  const [tried, setTried] = useState(false);
+  const nameErr = !name.trim() ? '请输入名称' : name.trim().length > 80 ? '名称最多 80 个字符' : '';
+  const scopeErr = scopes.length ? '' : '请选择至少一项权限';
+  const submit = (e) => {
+    e?.preventDefault();
     setTried(true);
     if (nameErr || scopeErr) return;
-    const secret = admNewSecret();
-    const d = Number(days);
-    setCreated({
-      secret,
-      token: {
-        id: Date.now(),
-        name: name.trim(),
-        prefix: 'pb_' + secret.slice(3, 8).toUpperCase(),
-        scopes: ['upload', 'read', 'manage'].filter((k) => scopes[k]),
-        createdAt: NOW,
-        lastUsedAt: null,
-        expiresAt: d ? NOW + d * DAY : null,
-        revokedAt: null,
-      },
-    });
+    onCreated({ name: name.trim(), scopes, expiresAt: exp ? NOW + Number(exp) * DAY : null });
   };
-
-  if (created) {
-    const finish = () => onDone(created.token);
-    return (
-      <Modal
-        title="令牌已创建"
-        width="520px"
-        onClose={finish}
-        footer={
-          <button type="button" className="btn btn-primary" onClick={finish}>
-            完成
-          </button>
-        }
-      >
-        <div className="adm-form">
-          <div className="alert warning">
-            <Icon name="alert" />
-            <span className="grow">令牌只显示这一次</span>
-          </div>
-          <div className="field">
-            <label htmlFor="adm-secret">令牌</label>
-            <div className="adm-secret">
-              <input id="adm-secret" className="input" readOnly value={created.secret} onFocus={(e) => e.target.select()} />
-              <CopyButton text={created.secret} />
-            </div>
-          </div>
-          <div className="adm-form" style={{ gap: 10 }}>
-            <div>
-              <Seg
-                label="使用方式"
-                value={kind}
-                onChange={setKind}
-                options={[
-                  { key: 'curl', label: 'curl' },
-                  { key: 'picgo', label: 'PicGo' },
-                  { key: 'sharex', label: 'ShareX' },
-                ]}
-              />
-            </div>
-            {kind === 'sharex' && (
-              <div>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => toast('已下载 PicBerth.sxcu')}>
-                  <Icon name="download" />
-                  下载 .sxcu
-                </button>
-              </div>
-            )}
-            <pre className="adm-pre">{admSnippet(kind, created.secret)}</pre>
-          </div>
-        </div>
-      </Modal>
-    );
-  }
-
   return (
-    <Modal
+    <Dialog
       title="新建令牌"
-      width="520px"
       onClose={onClose}
       footer={
         <>
@@ -132,599 +47,503 @@ function AdmTokenModal({ onClose, onDone, toast }) {
         </>
       }
     >
-      <div className="adm-form">
+      <form className="auth-form" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="adm-tk-name">名称</label>
-          <input
-            id="adm-tk-name"
-            className="input"
-            aria-invalid={tried && nameErr ? 'true' : undefined}
-            value={name}
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-          />
-          {tried && nameErr && <span className="error-text">{nameErr}</span>}
+          <label htmlFor="tk-name">名称</label>
+          <input id="tk-name" className="input" value={name} aria-invalid={tried && !!nameErr} onChange={(e) => setName(e.target.value)} />
+          {tried && nameErr && <span className="field-error">{nameErr}</span>}
         </div>
-        <div className="field">
-          <span className="field-label">权限</span>
-          <div className="adm-opts-row adm-opts-start">
-            {ADM_SCOPE_KEYS.map((k) => (
-              <label key={k} className="adm-opt-inline">
-                <input type="checkbox" className="check" checked={scopes[k]} onChange={(e) => setScopes({ ...scopes, [k]: e.target.checked })} />
-                {ADM_SCOPE_LABEL[k]}
-              </label>
-            ))}
+        <fieldset className="field" style={{ border: 0, margin: 0, padding: 0 }}>
+          <legend className="label medium" style={{ padding: 0, marginBottom: 6 }}>
+            权限
+          </legend>
+          <div className="scope-opts">
+            {SCOPES.map((s) => {
+              const on = scopes.includes(s.key);
+              return (
+                <button key={s.key} type="button" className="scope-opt" role="checkbox" aria-checked={on} onClick={() => setScopes((xs) => (on ? xs.filter((x) => x !== s.key) : [...xs, s.key]))}>
+                  <span className="check" data-on={String(on)}>{on && <Icon name="check" />}</span>
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
-          {tried && scopeErr && <span className="error-text">{scopeErr}</span>}
-        </div>
+          {tried && scopeErr && <span className="field-error">{scopeErr}</span>}
+        </fieldset>
         <div className="field">
-          <label htmlFor="adm-tk-exp">有效期</label>
-          <Select id="adm-tk-exp" value={days} options={ADM_EXPIRY_OPTIONS} onChange={setDays} />
+          <span className="label">有效期</span>
+          <Select label="有效期" value={exp} onChange={setExp} options={EXPIRY} width={160} />
         </div>
-      </div>
-    </Modal>
+      </form>
+    </Dialog>
   );
 }
 
-function AdmExpiry({ t }) {
-  if (t.revokedAt) return <span className="badge">已吊销</span>;
-  if (t.expiresAt == null) return <span>永不过期</span>;
-  if (t.expiresAt < NOW) return <span className="badge badge-danger">已过期</span>;
-  return <span className="num">{fmtDate(t.expiresAt).slice(0, 10)}</span>;
-}
-
-function AdmScopeBadges({ scopes }) {
+const CLIENTS = [
+  { value: 'picgo', label: 'PicGo' },
+  { value: 'sharex', label: 'ShareX' },
+  { value: 'curl', label: 'curl' },
+];
+function TokenReveal({ token, onDone }) {
+  const toast = useToast();
+  const [client, setClient] = useState('picgo');
+  const secret = `${token.prefix}_${fakeId(token.id * 7)}${fakeId(token.id * 13).slice(0, 12)}`;
+  const endpoint = 'https://pics.example.com/api/v1/images';
+  const snippets = {
+    picgo: `API 地址: ${endpoint}\nPOST 参数名: file\nJSON 路径: url\n自定义请求头: {"Authorization":"Bearer ${secret}"}`,
+    sharex: `RequestURL: ${endpoint}\nFileFormName: file\nHeaders: Authorization: Bearer ${secret}\nURL: {json:url}`,
+    curl: `curl -H "Authorization: Bearer ${secret}" \\\n  -F file=@image.png \\\n  ${endpoint}`,
+  };
   return (
-    <span className="adm-badges">
-      {scopes.map((s) => (
-        <span key={s} className={`badge ${s === 'manage' ? 'badge-warning' : ''}`}>
-          {ADM_SCOPE_LABEL[s]}
-        </span>
-      ))}
-    </span>
+    <Dialog
+      title="令牌已创建"
+      wide
+      dismissible={false}
+      onClose={onDone}
+      footer={
+        <button type="button" className="btn btn-primary" data-autofocus onClick={onDone}>
+          完成
+        </button>
+      }
+    >
+      <div className="notice">
+        <Icon name="alert" />
+        令牌只显示这一次
+      </div>
+      <div className="secret">
+        <span className="mono">{secret}</span>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => (copyText(secret), toast('已复制令牌'))}>
+          <Icon name="copy" size="s" />
+          复制
+        </button>
+      </div>
+      <div className="field">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <Seg label="客户端" value={client} onChange={setClient} options={CLIENTS} />
+          {client === 'sharex' ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => toast('已下载 PicBerth.sxcu')}>
+              <Icon name="download" size="s" />
+              下载 .sxcu
+            </button>
+          ) : (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => (copyText(snippets[client]), toast('已复制'))}>
+              <Icon name="copy" size="s" />
+              复制
+            </button>
+          )}
+        </div>
+        <pre className="snippet">{snippets[client]}</pre>
+      </div>
+    </Dialog>
   );
 }
 
-function TokensPage({ tokens, setTokens, toast }) {
-  const mobile = useMedia('(max-width: 720px)');
-  const [creating, setCreating] = React.useState(false);
-  // Revoking cannot be undone, so the button asks once more in place: 吊销 turns into 确认吊销 for a few seconds.
-  const [arming, setArming] = React.useState(null);
-  const disarm = React.useRef(0);
-  React.useEffect(() => () => clearTimeout(disarm.current), []);
-
+function Tokens({ dataState, onRetryLoad }) {
+  const toast = useToast();
+  const [tokens, setTokens] = useState(TOKENS);
+  const [creating, setCreating] = useState(false);
+  const [revealed, setRevealed] = useState(null);
+  const [arming, setArming] = useState(null);
+  useEffect(() => {
+    if (arming == null) return;
+    const t = setTimeout(() => setArming(null), 4000);
+    return () => clearTimeout(t);
+  }, [arming]);
   const revoke = (t) => {
-    if (arming !== t.id) {
-      setArming(t.id);
-      clearTimeout(disarm.current);
-      disarm.current = setTimeout(() => setArming(null), 4000);
-      return;
-    }
-    clearTimeout(disarm.current);
+    if (arming !== t.id) return setArming(t.id);
+    setTokens((xs) => xs.map((x) => (x.id === t.id ? { ...x, revokedAt: NOW } : x)));
     setArming(null);
-    setTokens(tokens.map((x) => (x.id === t.id ? { ...x, revokedAt: NOW } : x)));
     toast('令牌已吊销');
   };
-  const added = (token) => {
-    setTokens([token, ...tokens]);
-    setCreating(false);
-    toast('令牌已创建');
-  };
-
-  const lastUsed = (t) => (t.lastUsedAt ? <span title={fmtDate(t.lastUsedAt)}>{fmtRel(t.lastUsedAt)}</span> : <span className="subtle">从未使用</span>);
-  const newBtn = (
-    <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-      <Icon name="plus" />
-      新建令牌
-    </button>
-  );
-  const revokeBtn = (t) =>
-    !t.revokedAt && (
-      <button
-        type="button"
-        className={`btn btn-sm adm-revoke ${arming === t.id ? 'btn-danger-solid armed' : 'btn-danger-ghost'}`}
-        onClick={() => revoke(t)}
-        onBlur={() => arming === t.id && setArming(null)}
-      >
-        {arming === t.id ? '确认吊销' : '吊销'}
-      </button>
-    );
-  const nameCell = (t) => (
-    <span className="tk-name">
-      <span className="name truncate">{t.name}</span>
-      <span className="mono subtle">{t.prefix}…</span>
-    </span>
-  );
-
-  return (
-    <div className="page">
-      <PageHead title="令牌">{tokens.length > 0 && newBtn}</PageHead>
-      <div className="page-body">
-        {tokens.length === 0 ? (
-          <div className="empty">
-            <Icon name="key" size={32} />
-            <strong>还没有令牌</strong>
-            <div className="actions">{newBtn}</div>
-          </div>
-        ) : (
-          <div className="adm-col">
-            {mobile ? (
-              <div className="adm-trows">
-                {tokens.map((t) => (
-                  <div key={t.id} className={`adm-trow ${t.revokedAt ? 'adm-revoked' : ''}`}>
-                    <div className="adm-trow-top">
-                      {nameCell(t)}
-                      {revokeBtn(t)}
-                    </div>
-                    <AdmScopeBadges scopes={t.scopes} />
-                    <div className="adm-trow-meta">
-                      <span>{lastUsed(t)}</span>
-                      <AdmExpiry t={t} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="adm-tokens" role="table" aria-label="令牌">
-                <div className="alink-grid head" role="row">
-                  <span role="columnheader">名称</span>
-                  <span role="columnheader">权限</span>
-                  <span role="columnheader">最近使用</span>
-                  <span role="columnheader">到期</span>
-                  <span role="columnheader" className="sr-only">
-                    操作
-                  </span>
-                </div>
-                {tokens.map((t) => (
-                  <div key={t.id} role="row" className={`alink-grid ${t.revokedAt ? 'adm-revoked' : ''}`}>
-                    <span role="cell">{nameCell(t)}</span>
-                    <span role="cell">
-                      <AdmScopeBadges scopes={t.scopes} />
-                    </span>
-                    <span role="cell">{lastUsed(t)}</span>
-                    <span role="cell">
-                      <AdmExpiry t={t} />
-                    </span>
-                    <span role="cell" className="end">
-                      {revokeBtn(t)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+  const list = dataState === 'empty' ? [] : tokens;
+  const live = list.filter((t) => !t.revokedAt);
+  const dead = list.filter((t) => t.revokedAt);
+  const expiry = (t) => (t.revokedAt ? '已吊销' : t.expiresAt ? (t.expiresAt < NOW ? '已过期' : fmtDate(t.expiresAt).slice(0, 10)) : '永不过期');
+  const scopes = (t) => t.scopes.map((s) => SCOPES.find((x) => x.key === s).label).join('、');
+  const row = (t) => (
+    <div key={t.id} className={'list-row tok-row' + (t.revokedAt ? ' revoked' : '')}>
+      <div className="tok-name">
+        <span className="n ellipsis">{t.name}</span>
+        <span className="mono">{t.prefix}</span>
+        <span className="tok-sub">
+          <span>{scopes(t)}</span>
+          <span>{t.lastUsedAt ? fmtRel(t.lastUsedAt) : '从未使用'}</span>
+          <span>{expiry(t)}</span>
+        </span>
       </div>
-
-      {creating && <AdmTokenModal onClose={() => setCreating(false)} onDone={added} toast={toast} />}
+      <span className="c-scope">{scopes(t)}</span>
+      <span className="c-used muted num">{t.lastUsedAt ? fmtRel(t.lastUsedAt) : '从未使用'}</span>
+      <span className="c-exp muted num">{expiry(t)}</span>
+      {t.revokedAt ? (
+        <span />
+      ) : (
+        <button
+          type="button"
+          className={'btn btn-sm ' + (arming === t.id ? 'btn-danger-armed' : 'btn-ghost')}
+          aria-label={arming === t.id ? `确认吊销 ${t.name}` : `吊销 ${t.name}`}
+          onClick={() => revoke(t)}
+          onBlur={() => arming === t.id && setTimeout(() => setArming((a) => (a === t.id ? null : a)), 150)}
+        >
+          {arming === t.id ? '确认吊销' : '吊销'}
+        </button>
+      )}
+    </div>
+  );
+  return (
+    <div className="panel-main">
+      <Head title="令牌">
+        <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+          <Icon name="plus" />
+          新建令牌
+        </button>
+      </Head>
+      <div className="scroll">
+        <div className="page" style={{ maxWidth: 960 }}>
+          {dataState === 'loading' ? (
+            <div className="list" aria-busy="true">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="list-row tok-row">
+                  <div className="skeleton" style={{ height: 10, width: '60%' }} />
+                </div>
+              ))}
+            </div>
+          ) : dataState === 'error' ? (
+            <div className="state" role="alert" style={{ padding: '64px 0' }}>
+              <span className="t">令牌加载失败</span>
+              <button type="button" className="btn btn-secondary" onClick={onRetryLoad}>
+                重试
+              </button>
+            </div>
+          ) : !list.length ? (
+            <div className="state" style={{ padding: '64px 0' }}>
+              <span className="t">还没有令牌</span>
+              <span className="d">PicGo、ShareX 等工具通过令牌上传图片</span>
+            </div>
+          ) : (
+            <div className="list" role="table" aria-label="令牌">
+              <div className="list-row list-head tok-row" role="row">
+                <span>名称</span>
+                <span className="c-scope">权限</span>
+                <span className="c-used">最近使用</span>
+                <span className="c-exp">到期</span>
+                <span />
+              </div>
+              {live.map(row)}
+              {dead.map(row)}
+            </div>
+          )}
+        </div>
+      </div>
+      {creating && (
+        <TokenCreate
+          onClose={() => setCreating(false)}
+          onCreated={(t) => {
+            const id = Math.max(...tokens.map((x) => x.id)) + 1;
+            const tok = { ...t, id, prefix: 'pb_' + fakeId(id).slice(0, 5).toUpperCase(), createdAt: NOW, lastUsedAt: null, revokedAt: null };
+            setTokens((xs) => [tok, ...xs]);
+            setCreating(false);
+            setRevealed(tok);
+          }}
+        />
+      )}
+      {revealed && <TokenReveal token={revealed} onDone={() => setRevealed(null)} />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- settings
-
-const ADM_FORMAT_ORDER = ['jpeg', 'png', 'gif', 'webp', 'avif'];
-const ADM_NUM_FIELDS = ['maxUploadMB', 'maxPixelsM', 'trashRetentionDays', 'uploadsPerMinute', 'sessionIdleMinutes', 'sessionAbsoluteHours'];
-
-function admToDraft(s) {
-  const d = { ...s, allowedFormats: [...s.allowedFormats] };
-  ADM_NUM_FIELDS.forEach((k) => {
-    d[k] = String(s[k]);
-  });
-  return d;
-}
-
-function admFromDraft(d) {
-  const s = { ...d, allowedFormats: ADM_FORMAT_ORDER.filter((f) => d.allowedFormats.includes(f)) };
-  ADM_NUM_FIELDS.forEach((k) => {
-    s[k] = Number(d[k]);
-  });
-  return s;
-}
-
-function admRange(v, min, max) {
-  const t = String(v).trim();
-  if (!/^\d+$/.test(t)) return `请输入 ${min} 到 ${max} 之间的数字`;
-  const n = Number(t);
-  return n < min || n > max ? `请输入 ${min} 到 ${max} 之间的数字` : '';
-}
-
-function admValidate(d, hardMax) {
-  const e = {};
-  e.maxUploadMB = admRange(d.maxUploadMB, 1, hardMax);
-  e.maxPixelsM = admRange(d.maxPixelsM, 1, 1000);
-  e.trashRetentionDays = admRange(d.trashRetentionDays, 0, 3650);
-  e.uploadsPerMinute = admRange(d.uploadsPerMinute, 1, 6000);
-  e.sessionIdleMinutes = admRange(d.sessionIdleMinutes, 1, 1440);
-  e.sessionAbsoluteHours = admRange(d.sessionAbsoluteHours, 1, 720);
-  e.allowedFormats = d.allowedFormats.length ? '' : '至少选择一种格式';
-  return e;
-}
-
-/** Hairline row: label on the left, control on the right. */
-function AdmRow({ label, htmlFor, children }) {
+function NumField({ id, value, onChange, unit, min, max, err }) {
   return (
-    <div className="adm-row">
-      {htmlFor ? (
-        <label className="label" htmlFor={htmlFor}>
+    <>
+      <div className="field-wrap has-suffix w-num">
+        <input id={id} className="input num" inputMode="numeric" value={value} aria-invalid={!!err} onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))} />
+        <span className="suffix">{unit}</span>
+      </div>
+      {err && <span className="field-error">{err}</span>}
+    </>
+  );
+}
+
+function Settings({ settings, setSettings, guard }) {
+  const toast = useToast();
+  const [form, setForm] = useState(settings);
+  const dirty = JSON.stringify(form) !== JSON.stringify(settings);
+  useEffect(() => {
+    guard.current = dirty;
+  }, [dirty]);
+  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+  const range = (v, lo, hi) => (v === '' || Number(v) < lo || Number(v) > hi ? `请输入 ${lo} 到 ${hi} 之间的数字` : '');
+  const errs = {
+    maxUploadMB: range(form.maxUploadMB, 1, settings.hardMaxMB),
+    maxPixelsM: range(form.maxPixelsM, 1, 500),
+    uploadsPerMinute: range(form.uploadsPerMinute, 1, 6000),
+    trashRetentionDays: range(form.trashRetentionDays, 1, 365),
+    sessionIdleMinutes: range(form.sessionIdleMinutes, 5, 1440),
+    sessionAbsoluteHours: range(form.sessionAbsoluteHours, 1, 720),
+    allowedFormats: form.allowedFormats.length ? '' : '至少保留一种格式',
+  };
+  const invalid = Object.values(errs).some(Boolean);
+  const save = () => {
+    const n = {};
+    for (const [k, v] of Object.entries(form)) n[k] = typeof settings[k] === 'number' ? Number(v) : v;
+    setSettings(n);
+    setForm(n);
+    toast('设置已保存');
+  };
+  const row = (label, id, ctl, stack) => (
+    <div className={'form-row' + (stack ? ' stack' : '')}>
+      {id ? (
+        <label className="k" htmlFor={id}>
           {label}
         </label>
       ) : (
-        <span className="label">{label}</span>
+        <span className="k">{label}</span>
       )}
-      <div className="adm-ctl">{children}</div>
+      <div className="ctl">{ctl}</div>
     </div>
   );
-}
-
-function AdmSection({ title, compact, children }) {
   return (
-    <section className={`adm-sec ${compact ? 'adm-compact' : ''}`}>
-      <h2>{title}</h2>
-      <div className="adm-rows">{children}</div>
-    </section>
-  );
-}
-
-function SettingsPage({ settings, setSettings, toast }) {
-  const [draft, setDraft] = React.useState(() => admToDraft(settings));
-  const base = admToDraft(settings);
-  const hardMax = settings.hardMaxMB || 100;
-  const errors = admValidate(draft, hardMax);
-  const invalid = Object.values(errors).some(Boolean);
-
-  const same = (k) => (k === 'allowedFormats' ? ADM_FORMAT_ORDER.filter((f) => draft[k].includes(f)).join() === ADM_FORMAT_ORDER.filter((f) => base[k].includes(f)).join() : String(draft[k]).trim() === String(base[k]));
-  const changed = ['maxUploadMB', 'maxPixelsM', 'allowedFormats', 'defaultVisibility', 'dedupe', 'trashRetentionDays', 'uploadsPerMinute', 'sessionIdleMinutes', 'sessionAbsoluteHours'].filter((k) => !same(k));
-  const dirty = changed.length > 0;
-
-  const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
-  const toggleFormat = (f, on) => set('allowedFormats', on ? [...draft.allowedFormats, f] : draft.allowedFormats.filter((x) => x !== f));
-  const save = () => {
-    if (invalid) return;
-    const next = admFromDraft(draft);
-    setSettings(next);
-    setDraft(admToDraft(next));
-    toast('设置已保存');
-  };
-  const discard = () => setDraft(admToDraft(settings));
-
-  const num = (key, id, unit) => (
-    <>
-      <div className={`input-unit ${errors[key] ? 'invalid' : ''}`}>
-        <input id={id} className="num" inputMode="numeric" aria-invalid={errors[key] ? 'true' : undefined} value={draft[key]} onChange={(e) => set(key, e.target.value)} />
-        {unit && <span className="unit">{unit}</span>}
-      </div>
-      {errors[key] && <span className="error-text">{errors[key]}</span>}
-    </>
-  );
-
-  return (
-    <div className="page">
-      <PageHead title="设置" />
-      <div className="page-body">
-       <div className="adm-col">
-        <AdmSection title="上传">
-          <AdmRow label="单文件上限" htmlFor="adm-max-mb">
-            {num('maxUploadMB', 'adm-max-mb', 'MB')}
-          </AdmRow>
-          <AdmRow label="像素上限" htmlFor="adm-max-px">
-            {num('maxPixelsM', 'adm-max-px', '百万像素')}
-          </AdmRow>
-          <AdmRow label="格式">
-            <div className="adm-opts-row">
-              {ADM_FORMAT_ORDER.map((f) => (
-                <label key={f} className="adm-opt-inline">
-                  <input type="checkbox" className="check" checked={draft.allowedFormats.includes(f)} onChange={(e) => toggleFormat(f, e.target.checked)} />
-                  {FORMAT_LABEL[f]}
-                </label>
-              ))}
+    <div className="panel-main">
+      <Head title="设置" />
+      <div className="scroll">
+        <div className="page">
+          <section className="section">
+            <h2>上传</h2>
+            <div className="form-rows">
+              {row('单文件上限', 's-max', <NumField id="s-max" value={form.maxUploadMB} onChange={set('maxUploadMB')} unit="MB" err={errs.maxUploadMB} />)}
+              {row('像素上限', 's-px', <NumField id="s-px" value={form.maxPixelsM} onChange={set('maxPixelsM')} unit="MP" err={errs.maxPixelsM} />)}
+              {row(
+                '格式',
+                null,
+                <>
+                  {Object.keys(FORMAT_LABEL).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className="chip"
+                      aria-pressed={form.allowedFormats.includes(k)}
+                      onClick={() => set('allowedFormats')(form.allowedFormats.includes(k) ? form.allowedFormats.filter((x) => x !== k) : [...form.allowedFormats, k])}
+                    >
+                      {form.allowedFormats.includes(k) && <Icon name="check" size="s" />}
+                      {FORMAT_LABEL[k]}
+                    </button>
+                  ))}
+                  {errs.allowedFormats && <span className="field-error">{errs.allowedFormats}</span>}
+                </>,
+                true,
+              )}
+              {row('频率上限', 's-rate', <NumField id="s-rate" value={form.uploadsPerMinute} onChange={set('uploadsPerMinute')} unit="次/分" err={errs.uploadsPerMinute} />)}
+              {row('重复检测', null, <Switch on={form.dedupe} onChange={set('dedupe')} label="重复检测" />)}
             </div>
-            {errors.allowedFormats && <span className="error-text">{errors.allowedFormats}</span>}
-          </AdmRow>
-          <AdmRow label="频率上限" htmlFor="adm-rate">
-            {num('uploadsPerMinute', 'adm-rate', '次/分钟')}
-          </AdmRow>
-          <AdmRow label="重复检测">
-            <div className="adm-value">
-              <Switch checked={draft.dedupe} onChange={(v) => set('dedupe', v)} label="重复检测" />
+          </section>
+          <section className="section">
+            <h2>回收站</h2>
+            <div className="form-rows">
+              {row('保留时间', 's-trash', <NumField id="s-trash" value={form.trashRetentionDays} onChange={set('trashRetentionDays')} unit="天" err={errs.trashRetentionDays} />)}
             </div>
-          </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="图片">
-          <AdmRow label="默认可见性">
-            <Seg label="默认可见性" value={draft.defaultVisibility} onChange={(v) => set('defaultVisibility', v)} options={VIS_OPTS} />
-          </AdmRow>
-          <AdmRow label="回收站保留" htmlFor="adm-trash-days">
-            {num('trashRetentionDays', 'adm-trash-days', '天')}
-          </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="会话">
-          <AdmRow label="空闲超时" htmlFor="adm-idle">
-            {num('sessionIdleMinutes', 'adm-idle', '分钟')}
-          </AdmRow>
-          <AdmRow label="最长有效" htmlFor="adm-abs">
-            {num('sessionAbsoluteHours', 'adm-abs', '小时')}
-          </AdmRow>
-        </AdmSection>
-
-        <AdmSection title="地址">
-          <AdmRow label="公开地址">
-            <div className="adm-value mono">{settings.publicUrl}</div>
-          </AdmRow>
-          <AdmRow label="图片地址">
-            <div className="adm-value mono">{settings.imageUrl}</div>
-          </AdmRow>
-        </AdmSection>
-
-        {dirty && (
-          <div className="adm-sticky">
-            <span className="grow">{changed.length} 项更改未保存</span>
-            <button type="button" className="btn btn-secondary" onClick={discard}>
-              放弃
-            </button>
-            <button type="button" className="btn btn-primary" onClick={save} disabled={invalid}>
-              保存
-            </button>
-          </div>
-        )}
-       </div>
+          </section>
+          <section className="section">
+            <h2>会话</h2>
+            <div className="form-rows">
+              {row('空闲超时', 's-idle', <NumField id="s-idle" value={form.sessionIdleMinutes} onChange={set('sessionIdleMinutes')} unit="分钟" err={errs.sessionIdleMinutes} />)}
+              {row('最长有效', 's-abs', <NumField id="s-abs" value={form.sessionAbsoluteHours} onChange={set('sessionAbsoluteHours')} unit="小时" err={errs.sessionAbsoluteHours} />)}
+            </div>
+          </section>
+          <section className="section">
+            <h2>地址</h2>
+            <div className="form-rows">
+              {row('公开地址', null, <span className="mono ellipsis" style={{ fontSize: 'var(--fs-m)' }}>{form.publicUrl}</span>)}
+              {row('图片地址', null, <span className="mono ellipsis" style={{ fontSize: 'var(--fs-m)' }}>{form.imageUrl}</span>)}
+            </div>
+          </section>
+        </div>
       </div>
+      {dirty && (
+        <div className="save-bar" role="region" aria-label="未保存的更改">
+          <span className="t">有未保存的更改</span>
+          <button type="button" className="btn btn-ghost" onClick={() => setForm(settings)}>
+            放弃
+          </button>
+          <button type="button" className="btn btn-primary" disabled={invalid} onClick={save}>
+            保存
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- status
-
-function AdmStat({ label, value, children }) {
-  return (
-    <div className="stat">
-      <span className="k">{label}</span>
-      <span className="v">{value}</span>
-      {children}
-    </div>
-  );
-}
-
-/** Maintenance row: name on the left, result and action on the right. */
-function AdmRunRow({ label, idleLabel, busyLabel, running, disabled, onRun, result }) {
-  return (
-    <div className="adm-row adm-run-row">
-      <span className="label">{label}</span>
-      <div className="adm-run">
-        {running && (
-          <div className="progress indeterminate adm-run-bar" role="progressbar" aria-label={label}>
-            <span />
-          </div>
-        )}
-        {!running && result && (
-          <div className={`adm-result ${result.subtle ? 'subtle' : ''}`}>
-            {result.badge && <span className={`badge ${result.tone || 'badge-success'}`}>{result.badge}</span>}
-            {result.body}
-          </div>
-        )}
-        <button type="button" className="btn btn-secondary" disabled={running || disabled} onClick={onRun}>
-          {running ? busyLabel : idleLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StatusPage({ status, images, toast }) {
-  const mobile = useMedia('(max-width: 720px)');
-  const timers = React.useRef([]);
-  React.useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  const active = images.filter((i) => i.state === 'active');
-  const trashed = images.filter((i) => i.state === 'trashed');
-  const totalBytes = images.reduce((s, i) => s + i.size, 0);
-  const { disk, db } = status;
-  const usedShare = disk.totalBytes ? Math.round(((disk.totalBytes - disk.freeBytes) / disk.totalBytes) * 100) : 0;
-
-  const [running, setRunning] = React.useState(null);
-  const [snapDone, setSnapDone] = React.useState(false);
-  const [auditExtra, setAuditExtra] = React.useState([]);
-  const lc = status.lastCheck;
-  const ls = status.lastSnapshot;
-  const stale = (status.warnings || []).find((w) => w.code === 'snapshot-stale');
-  const lastCheckResult = lc
-    ? {
-        badge: lc.ok ? '正常' : `发现 ${lc.issues} 个问题`,
-        tone: lc.ok ? 'badge-success' : 'badge-danger',
-        body: (
-          <span className="subtle" title={fmtDate(lc.at)}>
-            {fmtRel(lc.at)}
-          </span>
-        ),
-      }
-    : null;
-  const [results, setResults] = React.useState({
-    quick: lc && lc.mode === 'quick' ? lastCheckResult : null,
-    full: lc && lc.mode === 'full' ? lastCheckResult : null,
-    snapshot: stale
-      ? { badge: stale.title, tone: 'badge-warning', body: <span className="subtle">{ls ? fmtRel(ls.at) : null}</span> }
-      : ls
-        ? { subtle: true, body: <span title={ls.path}>{fmtRel(ls.at)}</span> }
-        : null,
+function Status({ dataState, onRetryLoad }) {
+  const toast = useToast();
+  const [running, setRunning] = useState(null);
+  const [results, setResults] = useState({
+    quick: { tone: 'success', text: `正常`, at: STATUS.lastQuick.at },
+    full: { tone: 'success', text: `正常`, at: STATUS.lastFull.at },
+    snapshot: { tone: 'warning', text: '', at: STATUS.lastSnapshot },
   });
-
-  const run = (key, ms, finish) => {
-    if (running) return;
-    setRunning(key);
-    const t = setTimeout(() => {
+  const [warnings, setWarnings] = useState(STATUS.warnings);
+  const [audit, setAudit] = useState(AUDIT.slice(0, 6));
+  const run = (k) => {
+    setRunning(k);
+    setTimeout(() => {
       setRunning(null);
-      finish();
-    }, ms);
-    timers.current.push(t);
+      setResults((r) => ({ ...r, [k]: { tone: 'success', text: k === 'snapshot' ? '已创建' : '正常', at: NOW } }));
+      if (k === 'snapshot') setWarnings((w) => w.filter((x) => x.code !== 'snapshot-stale'));
+      toast(k === 'snapshot' ? '快照已创建' : k === 'quick' ? '快速检查完成' : '完整检查完成');
+    }, 1400);
   };
-  const runCheck = (key, seconds, label) =>
-    run(key, 1500, () => {
-      setResults((r) => ({
-        ...r,
-        [key]: {
-          badge: '正常',
-          tone: 'badge-success',
-          body: (
-            <>
-              <span>{active.length} 张图片</span>
-              <span className="subtle">{seconds} 秒</span>
-            </>
-          ),
-        },
-      }));
-      toast(`${label}完成`);
-    });
-  const runSnapshot = () =>
-    run('snapshot', 1500, () => {
-      const path = '/var/lib/picberth/snapshots/20261021T073000Z';
-      setResults((r) => ({
-        ...r,
-        snapshot: {
-          badge: '已创建',
-          tone: 'badge-success',
-          body: (
-            <>
-              <span className="mono">{path}</span>
-              <span className="subtle">2.3 MB</span>
-            </>
-          ),
-        },
-      }));
-      setSnapDone(true);
-      setAuditExtra((a) => [{ at: NOW, actor: 'admin', action: '创建快照', target: '20261021T073000Z' }, ...a]);
-      toast('快照已创建');
-    });
-
-  // A stale snapshot is shown on the snapshot row itself; other warnings stand above the figures.
-  const warnings = (status.warnings || []).filter((w) => w.code !== 'snapshot-stale');
-  const audit = [...auditExtra, ...AUDIT];
-
+  const s = STATUS;
+  const used = 1 - s.disk.free / s.disk.total;
+  if (dataState === 'loading' || dataState === 'error')
+    return (
+      <div className="panel-main">
+        <Head title="状态" />
+        <div className="scroll">
+          {dataState === 'error' ? (
+            <div className="state" role="alert">
+              <span className="t">状态加载失败</span>
+              <button type="button" className="btn btn-secondary" onClick={onRetryLoad}>
+                重试
+              </button>
+            </div>
+          ) : (
+            <div className="page" aria-busy="true">
+              <div className="skeleton" style={{ height: 76, borderRadius: 8 }} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  const maint = [
+    { k: 'quick', name: '快速检查', btn: '检查' },
+    { k: 'full', name: '完整检查', btn: '检查' },
+    { k: 'snapshot', name: '快照', btn: '创建' },
+  ];
   return (
-    <div className="page">
-      <PageHead title="状态">
+    <div className="panel-main">
+      <Head title="状态">
         <button type="button" className="btn btn-ghost" onClick={() => toast('状态已刷新')}>
           <Icon name="refresh" />
           刷新
         </button>
-      </PageHead>
-      <div className="page-body">
-       <div className="adm-col">
-        {warnings.map((w) => (
-          <div key={w.code} className="alert warning">
-            <Icon name="alert" />
-            <span className="grow">{w.title}</span>
+      </Head>
+      <div className="scroll">
+        <div className="page" style={{ maxWidth: 960 }}>
+          {warnings.length > 0 && (
+            <section className="section" aria-label="警告">
+              <div>
+                {warnings.map((w) => (
+                  <div key={w.code} className="warn-row" role="alert">
+                    <span className="dot dot-warning" />
+                    <span className="t">{w.title}</span>
+                    <span className="d">{w.help}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div className="figures">
+            <div className="figure">
+              <span className="v">{s.images.active.toLocaleString('zh-CN')}</span>
+              <span className="k">图片</span>
+            </div>
+            <div className="figure">
+              <span className="v">{fmtBytes(s.images.bytes)}</span>
+              <span className="k">占用空间</span>
+            </div>
+            <div className="figure">
+              <span className="v">{s.images.trashed}</span>
+              <span className="k">回收站</span>
+            </div>
+            <div className="figure">
+              <span className="v">{fmtBytes(s.dbBytes)}</span>
+              <span className="k">数据库</span>
+            </div>
+            <div className="figure">
+              <span className="v">{fmtBytes(s.disk.free)}</span>
+              <span className="k">磁盘剩余</span>
+              <div className="meter" role="progressbar" aria-label="磁盘已用" aria-valuenow={Math.round(used * 100)} aria-valuemin={0} aria-valuemax={100}>
+                <i style={{ width: `${used * 100}%` }} />
+              </div>
+            </div>
           </div>
-        ))}
 
-        <div className="stats">
-          <AdmStat label="图片" value={active.length.toLocaleString()} />
-          <AdmStat label="占用空间" value={fmtBytes(totalBytes)} />
-          <AdmStat label="回收站" value={trashed.length.toLocaleString()} />
-          <AdmStat label="数据库" value={fmtBytes(db.bytes)} />
-          <AdmStat label="磁盘剩余" value={fmtBytes(disk.freeBytes)}>
-            <div className="progress" role="progressbar" aria-label="磁盘已用" aria-valuemin="0" aria-valuemax="100" aria-valuenow={usedShare}>
-              <span style={{ width: `${usedShare}%` }} />
+          <section className="section">
+            <h2>维护</h2>
+            <div className="list">
+              {maint.map((m) => {
+                const r = results[m.k];
+                return (
+                  <div key={m.k} className="list-row maint-row">
+                    <span className="medium">{m.name}</span>
+                    <span className="c-res badge">
+                      <span className={'dot dot-' + r.tone} />
+                      {r.text && <span>{r.text}</span>}
+                      <span className="num">{fmtDate(r.at)}</span>
+                    </span>
+                    <button type="button" className="btn btn-secondary btn-sm" disabled={running != null} onClick={() => run(m.k)}>
+                      {running === m.k ? (m.k === 'snapshot' ? '创建中…' : '检查中…') : m.btn}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-          </AdmStat>
-        </div>
+          </section>
 
-        <AdmSection title="维护">
-          <AdmRunRow
-            label="快速检查"
-            idleLabel="检查"
-            busyLabel="检查中…"
-            running={running === 'quick'}
-            disabled={!!running}
-            onRun={() => runCheck('quick', '1.2', '快速检查')}
-            result={results.quick}
-          />
-          <AdmRunRow
-            label="完整检查"
-            idleLabel="检查"
-            busyLabel="检查中…"
-            running={running === 'full'}
-            disabled={!!running}
-            onRun={() => runCheck('full', '4.8', '完整检查')}
-            result={results.full}
-          />
-          <AdmRunRow
-            label="快照"
-            idleLabel="创建"
-            busyLabel="创建中…"
-            running={running === 'snapshot'}
-            disabled={!!running}
-            onRun={runSnapshot}
-            result={results.snapshot}
-          />
-        </AdmSection>
-
-        <AdmSection title="运行信息" compact>
-          <AdmRow label="版本">
-            <div className="adm-value adm-pair">
-              <span>{status.version}</span>
-              <span className="mono subtle">{status.commit}</span>
-            </div>
-          </AdmRow>
-          <AdmRow label="Go">
-            <div className="adm-value">{status.goVersion}</div>
-          </AdmRow>
-          <AdmRow label="SQLite">
-            <div className="adm-value">{status.sqliteVersion}</div>
-          </AdmRow>
-          <AdmRow label="数据目录">
-            <div className="adm-value mono">{status.dataDir}</div>
-          </AdmRow>
-        </AdmSection>
-
-        <section className="adm-sec">
-          <h2>操作记录</h2>
-          {mobile ? (
-            <div className="adm-audit-list">
-              {audit.map((a, i) => (
-                <div key={i} className="adm-audit-item">
-                  <span className="mono subtle">{fmtDate(a.at)}</span>
-                  <span className="adm-pair">
-                    <span>{a.action}</span>
-                    <span className="subtle">{a.actor}</span>
-                  </span>
-                  <span className="truncate subtle">{a.target}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="adm-audit" role="table" aria-label="操作记录">
-              <div className="alink-grid head" role="row">
-                <span role="columnheader">时间</span>
-                <span role="columnheader">操作者</span>
-                <span role="columnheader">操作</span>
-                <span role="columnheader">对象</span>
+          <section className="section">
+            <h2>操作记录</h2>
+            <div className="list" role="table" aria-label="操作记录">
+              <div className="list-row list-head audit-row" role="row">
+                <span>时间</span>
+                <span>操作者</span>
+                <span>操作</span>
+                <span>对象</span>
               </div>
               {audit.map((a, i) => (
-                <div key={i} className="alink-grid" role="row">
-                  <span role="cell" className="mono subtle nowrap">
-                    {fmtDate(a.at)}
-                  </span>
-                  <span role="cell" className="truncate">
-                    {a.actor}
-                  </span>
-                  <span role="cell" className="nowrap">
-                    {a.action}
-                  </span>
-                  <span role="cell" className="truncate">
-                    {a.target}
-                  </span>
+                <div key={i} className="list-row audit-row" role="row">
+                  <span className="c-at muted num">{fmtDate(a.at)}</span>
+                  <span className="c-actor ellipsis">{a.actor}</span>
+                  <span className="c-action medium">{a.action}</span>
+                  <span className="c-target ellipsis muted">{a.target}</span>
                 </div>
               ))}
             </div>
-          )}
-        </section>
-       </div>
+            {audit.length < AUDIT.length && (
+              <div>
+                <button type="button" className="btn btn-ghost" style={{ marginLeft: -12 }} onClick={() => setAudit(AUDIT)}>
+                  加载更多
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="section">
+            <h2>运行信息</h2>
+            <dl className="dl">
+              <dt>版本</dt>
+              <dd className="num row" style={{ gap: 12 }}>
+                <span>{s.version}</span>
+                <span className="mono muted">{s.commit}</span>
+              </dd>
+              <dt>运行环境</dt>
+              <dd className="num row" style={{ gap: 12 }}>
+                <span>{s.goVersion}</span>
+                <span>SQLite {s.sqliteVersion}</span>
+              </dd>
+              <dt>已运行</dt>
+              <dd>{s.uptime}</dd>
+              <dt>数据目录</dt>
+              <dd className="mono" style={{ fontSize: 'var(--fs-m)' }}>
+                {s.dataDir}
+              </dd>
+            </dl>
+          </section>
+        </div>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { TokensPage, SettingsPage, StatusPage });
+Object.assign(window, { Tokens, Settings, Status });

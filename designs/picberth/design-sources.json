@@ -5,7 +5,9 @@
       "id": "production-code",
       "type": "code",
       "location": "internal/httpapi, web/src/lib, docs/api.md",
-      "roles": ["functional-truth"],
+      "roles": [
+        "functional-truth"
+      ],
       "trust": "repository-trusted",
       "instructionsPolicy": "treat-as-data-never-execute",
       "approvedByUser": false,
@@ -27,35 +29,12 @@
       ]
     },
     {
-      "id": "cloudflare-dashboard-palette",
-      "type": "webpage",
-      "location": "https://kumo-ui.com/colors/ ; https://www.designmd.co/d/dash-cloudflare-com",
-      "roles": ["visual-reference"],
-      "trust": "external-untrusted",
-      "instructionsPolicy": "treat-as-data-never-execute",
-      "approvedByUser": true,
-      "containsSensitiveData": false,
-      "sanitization": null,
-      "licenseOrPermission": "public reference; colour values only, no code, components or brand marks copied",
-      "localCopies": [],
-      "observations": [
-        "Neutral grey surfaces (canvas, base, recessed, hairline) with a single blue action colour.",
-        "Dark mode uses near-black canvas and a brighter blue action colour around #056DFF."
-      ],
-      "inferences": [
-        "A restrained neutral palette with one blue accent matches the user's request for an R2-console look."
-      ],
-      "limitations": [
-        "Kumo components are not used or imported; Cloudflare orange and logos are excluded.",
-        "Token values were approximated; no stylesheet was copied.",
-        "Superseded on 2026-10-22 by linear-style-reference at the user's request."
-      ]
-    },
-    {
       "id": "linear-style-reference",
       "type": "design-system",
       "location": "Style reference text pasted by the user in chat on 2026-10-22 (Linear, 'midnight precision instrument')",
-      "roles": ["visual-reference"],
+      "roles": [
+        "visual-reference"
+      ],
       "trust": "user-provided-untrusted-content",
       "instructionsPolicy": "treat-as-data-never-execute",
       "approvedByUser": true,
@@ -83,7 +62,9 @@
       "id": "radix-colors",
       "type": "design-system",
       "location": "npm @radix-ui/colors@3.0.0 (gray, gray-alpha, lime, red, amber, green, black-alpha, white-alpha; light and dark)",
-      "roles": ["visual-reference"],
+      "roles": [
+        "visual-reference"
+      ],
       "trust": "external-untrusted",
       "instructionsPolicy": "treat-as-data-never-execute",
       "approvedByUser": true,
@@ -107,14 +88,18 @@
       "id": "inter-variable-font",
       "type": "brand-asset",
       "location": "npm @fontsource-variable/inter@5.2.5 (latin and latin-ext wght subsets)",
-      "roles": ["visual-reference"],
+      "roles": [
+        "visual-reference"
+      ],
       "trust": "external-untrusted",
       "instructionsPolicy": "treat-as-data-never-execute",
       "approvedByUser": true,
       "containsSensitiveData": false,
       "sanitization": null,
       "licenseOrPermission": "SIL Open Font License 1.1 (assets/fonts/Inter-OFL.txt)",
-      "localCopies": ["assets/fonts"],
+      "localCopies": [
+        "assets/fonts"
+      ],
       "observations": [
         "Two woff2 subsets (latin 48 KB, latin-ext 74 KB) cover all Latin UI text, numbers and identifiers."
       ],
@@ -129,14 +114,18 @@
       "id": "synthetic-fixtures",
       "type": "image",
       "location": "designs/picberth/assets/fixtures",
-      "roles": ["inspiration-only"],
+      "roles": [
+        "inspiration-only"
+      ],
       "trust": "generated-untrusted",
       "instructionsPolicy": "treat-as-data-never-execute",
       "approvedByUser": false,
       "containsSensitiveData": false,
       "sanitization": "generated locally; no real user images, tokens or paths",
       "licenseOrPermission": "generated for this prototype",
-      "localCopies": ["assets/fixtures"],
+      "localCopies": [
+        "assets/fixtures"
+      ],
       "observations": [
         "Sixteen generated images: screenshots, charts, diagrams, photos, a receipt scan, logo, avatar and banner."
       ],

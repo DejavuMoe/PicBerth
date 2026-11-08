@@ -2,8 +2,8 @@
 
 Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
 `internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
-The production SPA implements the approved prototype in `designs/picberth/` (console: single shell, design
-approved as `d4827e1`; auth and not-found screens). The earlier 「暗房」 design was
+The production SPA implements the prototype approved as `d4827e1`. On 2026-11-08 `designs/picberth/` was
+redesigned from scratch and awaits review; until it is approved, `d4827e1` stays the visual truth for production. The redesign drops 公开 / 私有 (every image is public); production and the API still carry visibility. The earlier 「暗房」 design was
 **rejected** by the user on 2026-10-21 and no longer exists in the code; it has no authority.
 
 ## Users and primary jobs
