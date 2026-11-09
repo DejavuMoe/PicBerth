@@ -1,9 +1,17 @@
 # syntax=docker/dockerfile:1
 
+ARG TARGETARCH
+# Use the same complete, checksummed pnpm distributions as mise.lock.
+FROM scratch AS pnpm-amd64
+ADD --checksum=sha256:502a275984a4cd01e5579ac72049a241091cac5118e44becf84951130c3e079e https://github.com/pnpm/pnpm/releases/download/v12.10.1/pnpm-linux-x64.tar.gz /pnpm.tar.gz
+FROM scratch AS pnpm-arm64
+ADD --checksum=sha256:18dbb118de1dbef0e4516c17bf847d6ee206fc4deffb2bb488ec8e1d2814e078 https://github.com/pnpm/pnpm/releases/download/v12.10.1/pnpm-linux-arm64.tar.gz /pnpm.tar.gz
+FROM pnpm-${TARGETARCH} AS pnpm
+
 # ---- web: build the Svelte SPA (Vite writes to /src/internal/webui/dist) ----
 FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS web
-ADD --checksum=sha256:992070e422dae33eac72268ffbde465e14dae81ed250149299d1fee3d842d60e https://registry.npmjs.org/pnpm/-/pnpm-12.10.1.tgz /tmp/pnpm.tgz
-RUN npm install -g --ignore-scripts /tmp/pnpm.tgz && rm /tmp/pnpm.tgz
+COPY --from=pnpm /pnpm.tar.gz /tmp/pnpm.tar.gz
+RUN mkdir /opt/pnpm && tar -xzf /tmp/pnpm.tar.gz -C /opt/pnpm && ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm && rm /tmp/pnpm.tar.gz
 WORKDIR /src/web
 # Wildcard so a missing pnpm-workspace.yaml does not break the COPY
 COPY web/package.json web/pnpm-*.yaml ./
