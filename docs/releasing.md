@@ -36,4 +36,4 @@ Release 附件使用与目标 CPU 相同的 Linux runner；Windows AMD64 和 mac
 两个架构先推送带 run ID、attempt 和架构的暂存标签，附件与镜像全部成功后才合并正式标签，保留 SBOM/provenance。
 演练输出 OCI 归档到 runner 临时目录，不推送仓库。原生 runner 的实际排队时间和冷/热缓存耗时需通过 Actions 演练测量。
 
-正式版本使用同一个完整标签：Git tag 和 GitHub Release 为 `v0.0.1`，Docker 镜像为 `ghcr.io/dejavumoe/picberth:v0.0.1`。不自动发布 `0.0.1`、`v0.0` 或 `latest` 别名。npm 包版本及程序内的语义版本仍使用 `0.0.1`；源码开发默认值保留 `-dev`。发布日志按中文、英文两节维护，功能、安装、安全提示和附件说明保持一致。
+正式版本使用同一个完整标签：Git tag 和 GitHub Release 为 `v0.0.1`，Docker 镜像为 `ghcr.io/dejavumoe/picberth:v0.0.1`。不自动发布 `0.0.1`、`v0.0` 或 `latest` 别名。程序内嵌及 API 返回版本统一为 `v0.0.1`；npm 包管理元数据仍使用 `0.0.1`，源码开发默认值为 `v0.0.1-dev`。发布日志按中文、英文两节维护，功能、安装、安全提示和附件说明保持一致。
