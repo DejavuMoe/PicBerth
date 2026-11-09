@@ -31,7 +31,7 @@ func runCLI(t *testing.T, stdin string, args ...string) result {
 
 func TestVersionAndUsage(t *testing.T) {
 	r := runCLI(t, "", "version")
-	if r.code != 0 || !strings.Contains(r.stdout, "picberth 0.0.1-dev") {
+	if r.code != 0 || !strings.Contains(r.stdout, "picberth v0.0.1-dev") {
 		t.Fatalf("version: %+v", r)
 	}
 	if r := runCLI(t, "", "frobnicate"); r.code != 2 {
