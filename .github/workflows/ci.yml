@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    # Validate a commit before a direct fast-forward to protected main.
+    branches: ['**']
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+env:
+  CGO_ENABLED: "0"
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Skip only documentation and design changes
+        id: filter
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag || -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}"; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            BASE=$(git merge-base "$BASE" "$HEAD")
+          fi
+          git diff --name-only --no-renames -z "$BASE" "$HEAD" > "$RUNNER_TEMP/changed-paths"
+          code=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              docs/*|designs/*|.agents/*) ;;
+              */*) code=true ;;
+              *.md|LICENSE|LICENSE.*) ;;
+              *) code=true ;;
+            esac
+          done < "$RUNNER_TEMP/changed-paths"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: mise run test
+      - name: Go vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Production dependency audit
+        working-directory: web
+        run: pnpm audit --prod --audit-level high
+
+  cross-compile:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          go-cache-suffix: ${{ matrix.goos }}-${{ matrix.goarch }}
+      - run: mise run web:build
+      - name: Cross-compile smoke build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -o dist/ ./cmd/picberth
+
+  e2e:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Resolve Playwright version
+        id: playwright
+        working-directory: web
+        run: echo "version=$(pnpm exec playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install browser system dependencies
+        working-directory: web
+        run: pnpm exec playwright install-deps chromium
+      - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        working-directory: web
+        run: pnpm exec playwright install chromium
+      - run: mise run web:e2e
+        env:
+          E2E_OUTPUT_DIR: ${{ runner.temp }}/picberth-e2e-artifacts
+      - name: Upload failed test traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-failures
+          path: ${{ runner.temp }}/picberth-e2e-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
+
+  docker:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          tags: picberth:ci
+          cache-from: type=gha,scope=picberth-ci
+          cache-to: type=gha,mode=max,scope=picberth-ci
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [changes, test, cross-compile, e2e, docker]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require successful jobs or an explicit docs-only skip
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -e '
+            .changes.result == "success" and
+            (if .changes.outputs.code == "false" then
+              [.test, .["cross-compile"], .e2e, .docker] | all(.result == "skipped")
+            elif .changes.outputs.code == "true" then
+              [.test, .["cross-compile"], .e2e, .docker] | all(.result == "success")
+            else false end)
+          ' <<< "$RESULTS"
