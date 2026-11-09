@@ -34,6 +34,9 @@ const PATHS = {
   alert: <><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3.25M8 10.75h.01" /></>,
   refresh: <><path d="M13 8a5 5 0 1 1-1.5-3.55M13 2.75V5h-2.25" /></>,
   edit: <><path d="M10.5 3 13 5.5 6 12.5H3.5V10Z" /></>,
+  folder: <><path d="M2.5 4.5a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1Z" /></>,
+  'folder-plus': <><path d="M8.5 12.5h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1V8M12 10v4M10 12h4" /></>,
+  external: <><path d="M9 3h4v4M13 3 7.5 8.5M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5" /></>,
 };
 function Icon({ name, size }) {
   return (
@@ -88,6 +91,7 @@ function useDismiss(open, refs, onClose) {
     if (!open) return;
     const down = (e) => {
       if (refs.some((r) => r.current && r.current.contains(e.target))) return;
+      if (e.target.closest?.('[data-nested]')) return;
       onClose();
     };
     const key = (e) => {
@@ -107,7 +111,7 @@ function useDismiss(open, refs, onClose) {
 }
 
 /** A trigger plus a floating layer. `trigger(props)` renders the button; `children(close)` the content. */
-function Popover({ trigger, children, align = 'end', className = 'menu', label }) {
+function Popover({ trigger, children, align = 'end', className = 'menu', label, nested }) {
   const [open, setOpen] = useState(false);
   const aRef = useRef(null);
   const fRef = useRef(null);
@@ -136,6 +140,7 @@ function Popover({ trigger, children, align = 'end', className = 'menu', label }
             className={className}
             role={className === 'menu' ? 'menu' : 'dialog'}
             aria-label={label}
+            data-nested={nested ? 'true' : undefined}
             onKeyDown={onKey}
             style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }}
           >
@@ -147,11 +152,12 @@ function Popover({ trigger, children, align = 'end', className = 'menu', label }
   );
 }
 
-function MenuItem({ icon, children, onClick, danger, end, checked, disabled }) {
+function MenuItem({ icon, children, onClick, danger, end, checked, disabled, indent = 0 }) {
   return (
     <button
       type="button"
       className={'menu-item' + (danger ? ' danger' : '')}
+      style={indent ? { paddingLeft: 8 + (indent - 1) * 16 } : undefined}
       role={checked === undefined ? 'menuitem' : 'menuitemradio'}
       aria-checked={checked}
       onClick={onClick}

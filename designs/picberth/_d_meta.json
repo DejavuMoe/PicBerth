@@ -7,9 +7,9 @@
       "versions": [
         {
           "path": "index.html",
-          "createdAt": "2026-10-21T12:27:29.586Z",
+          "createdAt": "2026-11-09T01:13:43.000Z",
           "status": "approved",
-          "subtitle": "从头重设计：工作区布局、上传托盘、链接复制、批量操作；Radix 色彩、三种字号、0.5px 线条",
+          "subtitle": "文件夹（最多 3 层）替代标签；路由整理；操作记录保留与筛选；令牌页 API 文档入口",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -21,17 +21,31 @@
       "versions": [
         {
           "path": "auth.html",
-          "createdAt": "2026-10-21T15:20:41.681Z",
+          "createdAt": "2026-11-09T01:13:43.000Z",
           "status": "approved",
+          "subtitle": "登录后回到来源页面",
           "viewport": {
             "width": 1440,
             "height": 900
-          },
-          "subtitle": "从头重设计：单列表单，无装饰"
+          }
+        }
+      ]
+    },
+    "API 文档": {
+      "versions": [
+        {
+          "path": "api-docs.html",
+          "createdAt": "2026-11-09T01:13:43.000Z",
+          "status": "approved",
+          "subtitle": "令牌使用的 API 参考页：认证、上传、图片、文件夹、错误、频率限制、客户端示例",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
         }
       ]
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-11-08T09:54:26.541Z"
+  "updatedAt": "2026-11-09T01:29:51Z"
 }

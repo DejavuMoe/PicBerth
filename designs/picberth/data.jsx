@@ -28,8 +28,8 @@ const PICS = {
 const TOKENS = [
   { id: 1, name: 'PicGo 笔记本', prefix: 'pb_7KQ2M', scopes: ['upload'], createdAt: NOW - 62 * DAY, lastUsedAt: NOW - 2 * HOUR, expiresAt: null, revokedAt: null },
   { id: 2, name: 'ShareX 工作机', prefix: 'pb_X4D9R', scopes: ['upload'], createdAt: NOW - 30 * DAY, lastUsedAt: NOW - 8 * MIN, expiresAt: NOW + 60 * DAY, revokedAt: null },
-  { id: 3, name: '备份脚本', prefix: 'pb_A0N3T', scopes: ['read'], createdAt: NOW - 120 * DAY, lastUsedAt: NOW - 9 * DAY, expiresAt: null, revokedAt: null },
-  { id: 5, name: '博客构建', prefix: 'pb_M2V6C', scopes: ['upload', 'read'], createdAt: NOW - 10 * DAY, lastUsedAt: null, expiresAt: NOW + 20 * DAY, revokedAt: null },
+  { id: 3, name: '备份脚本', prefix: 'pb_A0N3T', scopes: ['manage'], createdAt: NOW - 120 * DAY, lastUsedAt: NOW - 9 * DAY, expiresAt: null, revokedAt: null },
+  { id: 5, name: '博客构建', prefix: 'pb_M2V6C', scopes: ['upload', 'manage'], createdAt: NOW - 10 * DAY, lastUsedAt: null, expiresAt: NOW + 20 * DAY, revokedAt: null },
   { id: 4, name: '旧手机', prefix: 'pb_Q8W1Z', scopes: ['upload', 'manage'], createdAt: NOW - 200 * DAY, lastUsedAt: NOW - 90 * DAY, expiresAt: null, revokedAt: NOW - 40 * DAY },
 ];
 
@@ -40,41 +40,56 @@ const SOURCES = [
   { key: 'cli', label: '命令行' },
 ];
 
-// [fixture, filename, minutesAgo, source, tags, frames]
+// Folders: depth at most 3 (root-level folder = depth 1). Image rows point at a folder id or null (root).
+const MAX_DEPTH = 3;
+const FOLDERS = [
+  { id: 'travel', name: '旅行', parentId: null },
+  { id: 'y2026', name: '2026', parentId: 'travel' },
+  { id: 'yunnan', name: '云南', parentId: 'y2026' },
+  { id: 'y2025', name: '2025', parentId: 'travel' },
+  { id: 'blog', name: '博客', parentId: null },
+  { id: 'covers', name: '封面', parentId: 'blog' },
+  { id: 'shots', name: '截图', parentId: null },
+  { id: 'docs', name: '文档', parentId: null },
+  { id: 'architecture', name: '架构', parentId: 'docs' },
+  { id: 'brand', name: '品牌', parentId: null },
+  { id: 'receipts', name: '票据', parentId: null },
+];
+
+// [fixture, filename, minutesAgo, source, folderId, frames]
 const ROWS = [
-  ['dashboard-light.png', 'screenshot-2026-11-08-152210.png', 8, 'token:2', ['截图'], 1],
-  ['code-snippet.png', 'handler-retry.png', 24, 'token:1', ['截图', '博客'], 1],
-  ['architecture.png', '上传流程-v3.png', 70, 'web', ['文档', '架构'], 1],
-  ['mountain-dusk.jpg', 'IMG_4821.jpg', 150, 'web', ['旅行'], 1],
-  ['bar-chart.png', 'weekly-traffic.png', 300, 'token:1', ['博客'], 1],
-  ['banner-wide.webp', 'post-cover-dark.webp', 1440 + 40, 'web', ['博客', '封面'], 1],
-  ['dashboard-dark.png', 'screenshot-2026-11-07-221503.png', 1440 + 300, 'token:2', ['截图'], 1],
-  ['receipt-scan.jpg', 'receipt-2026-11.jpg', 1440 + 600, 'web', ['票据'], 1],
-  ['line-chart.png', 'latency-p95.png', 2 * 1440 + 100, 'token:1', ['博客'], 1],
-  ['lake-morning.jpg', 'IMG_4790.jpg', 3 * 1440, 'web', ['旅行'], 1],
-  ['logo-mark.png', 'logo-mark.png', 4 * 1440, 'cli', ['品牌'], 1],
-  ['settings-panel.png', 'settings-before.png', 5 * 1440, 'token:2', ['截图', '文档'], 1],
-  ['mobile-login.png', 'mobile-login.png', 6 * 1440, 'token:2', ['截图'], 1],
-  ['avatar.png', 'avatar-2026.png', 9 * 1440, 'web', ['品牌'], 1],
-  ['city-night.jpg', 'DSC_0112.jpg', 12 * 1440, 'web', ['旅行'], 1],
-  ['desert-noon.jpg', 'DSC_0098.jpg', 12 * 1440 + 20, 'web', ['旅行'], 1],
-  ['bar-chart.png', 'monthly-uploads.png', 18 * 1440, 'cli', ['文档'], 1],
-  ['code-snippet.png', 'loading-spinner.gif', 22 * 1440, 'token:1', ['博客'], 24],
-  ['architecture.png', '数据目录结构.png', 27 * 1440, 'web', ['文档', '架构'], 1],
-  ['dashboard-light.png', 'screenshot-2026-10-10-101144.png', 29 * 1440, 'token:2', ['截图'], 1],
-  ['banner-wide.webp', 'post-cover-light.webp', 35 * 1440, 'web', ['博客', '封面'], 1],
-  ['lake-morning.jpg', 'IMG_4402.jpg', 41 * 1440, 'web', ['旅行'], 1],
-  ['line-chart.png', 'error-rate.png', 48 * 1440, 'token:1', ['博客'], 1],
-  ['receipt-scan.jpg', 'invoice-0912.jpg', 52 * 1440, 'web', ['票据'], 1],
+  ['dashboard-light.png', 'screenshot-2026-11-08-152210.png', 8, 'token:2', null, 1],
+  ['code-snippet.png', 'handler-retry.png', 24, 'token:1', null, 1],
+  ['architecture.png', '上传流程-v3.png', 70, 'web', 'architecture', 1],
+  ['mountain-dusk.jpg', 'IMG_4821.jpg', 150, 'web', 'y2026', 1],
+  ['bar-chart.png', 'weekly-traffic.png', 300, 'token:1', 'blog', 1],
+  ['banner-wide.webp', 'post-cover-dark.webp', 1440 + 40, 'web', 'covers', 1],
+  ['dashboard-dark.png', 'screenshot-2026-11-07-221503.png', 1440 + 300, 'token:2', 'shots', 1],
+  ['receipt-scan.jpg', 'receipt-2026-11.jpg', 1440 + 600, 'web', 'receipts', 1],
+  ['line-chart.png', 'latency-p95.png', 2 * 1440 + 100, 'token:1', 'blog', 1],
+  ['lake-morning.jpg', 'IMG_4790.jpg', 3 * 1440, 'web', 'y2026', 1],
+  ['logo-mark.png', 'logo-mark.png', 4 * 1440, 'cli', 'brand', 1],
+  ['settings-panel.png', 'settings-before.png', 5 * 1440, 'token:2', 'shots', 1],
+  ['mobile-login.png', 'mobile-login.png', 6 * 1440, 'token:2', 'shots', 1],
+  ['avatar.png', 'avatar-2026.png', 9 * 1440, 'web', 'brand', 1],
+  ['city-night.jpg', 'DSC_0112.jpg', 12 * 1440, 'web', 'yunnan', 1],
+  ['desert-noon.jpg', 'DSC_0098.jpg', 12 * 1440 + 20, 'web', 'yunnan', 1],
+  ['bar-chart.png', 'monthly-uploads.png', 18 * 1440, 'cli', 'docs', 1],
+  ['code-snippet.png', 'loading-spinner.gif', 22 * 1440, 'token:1', 'blog', 24],
+  ['architecture.png', '数据目录结构.png', 27 * 1440, 'web', 'architecture', 1],
+  ['dashboard-light.png', 'screenshot-2026-10-10-101144.png', 29 * 1440, 'token:2', 'shots', 1],
+  ['banner-wide.webp', 'post-cover-light.webp', 35 * 1440, 'web', 'covers', 1],
+  ['lake-morning.jpg', 'IMG_4402.jpg', 41 * 1440, 'web', 'travel', 1],
+  ['line-chart.png', 'error-rate.png', 48 * 1440, 'token:1', 'blog', 1],
+  ['receipt-scan.jpg', 'invoice-0912.jpg', 52 * 1440, 'web', 'receipts', 1],
 ];
 
 // [..., trashedDaysAgo]
 const TRASH_ROWS = [
-  ['dashboard-dark.png', 'screenshot-old-draft.png', 3 * 1440, 'token:2', ['截图'], 1, 2],
-  ['code-snippet.png', 'typo-version.png', 7 * 1440, 'token:1', ['博客'], 1, 26],
-  ['city-night.jpg', 'blurry-night.jpg', 20 * 1440, 'web', ['旅行'], 1, 11],
+  ['dashboard-dark.png', 'screenshot-old-draft.png', 3 * 1440, 'token:2', 'shots', 1, 2],
+  ['code-snippet.png', 'typo-version.png', 7 * 1440, 'token:1', 'blog', 1, 26],
+  ['city-night.jpg', 'blurry-night.jpg', 20 * 1440, 'web', 'yunnan', 1, 11],
 ];
-
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
 function fakeId(seed) {
   let s = Math.imul(seed + 97, 2654435761) >>> 0 || 1;
@@ -102,7 +117,7 @@ function makeLinks(id, ext, name) {
 }
 
 function makeImage(row, i, trashed) {
-  const [file, name, minutesAgo, source, tags, frames, trashedDaysAgo] = row;
+  const [file, name, minutesAgo, source, folderId, frames, trashedDaysAgo] = row;
   const [w, h, fmt0] = PICS[file];
   const format = frames > 1 ? 'gif' : fmt0;
   const ext = format === 'jpeg' ? 'jpg' : format;
@@ -111,7 +126,7 @@ function makeImage(row, i, trashed) {
   const sha = Array.from({ length: 64 }, (_, k) => '0123456789abcdef'[(id.charCodeAt(k % 20) * (k + 7)) % 16]).join('');
   return {
     id, filename: name, thumb: `assets/fixtures/${file}`, format, ext, width: w, height: h, size, frames,
-    source, tags: [...tags], sha256: sha, createdAt: NOW - minutesAgo * MIN,
+    source, folderId, sha256: sha, createdAt: NOW - minutesAgo * MIN,
     trashedAt: trashed ? NOW - trashedDaysAgo * DAY : null, state: trashed ? 'trashed' : 'active',
     links: makeLinks(id, ext, name),
   };
@@ -124,13 +139,10 @@ function initialImages() {
 const SETTINGS = {
   maxUploadMB: 20,
   hardMaxMB: 100,
-  maxPixelsM: 50,
   allowedFormats: ['jpeg', 'png', 'gif', 'webp', 'avif'],
-  uploadsPerMinute: 60,
   dedupe: true,
   trashRetentionDays: 30,
-  sessionIdleMinutes: 30,
-  sessionAbsoluteHours: 12,
+  auditRetentionDays: 180,
   publicUrl: 'https://pics.example.com',
   imageUrl: 'https://img.example.com',
 };
@@ -153,17 +165,48 @@ const STATUS = {
   ],
 };
 
-const AUDIT = [
-  { at: NOW - 8 * MIN, actor: 'ShareX 工作机（#2）', action: '上传', target: 'screenshot-2026-11-08-152210.png' },
-  { at: NOW - 24 * MIN, actor: 'PicGo 笔记本（#1）', action: '上传', target: 'handler-retry.png' },
-  { at: NOW - 3 * HOUR, actor: 'admin', action: '重命名', target: 'IMG_4821.jpg' },
-  { at: NOW - 20 * HOUR, actor: '系统', action: '快速检查', target: '1287 张图片' },
-  { at: NOW - 1 * DAY, actor: 'admin', action: '移到回收站', target: 'screenshot-old-draft.png' },
-  { at: NOW - 2 * DAY, actor: 'admin', action: '修改设置', target: '回收站保留时间' },
-  { at: NOW - 9 * DAY, actor: 'admin', action: '创建快照', target: '20261030T030000Z' },
-  { at: NOW - 10 * DAY, actor: 'admin', action: '创建令牌', target: '博客构建' },
+const AUDIT_PAGE = 10;
+const AUDIT_KINDS = [
+  { value: '', label: '全部操作' },
+  { value: 'image', label: '图片' },
+  { value: 'folder', label: '文件夹' },
+  { value: 'token', label: '令牌' },
+  { value: 'settings', label: '设置' },
+  { value: 'system', label: '系统' },
+  { value: 'session', label: '登录' },
 ];
-
+const SX = 'ShareX 工作机（#2）';
+const PG = 'PicGo 笔记本（#1）';
+// [minutesAgo, actor, action, target, kind]
+const AUDIT = [
+  [8, SX, '上传', 'screenshot-2026-11-08-152210.png', 'image'],
+  [24, PG, '上传', 'handler-retry.png', 'image'],
+  [50, 'admin', '移动', '3 张图片', 'image'],
+  [3 * 60, 'admin', '重命名', 'IMG_4821.jpg', 'image'],
+  [5 * 60, 'admin', '创建文件夹', '旅行/2026/云南', 'folder'],
+  [20 * 60, '系统', '快速检查', '1287 张图片', 'system'],
+  [24 * 60, 'admin', '移到回收站', 'screenshot-old-draft.png', 'image'],
+  [26 * 60, 'admin', '重命名文件夹', '博客/封面', 'folder'],
+  [2 * 1440, 'admin', '修改设置', '回收站保留时间', 'settings'],
+  [2 * 1440 + 90, PG, '上传', 'latency-p95.png', 'image'],
+  [3 * 1440, 'admin', '移动文件夹', '品牌', 'folder'],
+  [4 * 1440, SX, '上传', 'mobile-login.png', 'image'],
+  [4 * 1440 + 40, 'admin', '登录', 'admin', 'session'],
+  [5 * 1440, 'admin', '删除文件夹', '临时', 'folder'],
+  [6 * 1440, 'admin', '恢复', 'typo-version.png', 'image'],
+  [9 * 1440, 'admin', '创建快照', '20261030T030000Z', 'system'],
+  [10 * 1440, 'admin', '创建令牌', '博客构建', 'token'],
+  [12 * 1440, PG, '上传', 'DSC_0112.jpg', 'image'],
+  [12 * 1440 + 30, PG, '上传', 'DSC_0098.jpg', 'image'],
+  [14 * 1440, 'admin', '登录', 'admin', 'session'],
+  [16 * 1440, '系统', '完整检查', '1287 张图片', 'system'],
+  [20 * 1440, 'admin', '永久删除', 'blurry-night.jpg', 'image'],
+  [30 * 1440, 'admin', '吊销令牌', '旧手机', 'token'],
+  [41 * 1440, 'admin', '修改设置', '单文件上限', 'settings'],
+  [62 * 1440, 'admin', '创建令牌', 'PicGo 笔记本', 'token'],
+  [90 * 1440, 'admin', '创建令牌', '旧手机', 'token'],
+  [120 * 1440, 'admin', '创建令牌', '备份脚本', 'token'],
+].map(([m, actor, action, target, kind]) => ({ at: NOW - m * MIN, actor, action, target, kind }));
 // ---------------------------------------------------------------- formatting
 
 function fmtBytes(n) {
@@ -213,12 +256,12 @@ const DATE_RANGES = [
   { key: '30d', label: '最近 30 天', since: () => NOW - 30 * DAY },
   { key: 'older', label: '30 天以前', until: () => NOW - 30 * DAY },
 ];
-const EMPTY_FILTERS = { q: '', formats: [], date: '', sources: [], tags: [] };
+const EMPTY_FILTERS = { q: '', formats: [], date: '', sources: [] };
 
 function applyFilters(list, f, sort) {
   const q = f.q.trim().toLowerCase();
   const out = list.filter((im) => {
-    if (q && !(im.filename.toLowerCase().includes(q) || im.id.startsWith(q) || im.sha256.startsWith(q) || im.tags.some((t) => t.includes(q)))) return false;
+    if (q && !(im.filename.toLowerCase().includes(q) || im.id.startsWith(q) || im.sha256.startsWith(q))) return false;
     if (f.formats.length && !f.formats.includes(im.format)) return false;
     if (f.date) {
       const r = DATE_RANGES.find((d) => d.key === f.date);
@@ -226,7 +269,6 @@ function applyFilters(list, f, sort) {
       if (r?.until && im.createdAt >= r.until()) return false;
     }
     if (f.sources.length && !f.sources.includes(im.source)) return false;
-    if (f.tags.length && !f.tags.every((t) => im.tags.includes(t))) return false;
     return true;
   });
   const by = {
@@ -240,13 +282,57 @@ function applyFilters(list, f, sort) {
 }
 
 function filterCount(f) {
-  return f.formats.length + (f.date ? 1 : 0) + f.sources.length + f.tags.length;
+  return f.formats.length + (f.date ? 1 : 0) + f.sources.length;
 }
 
-function tagCounts(list) {
-  const m = new Map();
-  for (const im of list) for (const t of im.tags) m.set(t, (m.get(t) ?? 0) + 1);
-  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+// ---------------------------------------------------------------- folders
+const ROOT_LABEL = '图片';
+const byName = (a, b) => a.name.localeCompare(b.name, 'zh-CN');
+const childrenOf = (folders, parentId) => folders.filter((f) => (f.parentId ?? null) === parentId).sort(byName);
+const folderById = (folders, id) => folders.find((f) => f.id === id);
+function folderChain(folders, id) {
+  const out = [];
+  for (let f = folderById(folders, id); f; f = folderById(folders, f.parentId)) out.unshift(f);
+  return out;
+}
+const folderDepth = (folders, id) => (id == null ? 0 : folderChain(folders, id).length);
+function folderLabel(folders, id) {
+  const chain = folderChain(folders, id);
+  return [ROOT_LABEL, ...chain.map((f) => f.name)].join(' / ');
+}
+function descendantIds(folders, id) {
+  const out = new Set();
+  const walk = (p) => childrenOf(folders, p).forEach((f) => (out.add(f.id), walk(f.id)));
+  walk(id);
+  return out;
+}
+function subtreeHeight(folders, id) {
+  const kids = childrenOf(folders, id);
+  return 1 + (kids.length ? Math.max(...kids.map((k) => subtreeHeight(folders, k.id))) : 0);
+}
+/** Moving `id` under `targetId` (null = root) must keep the deepest descendant at depth <= MAX_DEPTH. */
+const fitsUnder = (folders, id, targetId) => folderDepth(folders, targetId) + subtreeHeight(folders, id) <= MAX_DEPTH;
+/** Names -> folder id. null = root, undefined = no such folder. */
+function resolvePath(folders, names) {
+  let parent = null;
+  for (const n of names) {
+    const f = childrenOf(folders, parent).find((x) => x.name === n);
+    if (!f) return undefined;
+    parent = f.id;
+  }
+  return parent;
+}
+function libraryHash(folders, id) {
+  const names = folderChain(folders, id).map((f) => encodeURIComponent(f.name));
+  return '#/library' + names.map((n) => '/' + n).join('');
+}
+function folderNameError(folders, parentId, name, selfId) {
+  const n = name.trim();
+  if (!n) return '请输入名称';
+  if (n.length > 64) return '名称最多 64 个字符';
+  if (/[\\/]/.test(n)) return '名称不能包含 / 或 \\';
+  if (childrenOf(folders, parentId ?? null).some((f) => f.name === n && f.id !== selfId)) return '已有同名文件夹';
+  return '';
 }
 
 const LINK_FORMATS = [
@@ -264,12 +350,12 @@ const SORTS = [
 ];
 const SCOPES = [
   { key: 'upload', label: '上传' },
-  { key: 'read', label: '只读' },
   { key: 'manage', label: '管理' },
 ];
 
 Object.assign(window, {
   NOW, MIN, HOUR, DAY, IMG_HOST, TOKENS, SOURCES, SETTINGS, STATUS, AUDIT, FORMAT_LABEL, LINK_FORMATS, SORTS, SCOPES,
   DATE_RANGES, EMPTY_FILTERS, initialImages, makeLinks, fakeId, fmtBytes, fmtDate, fmtRel, sourceLabel, purgeIn,
-  applyFilters, filterCount, tagCounts,
+  applyFilters, filterCount, FOLDERS, MAX_DEPTH, ROOT_LABEL, AUDIT_KINDS, AUDIT_PAGE, childrenOf, folderById, folderChain,
+  folderDepth, folderLabel, descendantIds, subtreeHeight, fitsUnder, resolvePath, libraryHash, folderNameError,
 });

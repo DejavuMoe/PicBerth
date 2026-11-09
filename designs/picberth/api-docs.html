@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <title>API 文档 - PicBerth</title>
+    <link rel="stylesheet" href="styles.css?v=r5-1111" />
+    <script src="api-docs.js?v=r5-1111" defer></script>
+  </head>
+  <body>
+    <header class="doc-top">
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-word">PicBerth</span>
+      </span>
+      <a class="btn btn-secondary" href="/api/v1/openapi.json">
+        OpenAPI
+        <svg class="icon icon-s" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3h4v4M13 3 7.5 8.5M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5" /></svg>
+      </a>
+      <a class="btn btn-ghost" href="index.html#/tokens">令牌</a>
+    </header>
+
+    <div class="doc-layout">
+      <nav class="doc-toc" aria-label="目录">
+        <a href="#auth">认证</a>
+        <a href="#upload">上传</a>
+        <a href="#images">图片</a>
+        <a href="#folders">文件夹</a>
+        <a href="#errors">错误</a>
+        <a href="#limits">频率限制</a>
+        <a href="#clients">客户端</a>
+      </nav>
+
+      <main class="doc-main">
+        <section class="doc-sec" aria-labelledby="top">
+          <h1 id="top">API 文档</h1>
+          <dl class="dl">
+            <dt>地址</dt>
+            <dd class="mono">https://pics.example.com/api/v1</dd>
+            <dt>格式</dt>
+            <dd>JSON（UTF-8），上传使用 multipart/form-data</dd>
+          </dl>
+        </section>
+
+        <section class="doc-sec" id="auth">
+          <h2>认证</h2>
+          <p>在请求头中带上令牌。令牌不能放在查询字符串里。</p>
+          <div class="code"><pre>Authorization: Bearer pb_…</pre></div>
+          <div class="doc-scroll">
+            <table class="doc-table">
+              <thead>
+                <tr><th>权限</th><th>允许</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>上传</td><td>上传图片；只能读取自己上传的图片</td></tr>
+                <tr><td>管理</td><td>读取、上传、重命名、移动、删除图片；创建、重命名、移动、删除文件夹</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code"><pre>curl -H "Authorization: Bearer pb_…" \
+  "https://pics.example.com/api/v1/images?limit=2"</pre></div>
+        </section>
+
+        <section class="doc-sec" id="upload">
+          <h2>上传</h2>
+          <div class="ep-list">
+            <div class="ep">
+              <span class="m">POST</span>
+              <span class="p">/api/v1/images</span>
+              <span class="sc">上传</span>
+              <span class="d">上传一张图片</span>
+            </div>
+          </div>
+          <div class="doc-scroll">
+            <table class="doc-table">
+              <thead>
+                <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>file</code></td><td>文件</td><td>必填，图片文件</td></tr>
+                <tr><td><code>folder</code></td><td>文本</td><td>文件夹路径，例如 <code>旅行/2026</code>；省略时放在根目录；文件夹不存在时返回 <code>404</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code"><pre>curl -H "Authorization: Bearer pb_…" \
+  -F file=@image.png \
+  -F folder=旅行/2026 \
+  https://pics.example.com/api/v1/images</pre></div>
+          <div class="code"><pre>HTTP/1.1 201 Created
+
+{
+  "id": "7k2m9q4xw8bd3f6hz1ca",
+  "url": "https://img.example.com/i/7k2m9q4xw8bd3f6hz1ca.png",
+  "filename": "image.png",
+  "folder": "旅行/2026",
+  "size": 183224,
+  "width": 1440,
+  "height": 900,
+  "duplicate": false,
+  "links": {
+    "url": "https://img.example.com/i/7k2m9q4xw8bd3f6hz1ca.png",
+    "markdown": "![image](https://img.example.com/i/7k2m9q4xw8bd3f6hz1ca.png)",
+    "html": "&lt;img src=\"https://img.example.com/i/7k2m9q4xw8bd3f6hz1ca.png\" alt=\"image\"&gt;",
+    "bbcode": "[img]https://img.example.com/i/7k2m9q4xw8bd3f6hz1ca.png[/img]"
+  }
+}</pre></div>
+          <p>已存在相同的图片时返回 <code>200</code> 和 <code>"duplicate": true</code>，链接不变。</p>
+        </section>
+
+        <section class="doc-sec" id="images">
+          <h2>图片</h2>
+          <div class="ep-list">
+            <div class="ep">
+              <span class="m">GET</span>
+              <span class="p">/api/v1/images</span>
+              <span class="sc">管理</span>
+              <span class="d">列出图片</span>
+            </div>
+            <div class="ep">
+              <span class="m">GET</span>
+              <span class="p">/api/v1/images/{id}</span>
+              <span class="sc">管理</span>
+              <span class="d">获取图片</span>
+            </div>
+            <div class="ep">
+              <span class="m">PATCH</span>
+              <span class="p">/api/v1/images/{id}</span>
+              <span class="sc">管理</span>
+              <span class="d">重命名或移动图片</span>
+            </div>
+            <div class="ep">
+              <span class="m">DELETE</span>
+              <span class="p">/api/v1/images/{id}</span>
+              <span class="sc">管理</span>
+              <span class="d">移到回收站</span>
+            </div>
+            <div class="ep">
+              <span class="m">POST</span>
+              <span class="p">/api/v1/images/batch</span>
+              <span class="sc">管理</span>
+              <span class="d">批量移动、移到回收站、恢复，最多 500 张</span>
+            </div>
+          </div>
+          <div class="doc-scroll">
+            <table class="doc-table">
+              <thead>
+                <tr><th>查询参数</th><th>取值</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>folder</code></td><td>文件夹路径；空值表示根目录；带 <code>q</code> 或筛选时包含子文件夹</td></tr>
+                <tr><td><code>q</code></td><td>文件名、ID 或 SHA-256 前缀</td></tr>
+                <tr><td><code>format</code></td><td><code>jpeg</code> <code>png</code> <code>gif</code> <code>webp</code> <code>avif</code>，可重复</td></tr>
+                <tr><td><code>source</code></td><td><code>web</code> <code>cli</code> <code>token:&lt;id&gt;</code>，可重复</td></tr>
+                <tr><td><code>since</code> <code>until</code></td><td>RFC 3339 时间</td></tr>
+                <tr><td><code>sort</code></td><td><code>new</code> <code>old</code> <code>large</code> <code>small</code> <code>name</code></td></tr>
+                <tr><td><code>limit</code> <code>cursor</code></td><td>1 到 200，默认 60；<code>nextCursor</code> 翻页</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code"><pre>curl -X PATCH \
+  -H "Authorization: Bearer pb_…" \
+  -H "Content-Type: application/json" \
+  -d '{"folder": "旅行/2026/云南"}' \
+  https://pics.example.com/api/v1/images/7k2m9q4xw8bd3f6hz1ca</pre></div>
+          <div class="code"><pre>curl -X POST \
+  -H "Authorization: Bearer pb_…" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "move", "ids": ["7k2m9q4xw8bd3f6hz1ca"], "folder": ""}' \
+  https://pics.example.com/api/v1/images/batch</pre></div>
+        </section>
+
+        <section class="doc-sec" id="folders">
+          <h2>文件夹</h2>
+          <div class="ep-list">
+            <div class="ep">
+              <span class="m">GET</span>
+              <span class="p">/api/v1/folders</span>
+              <span class="sc">管理</span>
+              <span class="d">列出全部文件夹</span>
+            </div>
+            <div class="ep">
+              <span class="m">POST</span>
+              <span class="p">/api/v1/folders</span>
+              <span class="sc">管理</span>
+              <span class="d">创建文件夹</span>
+            </div>
+            <div class="ep">
+              <span class="m">PATCH</span>
+              <span class="p">/api/v1/folders/{id}</span>
+              <span class="sc">管理</span>
+              <span class="d">重命名或移动文件夹</span>
+            </div>
+            <div class="ep">
+              <span class="m">DELETE</span>
+              <span class="p">/api/v1/folders/{id}</span>
+              <span class="sc">管理</span>
+              <span class="d">删除空文件夹</span>
+            </div>
+          </div>
+          <dl class="dl">
+            <dt>层数</dt>
+            <dd>最多 3 层，例如 <code>旅行/2026/云南</code></dd>
+            <dt>名称</dt>
+            <dd>1 到 64 个字符，不含 <code>/</code> 和 <code>\</code>，同一层不能重名</dd>
+            <dt>删除</dt>
+            <dd>文件夹里有图片或子文件夹时返回 <code>folder-not-empty</code></dd>
+            <dt>链接</dt>
+            <dd>移动图片和文件夹不会改变图片链接</dd>
+          </dl>
+          <div class="code"><pre>curl -X POST \
+  -H "Authorization: Bearer pb_…" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "云南", "parent": "旅行/2026"}' \
+  https://pics.example.com/api/v1/folders</pre></div>
+          <div class="code"><pre>HTTP/1.1 201 Created
+
+{
+  "id": "3",
+  "name": "云南",
+  "path": "旅行/2026/云南",
+  "parent": "旅行/2026",
+  "imageCount": 0
+}</pre></div>
+        </section>
+
+        <section class="doc-sec" id="errors">
+          <h2>错误</h2>
+          <div class="code"><pre>HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+
+{
+  "type": "urn:picberth:problem:folder-not-empty",
+  "title": "Folder not empty",
+  "status": 409,
+  "detail": "The folder contains images or folders.",
+  "code": "folder-not-empty"
+}</pre></div>
+          <div class="doc-scroll">
+            <table class="doc-table">
+              <thead>
+                <tr><th>code</th><th class="r">状态</th><th>含义</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>validation</code></td><td class="r num">400</td><td>请求或字段无效</td></tr>
+                <tr><td><code>unauthorized</code></td><td class="r num">401</td><td>令牌缺失、无效或已吊销</td></tr>
+                <tr><td><code>forbidden</code></td><td class="r num">403</td><td>令牌权限不足</td></tr>
+                <tr><td><code>not-found</code></td><td class="r num">404</td><td>图片或文件夹不存在</td></tr>
+                <tr><td><code>conflict</code></td><td class="r num">409</td><td>当前状态不允许该操作</td></tr>
+                <tr><td><code>folder-exists</code></td><td class="r num">409</td><td>同一层已有同名文件夹</td></tr>
+                <tr><td><code>folder-not-empty</code></td><td class="r num">409</td><td>文件夹不为空</td></tr>
+                <tr><td><code>folder-depth</code></td><td class="r num">422</td><td>超过 3 层</td></tr>
+                <tr><td><code>too-large</code></td><td class="r num">413</td><td>超过单文件上限</td></tr>
+                <tr><td><code>unsupported-format</code></td><td class="r num">415</td><td>不支持的格式</td></tr>
+                <tr><td><code>invalid-image</code></td><td class="r num">422</td><td>图片已损坏</td></tr>
+                <tr><td><code>rate-limited</code></td><td class="r num">429</td><td>超过频率上限</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="doc-sec" id="limits">
+          <h2>频率限制</h2>
+          <p>上传每分钟最多 60 次。超出时返回 <code>429</code>，<code>Retry-After</code> 为等待的秒数。</p>
+          <div class="code"><pre>HTTP/1.1 429 Too Many Requests
+Retry-After: 12
+Content-Type: application/problem+json
+
+{ "code": "rate-limited", "status": 429 }</pre></div>
+        </section>
+
+        <section class="doc-sec" id="clients">
+          <h2>客户端</h2>
+          <h3>curl</h3>
+          <div class="code"><pre>curl -H "Authorization: Bearer pb_…" \
+  -F file=@image.png \
+  -F folder=旅行 \
+  https://pics.example.com/api/v1/images</pre></div>
+          <h3>PicGo</h3>
+          <div class="code"><pre>API 地址: https://pics.example.com/api/v1/images
+POST 参数名: file
+JSON 路径: url
+自定义请求头: {"Authorization":"Bearer pb_…"}
+自定义 Body: {"folder":"旅行"}</pre></div>
+          <h3>ShareX</h3>
+          <div class="code"><pre>{
+  "Version": "14.1.0",
+  "Name": "PicBerth",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://pics.example.com/api/v1/images",
+  "Headers": { "Authorization": "Bearer pb_…" },
+  "Body": "MultipartFormData",
+  "Arguments": { "folder": "旅行" },
+  "FileFormName": "file",
+  "URL": "{json:url}",
+  "ErrorMessage": "{json:detail}"
+}</pre></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
