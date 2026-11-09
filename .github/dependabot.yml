@@ -18,8 +18,21 @@ updates:
     directory: /web
     schedule:
       interval: weekly
+    ignore:
+      # svelte-check currently needs a separate migration for TypeScript 7.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
     groups:
       web:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directories:
+      - /.agents/skills/baoyu-design/agents/gen-pptx
+      - /.agents/skills/baoyu-design/agents/gen-video
+    schedule:
+      interval: weekly
+    groups:
+      design-tools:
         patterns: ["*"]
   - package-ecosystem: docker
     directory: /
