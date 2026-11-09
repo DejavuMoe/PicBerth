@@ -14,15 +14,12 @@ type User struct {
 	CreatedAt    int64
 }
 
-// Session is a browser login.
+// Session is a browser login. Expiry is derived from created_at/last_seen_at and fixed lifetimes.
 type Session struct {
 	IDHash     string
 	UserID     int64
 	CreatedAt  int64
 	LastSeenAt int64
-	ExpiresAt  int64
-	IP         string
-	UserAgent  string
 	Username   string // joined, read-only
 }
 
@@ -105,9 +102,8 @@ func (db *DB) SetPassword(ctx context.Context, userID int64, hash string) error 
 // CreateSession stores a new session.
 func (db *DB) CreateSession(ctx context.Context, s Session) error {
 	_, err := db.w.ExecContext(ctx,
-		`INSERT INTO sessions(id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		s.IDHash, s.UserID, s.CreatedAt, s.LastSeenAt, s.ExpiresAt, s.IP, s.UserAgent)
+		`INSERT INTO sessions(id_hash, user_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)`,
+		s.IDHash, s.UserID, s.CreatedAt, s.LastSeenAt)
 	return err
 }
 
@@ -115,9 +111,9 @@ func (db *DB) CreateSession(ctx context.Context, s Session) error {
 func (db *DB) GetSession(ctx context.Context, idHash string) (*Session, error) {
 	var s Session
 	err := db.r.QueryRowContext(ctx,
-		`SELECT s.id_hash, s.user_id, s.created_at, s.last_seen_at, s.expires_at, s.ip, s.user_agent, u.username
+		`SELECT s.id_hash, s.user_id, s.created_at, s.last_seen_at, u.username
 		 FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id_hash = ?`, idHash).
-		Scan(&s.IDHash, &s.UserID, &s.CreatedAt, &s.LastSeenAt, &s.ExpiresAt, &s.IP, &s.UserAgent, &s.Username)
+		Scan(&s.IDHash, &s.UserID, &s.CreatedAt, &s.LastSeenAt, &s.Username)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

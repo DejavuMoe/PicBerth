@@ -14,6 +14,8 @@
     minWidth?: number | undefined;
     /** The floating-layer class: `menu` or `popover`. */
     class?: string;
+    /** A layer opened from inside another popover: presses here must not dismiss the outer one. */
+    nested?: boolean;
     el?: HTMLElement | null;
     children: Snippet;
   }
@@ -25,6 +27,7 @@
     matchWidth = false,
     minWidth,
     class: className = 'menu',
+    nested = false,
     el = $bindable(null),
     children,
     ...rest
@@ -37,6 +40,8 @@
     const down = (e: PointerEvent) => {
       const t = e.target;
       if (!(t instanceof Node) || layer.contains(t) || anchor?.contains(t)) return;
+      // A menu opened from inside this popover lives in its own layer.
+      if (t instanceof Element && t.closest('[data-nested]')) return;
       onclose();
     };
     const key = (e: KeyboardEvent) => {
@@ -54,6 +59,14 @@
   });
 </script>
 
-<div bind:this={el} class={className} use:portal use:place={{ anchor, align, up, matchWidth, minWidth }} data-float {...rest}>
+<div
+  bind:this={el}
+  class={className}
+  use:portal
+  use:place={{ anchor, align, up, matchWidth, minWidth }}
+  data-float
+  data-nested={nested ? 'true' : undefined}
+  {...rest}
+>
   {@render children()}
 </div>

@@ -34,27 +34,26 @@ func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 // ImageView is the API representation of an image (docs/api.md §3).
 type ImageView struct {
-	ID         string      `json:"id"`
-	URL        string      `json:"url"`
-	Filename   string      `json:"filename"`
-	Mime       string      `json:"mime"`
-	Ext        string      `json:"ext"`
-	Size       int64       `json:"size"`
-	Width      int         `json:"width"`
-	Height     int         `json:"height"`
-	Frames     int         `json:"frames"`
-	SHA256     string      `json:"sha256"`
-	Visibility string      `json:"visibility"`
-	State      string      `json:"state"`
-	HasGPS     bool        `json:"hasGps"`
-	HasThumb   bool        `json:"hasThumb"`
-	Broken     bool        `json:"broken"`
-	Duplicate  bool        `json:"duplicate"`
-	Source     ImageSource `json:"source"`
-	Tags       []string    `json:"tags"`
-	CreatedAt  string      `json:"createdAt"`
-	TrashedAt  *string     `json:"trashedAt"`
-	Links      ImageLinks  `json:"links"`
+	ID        string      `json:"id"`
+	URL       string      `json:"url"`
+	Filename  string      `json:"filename"`
+	FolderID  *string     `json:"folderId"`
+	Mime      string      `json:"mime"`
+	Ext       string      `json:"ext"`
+	Size      int64       `json:"size"`
+	Width     int         `json:"width"`
+	Height    int         `json:"height"`
+	Frames    int         `json:"frames"`
+	SHA256    string      `json:"sha256"`
+	State     string      `json:"state"`
+	HasGPS    bool        `json:"hasGps"`
+	HasThumb  bool        `json:"hasThumb"`
+	Broken    bool        `json:"broken"`
+	Duplicate bool        `json:"duplicate"`
+	Source    ImageSource `json:"source"`
+	CreatedAt string      `json:"createdAt"`
+	TrashedAt *string     `json:"trashedAt"`
+	Links     ImageLinks  `json:"links"`
 }
 
 // ImageSource says how an image arrived.
@@ -79,11 +78,10 @@ func (s *Service) view(im *meta.Image) ImageView {
 		alt = "image"
 	}
 	v := ImageView{
-		ID: im.ID, URL: url, Filename: im.OriginalName, Mime: im.Mime, Ext: im.Ext, Size: im.Size,
-		Width: im.Width, Height: im.Height, Frames: im.Frames, SHA256: im.SHA256, Visibility: im.Visibility,
+		ID: im.ID, URL: url, Filename: im.OriginalName, FolderID: im.FolderID, Mime: im.Mime, Ext: im.Ext, Size: im.Size,
+		Width: im.Width, Height: im.Height, Frames: im.Frames, SHA256: im.SHA256,
 		State: im.State, HasGPS: im.HasGPS, HasThumb: im.Thumb == "jpg" || im.Thumb == "png", Broken: im.BrokenAt != nil,
 		Source:    ImageSource{Kind: im.Source},
-		Tags:      []string{},
 		CreatedAt: fmtTime(im.CreatedAt), TrashedAt: fmtTimePtr(im.TrashedAt),
 		Links: ImageLinks{
 			URL:      url,
@@ -97,17 +95,6 @@ func (s *Service) view(im *meta.Image) ImageView {
 		v.Source.TokenName = im.TokenName
 	}
 	return v
-}
-
-// viewTagged is view plus the image's tags.
-func (s *Service) viewTagged(ctx context.Context, im *meta.Image) (ImageView, error) {
-	tags, err := s.db.TagsFor(ctx, []string{im.ID})
-	if err != nil {
-		return ImageView{}, err
-	}
-	v := s.view(im)
-	v.Tags = tags[im.ID]
-	return v, nil
 }
 
 func mdEscape(s string) string {
@@ -156,32 +143,34 @@ func (s *Service) GetImage(ctx context.Context, p Principal, id string) (ImageVi
 	if err != nil {
 		return ImageView{}, err
 	}
-	return s.viewTagged(ctx, im)
+	return s.view(im), nil
 }
 
-// ListParams are the parsed list query parameters.
+// ListParams are the parsed list query parameters. Folder is empty (every folder), "root" or a folder id;
+// Recursive widens an explicit folder to its whole subtree.
 type ListParams struct {
-	State      string
-	Q          string
-	Format     string   // one format name, or several separated by commas
-	Formats    []string // repeated format values (each may also be comma-separated); any-of with Format
-	Tags       []string // image must carry all of them
-	Sources    []string // any of: "web", "cli", "token:<id>"
-	Visibility string
-	TokenID    *int64
-	Since      *time.Time // created at or after
-	Until      *time.Time // created before
-	Sort       string
-	Limit      int
-	Cursor     string
+	State     string
+	Q         string
+	Formats   []string // repeated format values (each may also be comma-separated); any-of
+	Sources   []string // any of: "web", "cli", "token:<id>"
+	TokenID   *int64
+	Folder    string
+	Recursive bool
+	Since     *time.Time // created at or after
+	Until     *time.Time // created before
+	Sort      string
+	Limit     int
+	Cursor    string
 }
 
 type cursorToken struct {
-	Sort   string `json:"s"`
-	State  string `json:"t"`
-	Key    int64  `json:"k"`
-	StrKey string `json:"n,omitempty"` // name sort only
-	ID     string `json:"i"`
+	Sort      string `json:"s"`
+	State     string `json:"t"`
+	Folder    string `json:"f,omitempty"`
+	Recursive bool   `json:"r,omitempty"`
+	Key       int64  `json:"k"`
+	StrKey    string `json:"n,omitempty"` // name sort only
+	ID        string `json:"i"`
 }
 
 const maxFilterValues = 50
@@ -280,24 +269,13 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if lp.Limit < 1 || lp.Limit > 200 {
 		return nil, "", validation("limit must be between 1 and 200.")
 	}
-	if lp.Visibility != "" && lp.Visibility != "public" && lp.Visibility != "private" {
-		return nil, "", validation("visibility must be public or private.")
-	}
-	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), Visibility: lp.Visibility, TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
+	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
 	if len(q.Q) > 200 {
 		return nil, "", validation("q is too long.")
 	}
 	var err error
-	if q.Exts, err = parseExts([]string{lp.Format}, lp.Formats); err != nil {
+	if q.Exts, err = parseExts(lp.Formats); err != nil {
 		return nil, "", err
-	}
-	for _, t := range lp.Tags {
-		if t = strings.TrimSpace(t); t != "" && !slices.Contains(q.Tags, t) {
-			q.Tags = append(q.Tags, t)
-		}
-	}
-	if len(q.Tags) > maxTagsPerImage {
-		return nil, "", validation("At most %d tags can be combined.", maxTagsPerImage)
 	}
 	if q.Sources, err = parseSources(lp.Sources); err != nil {
 		return nil, "", err
@@ -310,6 +288,27 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 		ms := lp.Until.UnixMilli()
 		q.Until = &ms
 	}
+	if lp.Folder != "" {
+		if lp.Folder == "root" {
+			if !lp.Recursive {
+				q.FolderRoot = true
+			}
+		} else {
+			f, err := s.resolveFolder(ctx, p, lp.Folder)
+			if err != nil {
+				return nil, "", err
+			}
+			if lp.Recursive {
+				idsInTree, _, err := s.db.FolderSubtree(ctx, f.ID)
+				if err != nil {
+					return nil, "", err
+				}
+				q.FolderIDs = idsInTree
+			} else {
+				q.FolderID = &f.ID
+			}
+		}
+	}
 	owner, token := p.listScope()
 	if token != nil {
 		q.TokenID = token
@@ -318,7 +317,8 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if lp.Cursor != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(lp.Cursor)
 		var ct cursorToken
-		if err != nil || json.Unmarshal(raw, &ct) != nil || ct.Sort != lp.Sort || ct.State != lp.State || !ids.ValidImageID(ct.ID) {
+		if err != nil || json.Unmarshal(raw, &ct) != nil || ct.Sort != lp.Sort || ct.State != lp.State ||
+			ct.Folder != lp.Folder || ct.Recursive != lp.Recursive || !ids.ValidImageID(ct.ID) {
 			return nil, "", validation("Invalid cursor.")
 		}
 		q.After = &meta.Cursor{Key: ct.Key, StrKey: ct.StrKey, ID: ct.ID}
@@ -331,7 +331,7 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 	if len(rows) > lp.Limit {
 		rows = rows[:lp.Limit]
 		last := rows[len(rows)-1]
-		ct := cursorToken{Sort: lp.Sort, State: lp.State, Key: last.CreatedAt, ID: last.ID}
+		ct := cursorToken{Sort: lp.Sort, State: lp.State, Folder: lp.Folder, Recursive: lp.Recursive, Key: last.CreatedAt, ID: last.ID}
 		switch lp.Sort {
 		case "large", "small":
 			ct.Key = last.Size
@@ -341,30 +341,19 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 		b, _ := json.Marshal(ct)
 		next = base64.RawURLEncoding.EncodeToString(b)
 	}
-	imageIDs := make([]string, len(rows))
-	for i := range rows {
-		imageIDs[i] = rows[i].ID
-	}
-	tags, err := s.db.TagsFor(ctx, imageIDs) // one query for the whole page
-	if err != nil {
-		return nil, "", err
-	}
 	out := make([]ImageView, len(rows))
 	for i := range rows {
 		out[i] = s.view(&rows[i])
-		out[i].Tags = tags[rows[i].ID]
 	}
 	return out, next, nil
 }
 
 // Facets are the library counts served by GET /api/v1/images/facets.
 type Facets struct {
-	Total      int64            `json:"total"`
-	Bytes      int64            `json:"bytes"`
-	Formats    map[string]int64 `json:"formats"`
-	Visibility map[string]int64 `json:"visibility"`
-	Sources    []FacetSource    `json:"sources"`
-	Tags       []FacetTag       `json:"tags"`
+	Total   int64            `json:"total"`
+	Bytes   int64            `json:"bytes"`
+	Formats map[string]int64 `json:"formats"`
+	Sources []FacetSource    `json:"sources"`
 }
 
 // FacetSource counts the images of one source (web, cli or a single token).
@@ -374,12 +363,6 @@ type FacetSource struct {
 	TokenID   *int64 `json:"tokenId,omitempty"`
 	TokenName string `json:"tokenName,omitempty"`
 	Count     int64  `json:"count"`
-}
-
-// FacetTag counts the images carrying one tag.
-type FacetTag struct {
-	Tag   string `json:"tag"`
-	Count int64  `json:"count"`
 }
 
 // ImageFacets counts the principal's whole visible set for a state (default active), ignoring list filters.
@@ -406,10 +389,8 @@ func (s *Service) ImageFacets(ctx context.Context, p Principal, state string) (F
 	}
 	f := Facets{
 		Total: mf.Total, Bytes: mf.Bytes,
-		Formats:    map[string]int64{},
-		Visibility: map[string]int64{"public": mf.Visibility["public"], "private": mf.Visibility["private"]},
-		Sources:    []FacetSource{},
-		Tags:       []FacetTag{},
+		Formats: map[string]int64{},
+		Sources: []FacetSource{},
 	}
 	for _, fm := range imaging.AllFormats {
 		f.Formats[string(fm)] = mf.Exts[fm.Ext()]
@@ -441,51 +422,34 @@ func (s *Service) ImageFacets(ctx context.Context, p Principal, state string) (F
 	if cli != nil {
 		f.Sources = append(f.Sources, *cli)
 	}
-	for _, tc := range mf.Tags {
-		f.Tags = append(f.Tags, FacetTag{Tag: tc.Tag, Count: tc.Count})
-	}
 	return f, nil
 }
 
-// SetVisibility changes an image's visibility.
-func (s *Service) SetVisibility(ctx context.Context, p Principal, id, vis string) (ImageView, error) {
-	if p.Kind == KindAnonymous {
-		return ImageView{}, unauthorized()
-	}
-	if !p.CanManage() {
-		return ImageView{}, forbidden("Changing visibility requires the manage scope.")
-	}
-	if vis != "public" && vis != "private" {
-		return ImageView{}, validation("visibility must be public or private.")
-	}
-	im, err := s.getVisible(ctx, p, id)
-	if err != nil {
-		return ImageView{}, err
-	}
-	unlock := s.lockImage(id)
-	defer unlock.Unlock()
-	ok, err := s.db.SetVisibility(ctx, id, vis)
-	if err != nil {
-		return ImageView{}, err
-	}
-	if !ok {
-		return ImageView{}, notFound()
-	}
-	if im.Visibility != vis {
-		s.audit(ctx, p, "image.visibility", id, im.Visibility+" -> "+vis)
-	}
-	im.Visibility = vis
-	return s.viewTagged(ctx, im)
-}
-
-// ImagePatch is the set of changes PatchImage applies; nil fields are left alone.
+// ImagePatch is the set of changes PatchImage applies; nil fields are left alone. MoveFolder with a nil
+// FolderID moves the image to the root.
 type ImagePatch struct {
-	Visibility *string
 	Filename   *string
-	Tags       *[]string // replaces the full tag set
+	FolderID   *string
+	MoveFolder bool
 }
 
-// PatchImage changes visibility, display name and tags of an image in one transaction.
+// sameFolder compares two optional folder ids.
+func sameFolder(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// folderLabel renders a folder reference for audit details.
+func folderLabel(id *string) string {
+	if id == nil {
+		return "root"
+	}
+	return *id
+}
+
+// PatchImage changes the display name and/or folder of an image in one transaction.
 func (s *Service) PatchImage(ctx context.Context, p Principal, id string, patch ImagePatch) (ImageView, error) {
 	if p.Kind == KindAnonymous {
 		return ImageView{}, unauthorized()
@@ -493,16 +457,10 @@ func (s *Service) PatchImage(ctx context.Context, p Principal, id string, patch 
 	if !p.CanManage() {
 		return ImageView{}, forbidden("Changing an image requires the manage scope.")
 	}
-	if patch.Visibility == nil && patch.Filename == nil && patch.Tags == nil {
-		return ImageView{}, validation("Provide at least one of visibility, filename or tags.")
+	if patch.Filename == nil && !patch.MoveFolder {
+		return ImageView{}, validation("Provide at least one of filename or folderId.")
 	}
 	var mp meta.ImagePatch
-	if patch.Visibility != nil {
-		if *patch.Visibility != "public" && *patch.Visibility != "private" {
-			return ImageView{}, validation("visibility must be public or private.")
-		}
-		mp.Visibility = patch.Visibility
-	}
 	if patch.Filename != nil {
 		name, err := normalizeFilename(*patch.Filename)
 		if err != nil {
@@ -510,12 +468,15 @@ func (s *Service) PatchImage(ctx context.Context, p Principal, id string, patch 
 		}
 		mp.Name = &name
 	}
-	if patch.Tags != nil {
-		tags, err := normalizeTags(*patch.Tags)
-		if err != nil {
-			return ImageView{}, err
+	if patch.MoveFolder {
+		if patch.FolderID != nil {
+			f, err := s.resolveFolder(ctx, p, *patch.FolderID)
+			if err != nil {
+				return ImageView{}, err
+			}
+			mp.FolderID = &f.ID
 		}
-		mp.Tags = &tags
+		mp.MoveFolder = true
 	}
 	im, err := s.getVisible(ctx, p, id)
 	if err != nil {
@@ -523,39 +484,81 @@ func (s *Service) PatchImage(ctx context.Context, p Principal, id string, patch 
 	}
 	unlock := s.lockImage(id)
 	defer unlock.Unlock()
-	old, err := s.db.TagsFor(ctx, []string{id})
-	if err != nil {
-		return ImageView{}, err
-	}
 	ok, err := s.db.PatchImage(ctx, id, mp)
 	if err != nil {
+		if errors.Is(err, meta.ErrNotFound) { // moved into a folder deleted concurrently
+			return ImageView{}, notFound()
+		}
 		return ImageView{}, err
 	}
 	if !ok {
 		return ImageView{}, notFound()
 	}
-	tags := old[id]
-	if mp.Visibility != nil && im.Visibility != *mp.Visibility {
-		s.audit(ctx, p, "image.visibility", id, im.Visibility+" -> "+*mp.Visibility)
-	}
 	if mp.Name != nil && im.OriginalName != *mp.Name {
 		s.audit(ctx, p, "image.rename", id, *mp.Name)
-	}
-	if mp.Tags != nil {
-		if !slices.Equal(tags, *mp.Tags) {
-			s.audit(ctx, p, "image.tags", id, strings.Join(*mp.Tags, ","))
-		}
-		tags = *mp.Tags
-	}
-	if mp.Visibility != nil {
-		im.Visibility = *mp.Visibility
-	}
-	if mp.Name != nil {
 		im.OriginalName = *mp.Name
 	}
-	v := s.view(im)
-	v.Tags = tags
-	return v, nil
+	if mp.MoveFolder && !sameFolder(im.FolderID, mp.FolderID) {
+		s.audit(ctx, p, "image.move", id, folderLabel(im.FolderID)+" -> "+folderLabel(mp.FolderID))
+		im.FolderID = mp.FolderID
+	}
+	return s.view(im), nil
+}
+
+// MoveImage moves one image to another folder (nil = root).
+func (s *Service) MoveImage(ctx context.Context, p Principal, id string, folderID *string) (ImageView, error) {
+	if p.Kind == KindAnonymous {
+		return ImageView{}, unauthorized()
+	}
+	if !p.CanManage() {
+		return ImageView{}, forbidden("Moving an image requires the manage scope.")
+	}
+	im, err := s.getVisible(ctx, p, id)
+	if err != nil {
+		return ImageView{}, err
+	}
+	if err := s.checkFolderRef(ctx, p, folderID); err != nil {
+		return ImageView{}, err
+	}
+	return s.applyMove(ctx, p, im, folderID)
+}
+
+// checkFolderRef validates a folder reference without locking (nil and "root" mean the root).
+func (s *Service) checkFolderRef(ctx context.Context, p Principal, folderID *string) error {
+	if folderID == nil || *folderID == "" || *folderID == "root" {
+		return nil
+	}
+	_, err := s.resolveFolder(ctx, p, *folderID)
+	return err
+}
+
+// applyMove is MoveImage with an already-authorized, already-resolved folder reference.
+func (s *Service) applyMove(ctx context.Context, p Principal, im *meta.Image, folderID *string) (ImageView, error) {
+	var target *string
+	if folderID != nil && *folderID != "" && *folderID != "root" {
+		f, err := s.resolveFolder(ctx, p, *folderID)
+		if err != nil {
+			return ImageView{}, err
+		}
+		target = &f.ID
+	}
+	unlock := s.lockImage(im.ID)
+	defer unlock.Unlock()
+	ok, err := s.db.PatchImage(ctx, im.ID, meta.ImagePatch{FolderID: target, MoveFolder: true})
+	if err != nil {
+		if errors.Is(err, meta.ErrNotFound) { // moved into a folder deleted concurrently
+			return ImageView{}, notFound()
+		}
+		return ImageView{}, err
+	}
+	if !ok {
+		return ImageView{}, notFound()
+	}
+	if !sameFolder(im.FolderID, target) {
+		s.audit(ctx, p, "image.move", im.ID, folderLabel(im.FolderID)+" -> "+folderLabel(target))
+		im.FolderID = target
+	}
+	return s.view(im), nil
 }
 
 // Trash moves an image to the trash. Trashing a trashed image is a no-op. With a retention of 0 days
@@ -602,7 +605,7 @@ func (s *Service) Trash(ctx context.Context, p Principal, id string) error {
 	return nil
 }
 
-// Restore brings an image back from the trash.
+// Restore brings an image back from the trash (to the root when its folder was deleted meanwhile).
 func (s *Service) Restore(ctx context.Context, p Principal, id string) (ImageView, error) {
 	if p.Kind == KindAnonymous {
 		return ImageView{}, unauthorized()
@@ -646,7 +649,7 @@ func (s *Service) Restore(ctx context.Context, p Principal, id string) (ImageVie
 		s.enqueueThumb(id)
 	}
 	im.State, im.TrashedAt = meta.StateActive, nil
-	return s.viewTagged(ctx, im)
+	return s.view(im), nil
 }
 
 // Purge permanently deletes a trashed image's file; the record stays as a tombstone.
@@ -751,8 +754,9 @@ type BatchResult struct {
 	Code string `json:"code,omitempty"`
 }
 
-// Batch applies one action to up to 500 images. Per-image failures are reported, not fatal.
-func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, visibility string) ([]BatchResult, error) {
+// Batch applies one action to up to 500 images. Per-image failures are reported, not fatal. For move,
+// folderID is the destination (nil = root) and is resolved once for the whole batch.
+func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, folderID *string) ([]BatchResult, error) {
 	if p.Kind == KindAnonymous {
 		return nil, unauthorized()
 	}
@@ -760,15 +764,17 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 		return nil, forbidden("Batch operations require the manage scope.")
 	}
 	switch action {
-	case "trash", "restore", "purge", "visibility":
+	case "trash", "restore", "purge", "move":
 	default:
-		return nil, validation("action must be trash, restore, purge or visibility.")
-	}
-	if action == "visibility" && visibility != "public" && visibility != "private" {
-		return nil, validation("visibility must be public or private.")
+		return nil, validation("action must be trash, restore, purge or move.")
 	}
 	if len(idList) == 0 || len(idList) > 500 {
 		return nil, validation("ids must contain between 1 and 500 entries.")
+	}
+	if action == "move" {
+		if err := s.checkFolderRef(ctx, p, folderID); err != nil {
+			return nil, err
+		}
 	}
 	seen := make(map[string]bool, len(idList))
 	results := make([]BatchResult, 0, len(idList))
@@ -785,8 +791,13 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 			_, err = s.Restore(ctx, p, id)
 		case "purge":
 			err = s.Purge(ctx, p, id)
-		case "visibility":
-			_, err = s.SetVisibility(ctx, p, id, visibility)
+		case "move":
+			im, gerr := s.getVisible(ctx, p, id)
+			if gerr != nil {
+				err = gerr
+			} else {
+				_, err = s.applyMove(ctx, p, im, folderID)
+			}
 		}
 		r := BatchResult{ID: id, OK: err == nil}
 		if err != nil {
@@ -828,7 +839,7 @@ func (s *Service) openedFrom(im *meta.Image, f *os.File, ctype string) (*Opened,
 	return &Opened{Image: im, File: f, Size: st.Size(), ModTime: st.ModTime(), ContentType: ctype}, nil
 }
 
-// OpenRaw opens the original bytes for a principal allowed to read this image (including private ones).
+// OpenRaw opens the original bytes for a principal allowed to read this image.
 func (s *Service) OpenRaw(ctx context.Context, p Principal, id string) (*Opened, error) {
 	im, err := s.getVisible(ctx, p, id)
 	if err != nil {
@@ -887,7 +898,7 @@ type PublicInfo struct {
 	key         string
 }
 
-// LookupPublic finds an active, public, healthy image by id and canonical extension.
+// LookupPublic finds an active, healthy image by id and canonical extension. Every active image is public.
 func (s *Service) LookupPublic(ctx context.Context, id, ext string) (*PublicInfo, error) {
 	if !ids.ValidImageID(id) {
 		return nil, notFound()
@@ -899,7 +910,7 @@ func (s *Service) LookupPublic(ctx context.Context, id, ext string) (*PublicInfo
 		}
 		return nil, err
 	}
-	if im.State != meta.StateActive || im.Visibility != "public" || im.BrokenAt != nil || im.Ext != ext {
+	if im.State != meta.StateActive || im.BrokenAt != nil || im.Ext != ext {
 		return nil, notFound()
 	}
 	return &PublicInfo{ID: im.ID, Ext: im.Ext, SHA256: im.SHA256, ContentType: im.Mime, Size: im.Size,

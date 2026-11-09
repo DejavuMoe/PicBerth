@@ -1,6 +1,6 @@
 // Tiny History API router: exact paths only, query params, link interception, leave guards.
 
-export const ROUTES = ['/', '/login', '/setup', '/library', '/trash', '/tokens', '/settings', '/status'] as const;
+export const ROUTES = ['/', '/login', '/setup', '/library', '/trash', '/tokens', '/settings', '/status', '/docs/api'] as const;
 
 const state = $state({ path: normalize(location.pathname), search: location.search });
 
@@ -20,8 +20,37 @@ function normalize(path: string): string {
   return path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
 }
 
+/** `/library` and any `/library/<folder names>` path inside it. */
+export function isLibraryPath(path: string): boolean {
+  const p = normalize(path);
+  return p === '/library' || p.startsWith('/library/');
+}
+
 export function isKnownPath(path: string): boolean {
-  return (ROUTES as readonly string[]).includes(normalize(path));
+  const p = normalize(path);
+  return (ROUTES as readonly string[]).includes(p) || isLibraryPath(p);
+}
+
+/** Decoded folder names from a `/library/<name>/<name>` path; empty at the root. */
+export function librarySegments(path: string): string[] {
+  const p = normalize(path);
+  if (!p.startsWith('/library/')) return [];
+  return p
+    .slice('/library/'.length)
+    .split('/')
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        return decodeURIComponent(s);
+      } catch {
+        return s;
+      }
+    });
+}
+
+/** The production path for a folder (null = root): `/library/<encoded names>`. */
+export function libraryPath(names: readonly string[]): string {
+  return '/library' + names.map((n) => `/${encodeURIComponent(n)}`).join('');
 }
 
 let lastHref = location.pathname + location.search;

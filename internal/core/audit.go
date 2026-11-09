@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -54,16 +55,42 @@ type AuditItem struct {
 	IP     string `json:"ip"`
 }
 
-// ListAudit pages the audit log, newest first. The cursor is the id of the last item of the previous page.
-func (s *Service) ListAudit(ctx context.Context, p Principal, limit int, cursor string) ([]AuditItem, string, error) {
+// AuditQuery filters the audit log: Action keeps exactly one action string, Kind keeps one category of
+// AuditKinds. Both may be combined; empty means no filter.
+type AuditQuery struct {
+	Action string
+	Kind   string
+}
+
+// AuditKinds groups action strings into the console's filter categories (docs/api.md §7).
+var AuditKinds = map[string]meta.AuditFilter{
+	"image":    {Prefixes: []string{"image."}},
+	"folder":   {Prefixes: []string{"folder."}},
+	"token":    {Prefixes: []string{"token."}},
+	"settings": {Prefixes: []string{"settings."}},
+	"system":   {Prefixes: []string{"check.", "admin."}, Exact: []string{"snapshot"}},
+	"session":  {Prefixes: []string{"login."}, Exact: []string{"logout", "setup", "setup.failure"}},
+}
+
+// ListAudit pages the audit log, newest first, filtered by q. The cursor is the id of the last item of
+// the previous page.
+func (s *Service) ListAudit(ctx context.Context, p Principal, q AuditQuery, limit int, cursor string) ([]AuditItem, string, error) {
 	if !p.IsAdmin() {
 		return nil, "", s.denyAdmin(p)
 	}
-	if limit == 0 {
-		limit = 50
+	filter := meta.AuditFilter{Action: q.Action}
+	if q.Kind != "" {
+		k, ok := AuditKinds[q.Kind]
+		if !ok {
+			return nil, "", validation("Unknown kind %q (valid: image, folder, token, settings, system, session).", q.Kind)
+		}
+		filter.Exact, filter.Prefixes = k.Exact, k.Prefixes
 	}
-	if limit < 1 || limit > 200 {
-		return nil, "", validation("limit must be between 1 and 200.")
+	if limit == 0 {
+		limit = 10
+	}
+	if limit < 1 || limit > 100 {
+		return nil, "", validation("limit must be between 1 and 100.")
 	}
 	var before int64
 	if cursor != "" {
@@ -73,7 +100,7 @@ func (s *Service) ListAudit(ctx context.Context, p Principal, limit int, cursor 
 		}
 		before = n
 	}
-	rows, err := s.db.ListAudit(ctx, before, limit+1)
+	rows, err := s.db.ListAudit(ctx, before, filter, limit+1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -87,6 +114,35 @@ func (s *Service) ListAudit(ctx context.Context, p Principal, limit int, cursor 
 		items[i] = AuditItem{ID: r.ID, At: fmtTime(r.At), Actor: r.Actor, Action: r.Action, Target: r.Target, Detail: r.Detail, IP: r.IP}
 	}
 	return items, next, nil
+}
+
+// ListAuditActions returns the distinct action strings in the log, for the console's filter.
+func (s *Service) ListAuditActions(ctx context.Context, p Principal) ([]string, error) {
+	if !p.IsAdmin() {
+		return nil, s.denyAdmin(p)
+	}
+	return s.db.AuditActions(ctx)
+}
+
+// PruneExpiredAudit deletes audit rows older than the retention setting in batches. It writes no audit
+// row of its own: the job only logs the count.
+func (s *Service) PruneExpiredAudit(ctx context.Context) (int64, error) {
+	days := s.Settings().AuditRetentionDays
+	cutoff := s.now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+	var total int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		n, err := s.db.DeleteAuditBefore(ctx, cutoff, 1000)
+		if err != nil {
+			return total, err
+		}
+		total += n
+		if n < 1000 {
+			return total, nil
+		}
+	}
 }
 
 // utf8Len counts characters, which is what the API limits mean.

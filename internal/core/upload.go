@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,20 +19,20 @@ import (
 )
 
 // Upload is one in-progress upload. The HTTP layer streams the multipart body into WriteFile, may set the
-// visibility (the part can arrive before or after the file), then calls Commit. Close must always be called.
+// destination folder (the part can arrive before or after the file), then calls Commit. Close must always
+// be called.
 type Upload struct {
-	s          *Service
-	p          Principal
-	tmp        *blob.Temp
-	tmpClosed  bool
-	sum        hash.Hash
-	size       int64
-	filename   string
-	haveFile   bool
-	visibility string
-	tags       []string // normalized, sorted
-	release    func()
-	done       bool
+	s         *Service
+	p         Principal
+	tmp       *blob.Temp
+	tmpClosed bool
+	sum       hash.Hash
+	size      int64
+	filename  string
+	haveFile  bool
+	folderID  *string // nil = root
+	release   func()
+	done      bool
 }
 
 // UploadResult is the outcome of a committed upload.
@@ -112,24 +111,15 @@ func (s *Service) BeginUpload(ctx context.Context, p Principal) (*Upload, error)
 	return u, nil
 }
 
-// SetVisibility sets the requested visibility ("public" or "private").
-func (u *Upload) SetVisibility(v string) error {
-	if v != "public" && v != "private" {
-		return validation("visibility must be public or private.")
+// SetFolder sets the destination folder id from a `folder` form part. An empty value means the root;
+// existence and ownership are checked at Commit.
+func (u *Upload) SetFolder(raw string) {
+	id := strings.TrimSpace(raw)
+	if id == "" {
+		u.folderID = nil
+		return
 	}
-	u.visibility = v
-	return nil
-}
-
-// AddTag adds one tag from a `tag` form part. The whole set is validated on every call, so an invalid or
-// surplus tag fails the request before any bytes are committed.
-func (u *Upload) AddTag(raw string) error {
-	tags, err := normalizeTags(append(slices.Clone(u.tags), raw))
-	if err != nil {
-		return err
-	}
-	u.tags = tags
-	return nil
+	u.folderID = &id
 }
 
 // WriteFile streams the file part into the temp file while hashing, enforcing maxUploadBytes.
@@ -204,6 +194,17 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	}
 	st := s.Settings()
 
+	// The destination folder must exist and belong to the uploader's library; upload-only tokens may
+	// use any folder of it. Folders are never created implicitly.
+	folderID := u.folderID
+	if folderID != nil {
+		f, err := s.resolveFolder(ctx, u.p, *folderID)
+		if err != nil {
+			return UploadResult{}, err
+		}
+		folderID = &f.ID
+	}
+
 	head := make([]byte, 64)
 	n, err := u.tmp.ReadAt(head, 0)
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -216,11 +217,11 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	if !st.allows(sniffed) {
 		return UploadResult{}, newErr(CodeUnsupportedFormat, "The %s format is not allowed (allowed: %s).", sniffed, strings.Join(st.AllowedFormats, ", "))
 	}
-	info, err := s.Inspect(u.tmp.File, u.size, imaging.Limits{MaxPixels: st.MaxPixels})
+	info, err := s.Inspect(u.tmp.File, u.size, imaging.Limits{MaxPixels: maxPixels})
 	switch {
 	case err == nil:
 	case errors.Is(err, imaging.ErrTooManyPixels):
-		return UploadResult{}, newErr(CodeTooManyPixels, "The image has more than %d pixels per frame.", st.MaxPixels)
+		return UploadResult{}, newErr(CodeTooManyPixels, "The image has more than %d pixels per frame.", maxPixels)
 	case errors.Is(err, imaging.ErrInvalid):
 		return UploadResult{}, newErr(CodeInvalidImage, "The image is damaged or not valid.")
 	case errors.Is(err, imaging.ErrUnsupported):
@@ -237,12 +238,12 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 
 	sha := hex.EncodeToString(u.sum.Sum(nil))
 	owner := u.p.UserID
+	var dedupe *meta.DupScope
 	if st.Dedupe {
-		if dup, err := s.db.FindActiveDuplicate(ctx, owner, sha); err == nil {
-			v, err := s.viewTagged(ctx, dup)
-			if err != nil {
-				return UploadResult{}, err
-			}
+		scope := u.p.dedupeScope(owner, folderID)
+		dedupe = &scope
+		if dup, err := s.db.FindActiveDuplicate(ctx, scope, sha); err == nil {
+			v := s.view(dup)
 			v.Duplicate = true
 			return UploadResult{Image: v, Duplicate: true}, nil
 		} else if !errors.Is(err, meta.ErrNotFound) {
@@ -250,10 +251,6 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 		}
 	}
 
-	vis := u.visibility
-	if vis == "" {
-		vis = st.DefaultVisibility
-	}
 	id := ids.NewImageID()
 	ext := info.Format.Ext()
 	frames := info.Frames
@@ -261,10 +258,10 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 		frames = 1
 	}
 	rec := meta.Image{
-		ID: id, OwnerID: owner, Source: sourceKind(u.p), ObjectKey: ids.ObjectKey(id, ext),
+		ID: id, OwnerID: owner, FolderID: folderID, Source: sourceKind(u.p), ObjectKey: ids.ObjectKey(id, ext),
 		OriginalName: SanitizeFilename(u.filename, ext), Mime: info.Format.MIME(), Ext: ext, Size: u.size,
 		Width: info.Width, Height: info.Height, Frames: frames, SHA256: sha, HasGPS: info.HasGPS,
-		Visibility: vis, CreatedAt: s.nowMs(),
+		CreatedAt: s.nowMs(),
 	}
 	if u.p.Kind == KindToken {
 		tid := u.p.TokenID
@@ -295,10 +292,13 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	if err := s.fault(FaultUploadAfterRename); err != nil {
 		return UploadResult{}, err
 	}
-	dup, err := s.db.InsertImageWithTags(cctx, rec, st.Dedupe, u.tags)
+	dup, err := s.db.InsertImage(cctx, rec, dedupe)
 	if err != nil {
 		if rmErr := s.blobs.Remove(blob.Objects, rec.ObjectKey); rmErr != nil {
 			s.log.Warn("could not remove object after failed insert (the check will quarantine it)", "key", rec.ObjectKey, "err", rmErr)
+		}
+		if errors.Is(err, meta.ErrNotFound) { // the folder was deleted while the file was being stored
+			return UploadResult{}, notFound()
 		}
 		return UploadResult{}, err
 	}
@@ -306,22 +306,20 @@ func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 		if rmErr := s.blobs.Remove(blob.Objects, rec.ObjectKey); rmErr != nil {
 			s.log.Warn("could not remove duplicate object", "key", rec.ObjectKey, "err", rmErr)
 		}
-		v, err := s.viewTagged(cctx, dup)
-		if err != nil {
-			return UploadResult{}, err
-		}
+		v := s.view(dup)
 		v.Duplicate = true
 		return UploadResult{Image: v, Duplicate: true}, nil
 	}
+	detail := ""
+	if folderID != nil {
+		detail = *folderID
+	}
+	s.audit(cctx, u.p, "image.upload", id, detail)
 	s.enqueueThumb(id)
 	im := rec
 	im.State = meta.StateActive
 	im.TokenName = u.p.TokenName
-	v := s.view(&im)
-	if u.tags != nil {
-		v.Tags = u.tags
-	}
-	return UploadResult{Image: v}, nil
+	return UploadResult{Image: s.view(&im)}, nil
 }
 
 func sourceKind(p Principal) string {

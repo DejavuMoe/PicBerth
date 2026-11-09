@@ -5,10 +5,12 @@
   import Icon from '../Icon.svelte';
   import Menu from '../Menu.svelte';
   import MenuItem from '../MenuItem.svelte';
+  import FolderTargets from './FolderTargets.svelte';
 
   let { lib, image }: { lib: Library; image: Image } = $props();
 
   const trash = $derived(lib.mode === 'trash');
+  let view = $state<'main' | 'move'>('main');
 </script>
 
 <Menu align="right">
@@ -38,6 +40,15 @@
           close();
         }}>永久删除</MenuItem
       >
+    {:else if view === 'move'}
+      <MenuItem icon="left" onclick={() => (view = 'main')}>移动到</MenuItem>
+      <div class="menu-sep"></div>
+      <FolderTargets
+        {lib}
+        currentId={image.folderId ?? null}
+        onpick={(id) => void lib.moveImages([image.id], id)}
+        {close}
+      />
     {:else}
       {#each LINK_FORMATS as f (f.value)}
         <MenuItem
@@ -48,6 +59,7 @@
         >
       {/each}
       <div class="menu-sep"></div>
+      <MenuItem icon="folder" onclick={() => (view = 'move')}>移动到…</MenuItem>
       <MenuItem
         icon="download"
         onclick={() => {

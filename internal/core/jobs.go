@@ -5,10 +5,10 @@ import (
 )
 
 // StartJobs launches the in-process background jobs (docs/architecture.md §4): thumbnail worker with
-// startup backfill, quick check 30 s after start and every 24 h, hourly purge of expired trash and
-// hourly cleanup of expired sessions. Call once; Close stops them.
+// startup backfill, quick check 30 s after start and every 24 h, hourly purge of expired trash, hourly
+// cleanup of expired sessions and hourly batched pruning of the audit log. Call once; Close stops them.
 func (s *Service) StartJobs() {
-	s.wg.Add(4)
+	s.wg.Add(5)
 	go s.runThumbWorker()
 	go s.every(30*time.Second, 24*time.Hour, "quick check", func() {
 		rep, err := s.Check(s.jobCtx, Principal{Kind: KindCLI, Username: "system"}, CheckQuick)
@@ -30,6 +30,13 @@ func (s *Service) StartJobs() {
 	go s.every(time.Minute, time.Hour, "session cleanup", func() {
 		if _, err := s.PurgeExpiredSessions(s.jobCtx); err != nil {
 			s.log.Error("deleting expired sessions failed", "err", err)
+		}
+	})
+	go s.every(2*time.Minute, time.Hour, "audit prune", func() {
+		if n, err := s.PruneExpiredAudit(s.jobCtx); err != nil {
+			s.log.Error("pruning the audit log failed", "err", err)
+		} else if n > 0 {
+			s.log.Info("pruned old audit entries", "entries", n)
 		}
 	})
 }

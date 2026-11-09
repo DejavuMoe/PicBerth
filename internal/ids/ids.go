@@ -16,6 +16,8 @@ const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
 const (
 	// ImageIDLen is 20 base32 characters = 100 bits of entropy.
 	ImageIDLen = 20
+	// FolderIDLen is 16 base32 characters = 80 bits of entropy. Folder ids are opaque: never a path.
+	FolderIDLen = 16
 	// TokenPrefix marks API token secrets so secret scanners can find them.
 	TokenPrefix = "pb_"
 	// TokenBodyLen is 32 base32 characters = 160 bits.
@@ -42,6 +44,22 @@ func NewImageID() string { return randomBase32(ImageIDLen) }
 // ValidImageID reports whether s is syntactically a canonical (lowercase) image ID.
 func ValidImageID(s string) bool {
 	if len(s) != ImageIDLen {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if strings.IndexByte(alphabet, s[i]) < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// NewFolderID returns a fresh opaque folder ID.
+func NewFolderID() string { return randomBase32(FolderIDLen) }
+
+// ValidFolderID reports whether s is syntactically a canonical (lowercase) folder ID.
+func ValidFolderID(s string) bool {
+	if len(s) != FolderIDLen {
 		return false
 	}
 	for i := 0; i < len(s); i++ {

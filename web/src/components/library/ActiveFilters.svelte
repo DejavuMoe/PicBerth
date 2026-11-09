@@ -36,9 +36,6 @@
         remove: () => lib.setFilters({ sources: f.sources.filter((x) => x !== v) }),
       });
     }
-    for (const v of f.tags) {
-      out.push({ key: `t${v}`, label: v, remove: () => lib.setFilters({ tags: f.tags.filter((x) => x !== v) }) });
-    }
     return out;
   });
 </script>

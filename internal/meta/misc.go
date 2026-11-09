@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 // AuditEntry is one row of the audit log.
@@ -31,14 +32,41 @@ func nullStr(s string) any {
 	return s
 }
 
-// ListAudit returns up to limit entries with id < before (0 = from the newest), newest first.
-func (db *DB) ListAudit(ctx context.Context, before int64, limit int) ([]AuditEntry, error) {
+// AuditFilter narrows an audit listing. Action keeps exactly that action string; Exact and Prefixes,
+// when either is non-empty, keep actions equal to one of Exact or starting with one of Prefixes.
+type AuditFilter struct {
+	Action   string
+	Exact    []string
+	Prefixes []string
+}
+
+// ListAudit returns up to limit entries with id < before (0 = from the newest), newest first, that
+// match f.
+func (db *DB) ListAudit(ctx context.Context, before int64, f AuditFilter, limit int) ([]AuditEntry, error) {
 	if before <= 0 {
 		before = 1<<63 - 1
 	}
-	rows, err := db.r.QueryContext(ctx,
-		`SELECT id, at, actor, action, COALESCE(target, ''), COALESCE(detail, ''), COALESCE(ip, '') FROM audit WHERE id < ? ORDER BY id DESC LIMIT ?`,
-		before, limit)
+	q := `SELECT id, at, actor, action, COALESCE(target, ''), COALESCE(detail, ''), COALESCE(ip, '') FROM audit WHERE id < ?`
+	args := []any{before}
+	if f.Action != "" {
+		q += ` AND action = ?`
+		args = append(args, f.Action)
+	}
+	if len(f.Exact)+len(f.Prefixes) > 0 {
+		var or []string
+		for _, a := range f.Exact {
+			or = append(or, `action = ?`)
+			args = append(args, a)
+		}
+		for _, p := range f.Prefixes {
+			or = append(or, `substr(action, 1, ?) = ?`)
+			args = append(args, len(p), p)
+		}
+		q += ` AND (` + strings.Join(or, ` OR `) + `)`
+	}
+	q += ` ORDER BY id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := db.r.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +80,35 @@ func (db *DB) ListAudit(ctx context.Context, before int64, limit int) ([]AuditEn
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// AuditActions returns the distinct action strings in the log, ascending.
+func (db *DB) AuditActions(ctx context.Context) ([]string, error) {
+	rows, err := db.r.QueryContext(ctx, `SELECT DISTINCT action FROM audit ORDER BY action`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// DeleteAuditBefore removes at most limit entries older than cutoff (unix ms), oldest first, and
+// reports how many rows went away.
+func (db *DB) DeleteAuditBefore(ctx context.Context, cutoff int64, limit int) (int64, error) {
+	res, err := db.w.ExecContext(ctx,
+		`DELETE FROM audit WHERE id IN (SELECT id FROM audit WHERE at < ? ORDER BY id LIMIT ?)`, cutoff, limit)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // AllSettings returns every stored setting as raw JSON text by key.

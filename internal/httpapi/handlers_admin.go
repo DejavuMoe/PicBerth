@@ -127,12 +127,13 @@ func (s *Server) getAudit(w http.ResponseWriter, r *http.Request, c *call) {
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n == 0 {
-			s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "limit must be between 1 and 200."})
+			s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "limit must be between 1 and 100."})
 			return
 		}
 		limit = n
 	}
-	items, next, err := s.core.ListAudit(r.Context(), c.p, limit, r.URL.Query().Get("cursor"))
+	q := core.AuditQuery{Action: r.URL.Query().Get("action"), Kind: r.URL.Query().Get("kind")}
+	items, next, err := s.core.ListAudit(r.Context(), c.p, q, limit, r.URL.Query().Get("cursor"))
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -145,4 +146,16 @@ func (s *Server) getAudit(w http.ResponseWriter, r *http.Request, c *call) {
 		nextCursor = next
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
+}
+
+func (s *Server) getAuditActions(w http.ResponseWriter, r *http.Request, c *call) {
+	actions, err := s.core.ListAuditActions(r.Context(), c.p)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	if actions == nil {
+		actions = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": actions})
 }

@@ -55,7 +55,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request, c *call) {
 		s.writeError(w, r, err)
 		return
 	}
-	sess, err := s.core.Login(r.Context(), c.ip, r.UserAgent(), req.Username, req.Password)
+	sess, err := s.core.Login(r.Context(), c.ip, req.Username, req.Password)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -83,7 +83,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request, c *call) {
 		s.writeError(w, r, err)
 		return
 	}
-	sess, err := s.core.Setup(r.Context(), c.ip, r.UserAgent(), req.SetupCode, req.Username, req.Password)
+	sess, err := s.core.Setup(r.Context(), c.ip, req.SetupCode, req.Username, req.Password)
 	if err != nil {
 		s.writeError(w, r, err)
 		return

@@ -17,8 +17,10 @@
     class?: string;
     /** Accessible name of the menu. */
     label?: string;
+    /** Opened from inside a popover: presses in the menu must not dismiss that popover. */
+    nested?: boolean;
   }
-  let { trigger, children, align = 'left', up = false, width, class: className = 'menu', label }: Props = $props();
+  let { trigger, children, align = 'left', up = false, width, class: className = 'menu', label, nested = false }: Props = $props();
 
   let open = $state(false);
   let wrap = $state<HTMLElement | null>(null);
@@ -97,6 +99,7 @@
     class={className}
     role={className === 'popover' ? 'dialog' : 'menu'}
     aria-label={label}
+    {nested}
     onkeydown={onlayerkeydown}
   >
     {@render children(close)}

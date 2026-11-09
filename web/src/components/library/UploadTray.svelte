@@ -16,7 +16,13 @@
   }
 
   function open(u: UploadItem) {
-    if (u.image) lib.open(u.image.id);
+    if (!u.image) return;
+    if ((u.image.folderId ?? null) !== lib.folderId) {
+      lib.pendingOpen = u.image.id;
+      lib.openFolder(u.image.folderId);
+      return;
+    }
+    lib.open(u.image.id);
   }
 
   function copyOne(u: UploadItem) {
@@ -73,7 +79,10 @@
             {#if u.image?.duplicate}
               <span class="s muted">已存在，使用原有链接</span>
             {:else}
-              <span class="s muted">{formatBytes(u.file.size)}</span>
+              <span class="s muted facts">
+                <span>{formatBytes(u.file.size)}</span>
+                {#if u.folderId}<span class="ellipsis">{u.folderLabel}</span>{/if}
+              </span>
             {/if}
           {/if}
         </div>

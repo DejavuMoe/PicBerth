@@ -48,12 +48,21 @@ func (s *Server) apiMux() http.Handler {
 	route("POST /api/v1/tokens", s.createToken)
 	route("DELETE /api/v1/tokens/{id}", s.revokeToken)
 
+	route("GET /api/v1/folders", s.listFolders)
+	route("POST /api/v1/folders", s.createFolder)
+	route("PATCH /api/v1/folders/{id}", s.patchFolder)
+	route("DELETE /api/v1/folders/{id}", s.deleteFolder)
+
 	route("GET /api/v1/settings", s.getSettings)
 	route("PATCH /api/v1/settings", s.patchSettings)
 	route("GET /api/v1/status", s.getStatus)
 	route("POST /api/v1/checks", s.runCheck)
 	route("POST /api/v1/snapshots", s.runSnapshot)
+	route("GET /api/v1/audit/actions", s.getAuditActions)
 	route("GET /api/v1/audit", s.getAudit)
+
+	// Public, machine-readable contract; no credentials required.
+	mux.HandleFunc("GET /api/v1/openapi.json", s.handleOpenAPI)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, core.CodeNotFound, "Not found.", 0)
@@ -182,6 +191,27 @@ func jsonErrDetail(err error) string {
 		return strings.TrimPrefix(msg, "json: ")
 	}
 	return "invalid body."
+}
+
+// nullableString distinguishes an absent JSON field from an explicit null. UnmarshalJSON runs only when
+// the field is present, so Set records exactly that.
+type nullableString struct {
+	Set   bool
+	Value *string
+}
+
+func (n *nullableString) UnmarshalJSON(b []byte) error {
+	n.Set = true
+	if string(b) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	n.Value = &s
+	return nil
 }
 
 // requireAdmin answers 401/403 before any request body is parsed. core re-checks every operation.

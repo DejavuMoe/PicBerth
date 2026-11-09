@@ -9,6 +9,7 @@
   let { lib }: { lib: Library } = $props();
 
   const trash = $derived(lib.mode === 'trash');
+  const showFolder = $derived(trash || lib.filtered);
 
   function tileKey(e: KeyboardEvent, id: string) {
     if (e.target !== e.currentTarget) return;
@@ -38,8 +39,10 @@
       aria-selected={on}
       tabindex="0"
       data-id={im.id}
+      draggable={!trash}
       onclick={(e) => lib.clickItem(im.id, e)}
       onkeydown={(e) => tileKey(e, im.id)}
+      ondragstart={(e) => lib.dragImages(im, e)}
       use:longpress={() => {
         lib.selectMode = true;
         lib.toggle(im.id);
@@ -58,6 +61,7 @@
       <div class="tile-sub num">
         <span>{formatBytes(im.size)}</span>
         <span>{trash ? (daysLeft(im, lib.retention) ?? '') : formatRelative(im.createdAt)}</span>
+        {#if showFolder}<span class="ellipsis">{lib.label(im.folderId)}</span>{/if}
       </div>
     </div>
   {/each}

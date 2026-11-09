@@ -1,9 +1,8 @@
-// Types mirror docs/api.md. Unknown response fields are ignored.
+// Types mirror docs/api.md and the approved folder contract. Unknown response fields are ignored.
 
-export type Visibility = 'public' | 'private';
 export type ImageFormat = 'jpeg' | 'png' | 'gif' | 'webp' | 'avif';
 export type ImageState = 'active' | 'trashed';
-export type Scope = 'upload' | 'read' | 'manage';
+export type Scope = 'upload' | 'manage';
 
 export interface Links {
   url: string;
@@ -29,14 +28,14 @@ export interface Image {
   height: number;
   frames: number;
   sha256: string;
-  visibility: Visibility;
   state: ImageState;
   hasGps: boolean;
   hasThumb: boolean;
   broken: boolean;
   duplicate: boolean;
   source: ImageSource;
-  tags: string[];
+  /** The folder the image is in; null is the root (图片). */
+  folderId: string | null;
   createdAt: string;
   trashedAt: string | null;
   links: Links;
@@ -51,13 +50,14 @@ export type ImageSort = 'new' | 'old' | 'large' | 'small' | 'name';
 
 export interface ImageQuery {
   state?: ImageState;
+  /** `root` or a folder id. Folder browsing only. */
+  folder?: string;
+  /** Include every folder below `folder` (set while searching or filtering). */
+  recursive?: boolean;
   q?: string;
   /** Any-of. */
   format?: ImageFormat[];
-  visibility?: Visibility;
-  /** All-of. */
-  tag?: string[];
-  /** web, cli or 	oken:<id>; any-of. */
+  /** web, cli or token:<id>; any-of. */
   source?: string[];
   /** RFC 3339: created_at >= since, created_at < until. */
   since?: string;
@@ -68,9 +68,9 @@ export interface ImageQuery {
 }
 
 export interface ImagePatch {
-  visibility?: Visibility;
   filename?: string;
-  tags?: string[];
+  /** Move the image; null puts it in the root. */
+  folderId?: string | null;
 }
 
 export interface FacetSource {
@@ -85,16 +85,35 @@ export interface Facets {
   total: number;
   bytes: number;
   formats: Record<ImageFormat, number>;
-  visibility: Record<Visibility, number>;
   sources: FacetSource[];
-  tags: { tag: string; count: number }[];
 }
 
-export type BatchAction = 'trash' | 'restore' | 'purge' | 'visibility';
+export type BatchAction = 'trash' | 'restore' | 'purge' | 'move';
 export interface BatchResult {
   id: string;
   ok: boolean;
   code?: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  /** 1 for a root-level folder; the deepest allowed is 3. */
+  depth: number;
+  /** Direct images in the folder. */
+  imageCount: number;
+  createdAt: string;
+}
+
+export interface FolderCreate {
+  name: string;
+  parentId: string | null;
+}
+
+export interface FolderPatch {
+  name?: string;
+  parentId?: string | null;
 }
 
 export interface Token {
@@ -116,14 +135,10 @@ export interface TokenCreate {
 
 export interface Settings {
   maxUploadBytes: number;
-  maxPixels: number;
   allowedFormats: ImageFormat[];
   dedupe: boolean;
-  defaultVisibility: Visibility;
   trashRetentionDays: number;
-  uploadsPerMinute: number;
-  sessionIdleMinutes: number;
-  sessionAbsoluteHours: number;
+  auditRetentionDays: number;
   // read-only
   publicUrl: string;
   imageUrl: string;
@@ -139,7 +154,6 @@ export interface SessionInfo {
   limits: {
     maxUploadBytes: number;
     allowedFormats: ImageFormat[];
-    defaultVisibility: Visibility;
   } | null;
   version: string;
 }

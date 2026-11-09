@@ -22,6 +22,10 @@ const (
 	CodeSetupDone           = "setup-done"
 	CodeRateLimited         = "rate-limited"
 	CodeInsufficientStorage = "insufficient-storage"
+	CodeFolderExists        = "folder-exists"
+	CodeFolderNotEmpty      = "folder-not-empty"
+	CodeFolderDepth         = "folder-depth"
+	CodeInvalidScope        = "invalid-scope"
 	CodeInternal            = "internal"
 )
 
@@ -70,6 +74,18 @@ func validation(format string, args ...any) *Error { return newErr(CodeValidatio
 func notFound() *Error                             { return &Error{Code: CodeNotFound, Detail: "Not found."} }
 func forbidden(detail string) *Error               { return &Error{Code: CodeForbidden, Detail: detail} }
 func conflict(format string, args ...any) *Error   { return newErr(CodeConflict, format, args...) }
+
+func folderExists() *Error {
+	return &Error{Code: CodeFolderExists, Detail: "A folder with that name already exists here."}
+}
+
+func folderNotEmpty() *Error {
+	return &Error{Code: CodeFolderNotEmpty, Detail: "The folder contains images or folders."}
+}
+
+func folderDepth() *Error {
+	return &Error{Code: CodeFolderDepth, Detail: "Folders can be at most 3 levels deep."}
+}
 func unauthorized() *Error {
 	return &Error{Code: CodeUnauthorized, Detail: "Authentication required or credentials invalid."}
 }

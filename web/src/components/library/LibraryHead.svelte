@@ -1,13 +1,16 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import type { Library } from '../../lib/library.svelte';
-  import { phone } from '../../lib/media.svelte';
+  import { phone, wideNav } from '../../lib/media.svelte';
   import { openPicker } from '../../lib/picker';
   import Check from '../Check.svelte';
   import Icon from '../Icon.svelte';
+  import Menu from '../Menu.svelte';
+  import Breadcrumb from './Breadcrumb.svelte';
   import BulkActions from './BulkActions.svelte';
   import DisplayMenu from './DisplayMenu.svelte';
   import FilterPopover from './FilterPopover.svelte';
+  import FolderPanel from './FolderPanel.svelte';
 
   interface Props {
     lib: Library;
@@ -20,7 +23,9 @@
   const items = $derived(lib.items);
   const allOn = $derived(items.length > 0 && items.every((i) => lib.sel.has(i.id)));
   const someOn = $derived(items.some((i) => lib.sel.has(i.id)));
-  const pool = $derived(lib.facets?.total ?? items.length);
+  const count = $derived(
+    lib.phase === 'ready' && (trash || lib.foldersPhase === 'ready') ? lib.countText : null,
+  );
 
   // The box edits local text; the URL (and the query) follows after a short pause. Enter applies at once.
   let text = $state(untrack(() => lib.filters.q));
@@ -65,7 +70,29 @@
       }
     }
   }
+
 </script>
+
+{#snippet folderTool()}
+  <Menu align="left" class="popover" label="文件夹">
+    {#snippet trigger(open, toggle)}
+      <button
+        type="button"
+        class="btn btn-ghost btn-icon"
+        aria-label="文件夹"
+        title="文件夹"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onclick={toggle}
+      >
+        <Icon name="folder" />
+      </button>
+    {/snippet}
+    {#snippet children(close)}
+      <FolderPanel {lib} currentId={lib.folderId} counts={lib.counts} compact {close} />
+    {/snippet}
+  </Menu>
+{/snippet}
 
 {#if phone.matches && searching}
   <div class="head">
@@ -102,12 +129,14 @@
   </div>
 {:else}
   <div class="head">
-    <div class="head-title">
-      <h1>{trash ? '回收站' : '图片'}</h1>
-      {#if lib.phase === 'ready'}
-        {#if !lib.filtered}<span class="count">{pool}</span>{:else if !lib.cursor}<span class="count">{items.length} / {pool}</span>{/if}
-      {/if}
-    </div>
+    {#if trash}
+      <div class="head-title">
+        <h1>回收站</h1>
+        {#if count !== null}<span class="count">{count}</span>{/if}
+      </div>
+    {:else}
+      <Breadcrumb {lib} currentId={lib.folderId} {count} tool={!wideNav.matches ? folderTool : undefined} />
+    {/if}
     {#if phone.matches}
       <button
         type="button"

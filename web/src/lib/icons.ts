@@ -127,6 +127,17 @@ export const ICONS = {
     { t: 'path', d: 'M13 2.75V5h-2.25' },
   ],
   edit: [{ t: 'path', d: 'M10.5 3 13 5.5 6 12.5H3.5V10Z' }],
+  folder: [{ t: 'path', d: 'M2.5 4.5a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1Z' }],
+  'folder-plus': [
+    { t: 'path', d: 'M8.5 12.5h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1V8' },
+    { t: 'path', d: 'M12 10v4' },
+    { t: 'path', d: 'M10 12h4' },
+  ],
+  external: [
+    { t: 'path', d: 'M9 3h4v4' },
+    { t: 'path', d: 'M13 3 7.5 8.5' },
+    { t: 'path', d: 'M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5' },
+  ],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -18,7 +18,7 @@ internal/blob/          file store over os.Root: temp, commit, move between area
 internal/imaging/       format sniffing, header/structure inspection, GPS detection, thumbnails
 internal/meta/          SQLite: open (writer + reader pools), embedded migrations, repositories
 internal/core/          application services, principals, authorization, background jobs
-internal/httpapi/       net/http server, middleware, handlers (public, api, spa, health)
+internal/httpapi/       net/http server, middleware, handlers (public, api, spa, health, openapi.json)
 internal/webui/         //go:embed all:dist  — Vite build output lands in internal/webui/dist
 web/                    Svelte 5 + Vite SPA source (no Go files)
 deploy/                 Dockerfile helpers, Caddy / Nginx / systemd / launchd examples
@@ -44,7 +44,7 @@ Allowed runtime dependencies (AC-MAINT-01): `modernc.org/sqlite`, `golang.org/x/
   cache/thumbs/ab/<id>.<jpg|png>
   quarantine/<unix-ms>-<name>   orphans found by full check (never auto-deleted)
   snapshots/<YYYYMMDDTHHMMSSZ>/  default snapshot destination
-  backups/picberth-schema<N>-<UTC>.db   automatic copy taken before migrating an existing schema N
+  backups/picberth-schema<N>-<UTC>.db   automatic copy taken before migrating an existing schema N (newest 5 kept)
 ```
 
 - Object key = `<id[0:2]>/<id[2:4]>/<id>.<ext>`; stored in the DB with `/` separators; the area
@@ -57,35 +57,52 @@ Allowed runtime dependencies (AC-MAINT-01): `modernc.org/sqlite`, `golang.org/x/
 ```
 users(id INTEGER PK, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL)
 sessions(id_hash TEXT PK, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,
-         created_at INTEGER, last_seen_at INTEGER, expires_at INTEGER, ip TEXT, user_agent TEXT)
+         created_at INTEGER, last_seen_at INTEGER) -- expiry from fixed 7 d idle / 30 d absolute lifetimes
 tokens(id INTEGER PK, owner_id INTEGER NOT NULL REFERENCES users, name TEXT NOT NULL, prefix TEXT NOT NULL,
        secret_hash TEXT UNIQUE NOT NULL, scopes TEXT NOT NULL, created_at INTEGER, expires_at INTEGER NULL,
        last_used_at INTEGER NULL, revoked_at INTEGER NULL)
 images(id TEXT PK, owner_id INTEGER NOT NULL REFERENCES users, token_id INTEGER NULL REFERENCES tokens,
+       folder_id TEXT NULL REFERENCES folders,
        source TEXT NOT NULL CHECK(source IN ('web','token','cli')),
        object_key TEXT UNIQUE NOT NULL, original_name TEXT NOT NULL, mime TEXT NOT NULL, ext TEXT NOT NULL,
        size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, frames INTEGER NOT NULL,
-       sha256 TEXT NOT NULL, has_gps INTEGER NOT NULL, visibility TEXT NOT NULL CHECK(...),
+       sha256 TEXT NOT NULL, has_gps INTEGER NOT NULL,
        state TEXT NOT NULL CHECK(state IN ('active','trashed','purged')),
        thumb TEXT NOT NULL DEFAULT '' CHECK(thumb IN ('','jpg','png','none')),
        created_at INTEGER NOT NULL, trashed_at INTEGER NULL, purged_at INTEGER NULL, broken_at INTEGER NULL)
-  indexes: (state, created_at DESC, id DESC), (state, size, id), (owner_id, sha256) WHERE state='active',
-           (token_id, state, created_at DESC)
-image_tags(image_id TEXT NOT NULL REFERENCES images, tag TEXT NOT NULL, PRIMARY KEY(image_id, tag))  -- schema 2; index (tag, image_id); deleted when the image is purged
+  indexes: (state, created_at DESC, id DESC), (state, size, id), (folder_id, state, created_at DESC, id DESC),
+           (owner_id, folder_id, sha256) WHERE state='active', (token_id, state, created_at DESC),
+           (trashed_at) WHERE state='trashed', (created_at) WHERE thumb='' AND state='active'
+folders(id TEXT PK, owner_id INTEGER NOT NULL REFERENCES users, parent_id TEXT NULL REFERENCES folders,
+        name TEXT NOT NULL, name_key TEXT NOT NULL, depth INTEGER NOT NULL CHECK(depth BETWEEN 1 AND 3),
+        created_at INTEGER NOT NULL)
+  unique: (owner_id, COALESCE(parent_id,''), name_key); index (owner_id, parent_id)
 settings(key TEXT PK, value TEXT NOT NULL)          -- JSON values; defaults live in code
 audit(id INTEGER PK, at INTEGER NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT, detail TEXT, ip TEXT)
+  index: (at)                                        -- schema 3, for retention pruning
 kv(key TEXT PK, value TEXT NOT NULL)                -- last_snapshot, last_check
 ```
 
 Times are unix milliseconds UTC. `application_id` = `0x50494342` ("PICB").
 
+Schema history: 1 initial; 2 tags; 3 folders and removal of tags, visibility and the `read` token scope
+(also drops the write-only session columns `expires_at`/`ip`/`user_agent`, rebuilds `images` with
+`folder_id`, adds the audit `at` index, prunes removed settings, strips `read` from tokens and revokes
+tokens left without a scope — with an audit row naming the migration reason, and rotates `backups/` to the
+newest five files).
+
 Connections (ADR-004): writer pool `SetMaxOpenConns(1)`, reader pool `SetMaxOpenConns(max(4, GOMAXPROCS))`,
 readers open with `query_only=1`. Every connection gets — through the DSN `_pragma` parameters, never a one-off
 Exec — `journal_mode=WAL`, `synchronous=FULL`, `foreign_keys=ON`, `busy_timeout=5000`. Write transactions start
 with `BEGIN IMMEDIATE` (driver `_txlock=immediate`). Assert at open that `sqlite_version() >= 3.51.3` (AC-DATA-08).
+Every folder write runs its checks — ownership, sibling-name uniqueness, cycles, subtree depth, emptiness
+and the release of trashed images — inside the same write transaction as the change; an image INSERT or
+folder UPDATE re-verifies its destination folder there too, so concurrent writes cannot create a cycle,
+exceed three levels, or leave an active image in a folder that no longer exists.
 
-Purged images keep a tombstone row (id, sha256, times, state='purged'); all other columns stay as they were so the
-ID can never be reused (§6.1).
+Purged images keep a tombstone row (id, sha256, times, state='purged'); the other columns stay as they were
+except `folder_id`, which purge clears, so a purged image never holds a deleted folder reference. The ID can
+never be reused (§6.1).
 
 ## 4. Consistency protocol (§6.4–6.6, ADR-005)
 
@@ -94,19 +111,22 @@ The database is the source of truth for *where a file must be*: `active` → `ob
 
 | Operation | Order |
 |---|---|
-| Upload | stream to `tmp/` (hash + count) → inspect → dedupe → `fsync` file → close → rename to `objects/key` → fsync parent dir (Unix) → INSERT record → enqueue thumbnail |
+| Upload | stream to `tmp/` (hash + count) → inspect → resolve the destination folder → dedupe (visible active, healthy records: same owner **and same folder**, the root counting as a folder; or own uploads for an upload-only token) → `fsync` file → close → rename to `objects/key` → fsync parent dir (Unix) → INSERT record (re-checking the destination folder and the same dedupe scope in one write transaction) → audit `image.upload` → enqueue thumbnail |
 | Trash | UPDATE state=trashed → rename `objects/key` → `trash/key` (retry on Windows sharing violations) |
 | Restore | rename `trash/key` → `objects/key` → UPDATE state=active |
 | Purge | UPDATE state=purged → remove `trash/key` and thumbnail |
 
 Check (quick): for each active/trashed record, stat the expected path; if missing but present in the other area,
-move it (`pending-move`, repaired); if missing in both → set `broken_at`; size mismatch → `broken_at`; clear
-`broken_at` when healthy again; remove files left in `trash/` for purged records; delete `tmp/` files older than
-the maximum upload duration. Check (full): quick + re-hash each file (`hash-mismatch` → broken) + walk
-`objects/` and `trash/` for files with no active/trashed record → move to `quarantine/` (`orphan-file`).
+move it (`pending-move`, repaired); if missing in both → set `broken_at`; size mismatch → `broken_at`;
+remove files left in `trash/` for purged records; delete `tmp/` files older than the maximum upload duration.
+Check (full): quick + re-hash each file (`hash-mismatch` → broken) + walk `objects/` and `trash/` for files
+with no active/trashed record → move to `quarantine/` (`orphan-file`). Only a successful full check of an image
+clears its `broken_at` flag: restoring a file or passing a quick check alone does not prove its bytes are intact.
 
 Background jobs (in-process tickers): quick check 30 s after start and every 24 h; purge expired trash hourly;
-delete expired sessions hourly; thumbnail worker (concurrency 1) fed by upload events and a startup backfill.
+delete expired sessions hourly; prune the audit log hourly in batches of 1000 by `auditRetentionDays`
+(2 min after start, no audit row, log only); thumbnail worker (concurrency 1) fed by upload events and a
+startup backfill.
 
 ## 5. Snapshot / restore (§12.2–12.3)
 
@@ -123,10 +143,12 @@ check; non-zero exit on any issue.
 
 - Principal = `{Kind: anonymous|session|token|cli, UserID, TokenID, Scopes, Name}`. `core` checks every
   operation against the matrix in api.md §3 (Token scopes) and baseline §7.3. Tokens can never manage tokens or
-  settings; `upload`-scoped tokens only see images they uploaded.
+  settings; `upload`-scoped tokens only see images they uploaded. Scopes are only `upload` and `manage`;
+  folder reads are allowed for every authenticated principal of the owner, folder writes need a session or
+  `manage`.
 - Sessions: 32 random bytes, base64url in the cookie, SHA-256 hex in the DB. Cookie `__Host-pb_session`
   (`Secure`) when the public URL is https, else `pb_session`; `HttpOnly; SameSite=Strict; Path=/`. Idle + absolute
-  expiry from settings; `last_seen_at` written at most once per minute.
+  expiry are fixed (7 days / 30 days); `last_seen_at` written at most once per minute.
 - Tokens: `pb_` + 32 Crockford base32 chars (160 bits). DB stores SHA-256 hex. Display prefix = first 9 chars.
   `last_used_at` written at most once per minute per token.
 - Passwords: Argon2id m=19456 KiB, t=2, p=1, 16-byte salt, 32-byte key, PHC string. At most 2 concurrent hashes.
@@ -137,11 +159,13 @@ check; non-zero exit on any issue.
   `X-PicBerth-Client: web`.
 - Real IP: peer address unless the peer is in `trusted-proxies`; then walk `X-Forwarded-For` right→left skipping
   trusted entries. Requests from an untrusted peer carrying `X-Forwarded-For` set the `untrusted-forwarded` warning.
-- Rate limits: login 5/min burst 5 per IP and 10 per 10 min per username; uploads `uploadsPerMinute` per principal
-  (token id, or user for sessions); 429 + `Retry-After`.
+- Rate limits: login 5/min burst 5 per IP and 10 per 10 min per username; uploads 60/min per principal
+  (token id, or user for sessions), a fixed constant; 429 + `Retry-After`.
 - Uploads: `MaxBytesReader(maxUploadBytes + 64 KiB)`; `r.MultipartReader()` streaming (never ParseMultipartForm);
-  at most 8 parts (repeated `tag` parts excluded, at most 20 tags); exactly one part named `file`; optional `visibility`; process-wide semaphore of 4 concurrent
-  uploads (excess → 429 with Retry-After 2); disk watermark `max(1 GiB, 2% of volume)` checked before writing.
+  at most 8 parts; exactly one part named `file`; optional `folder` part with a folder id (empty = root,
+  unknown/foreign = 404, never created implicitly); max 50 MP per frame (constant); process-wide semaphore of
+  4 concurrent uploads (excess → 429 with Retry-After 2); disk watermark `max(1 GiB, 2% of volume)` checked
+  before writing.
 - Response headers:
   - SPA HTML: `Content-Security-Policy: default-src 'self'; img-src 'self' blob: data: <image origin>; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
     `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`, `Cache-Control: no-cache`.
@@ -178,5 +202,8 @@ The Docker image sets `PICBERTH_LISTEN=0.0.0.0:12433` and `PICBERTH_DATA_DIR=/da
 
 - `mise run build` → `pnpm --dir web build` (outputs to `internal/webui/dist`) → `go build -trimpath
   -ldflags "-s -w -X …buildinfo.Version=…" ./cmd/picberth` with `CGO_ENABLED=0`.
-- `mise run dev` → Go server on 127.0.0.1:12433 + Vite dev server on 127.0.0.1:5173 proxying `/api`, `/i`.
-- `mise run test` → `go test ./...` + `pnpm --dir web check`.
+- `mise run dev` builds the embedded SPA, then starts the Go server on 127.0.0.1:12433. Run `mise run web:dev`
+  separately for Vite on 127.0.0.1:5173, proxying `/api` and `/i`.
+- `mise run test` builds the embedded SPA, then runs `go vet ./...`, `go test ./...` and `pnpm --dir web check`.
+  Run `mise run web:install` first. Direct Go commands that include `cmd/picberth` or `internal/webui` also need
+  `mise run web:build` first on a clean checkout.

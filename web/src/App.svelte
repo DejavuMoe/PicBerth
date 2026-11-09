@@ -8,9 +8,10 @@
   import { watchHealth } from './lib/health.svelte';
   import { isTypingTarget, modalOpen } from './lib/modal';
   import { openPicker, registerPicker } from './lib/picker';
-  import { isKnownPath, navigate, router, safeNext } from './lib/router.svelte';
+  import { isKnownPath, isLibraryPath, navigate, router, safeNext } from './lib/router.svelte';
   import { loadSession, session } from './lib/session.svelte';
   import { acceptAttr, addFiles, installGlobalInput } from './lib/upload.svelte';
+  import DocsApi from './screens/DocsApi.svelte';
   import Library from './screens/Library.svelte';
   import Login from './screens/Login.svelte';
   import NotFound from './screens/NotFound.svelte';
@@ -24,7 +25,9 @@
   });
 
   // What is on screen follows from session + path, so a wrong screen never flashes before a redirect.
+  // The API reference is public and needs no session.
   const view = $derived.by(() => {
+    if (router.path === '/docs/api') return 'docs';
     if (!session.loaded) return 'boot';
     if (session.failure) return 'error';
     const p = router.path;
@@ -38,6 +41,7 @@
   $effect(() => {
     if (!session.loaded || session.failure) return;
     const p = router.path;
+    if (p === '/docs/api') return; // public page, no session needed
     if (session.setupRequired) {
       if (p !== '/setup') void navigate('/setup', { replace: true, force: true });
     } else if (!session.authenticated) {
@@ -48,21 +52,23 @@
       }
     } else if (p === '/login' || p === '/setup') {
       void navigate(safeNext(router.query.get('next')), { replace: true });
+    } else if (p === '/') {
+      void navigate('/library', { replace: true });
     }
   });
 
   const TITLES: Record<string, string> = {
-    '/': '图片',
-    '/library': '图片',
+    '/login': '登录',
+    '/setup': '初始化',
     '/trash': '回收站',
     '/tokens': '令牌',
     '/settings': '设置',
     '/status': '状态',
-    '/login': '登录',
-    '/setup': '初始化',
+    '/docs/api': 'API 文档',
   };
   $effect(() => {
-    const t = TITLES[router.path];
+    const p = router.path;
+    const t = p === '/' || isLibraryPath(p) ? '图片' : TITLES[p];
     document.title = t ? `${t} - PicBerth` : 'PicBerth';
   });
 
@@ -93,7 +99,7 @@
   function onkeydown(e: KeyboardEvent) {
     if (view !== 'app' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTypingTarget(e.target) || modalOpen()) return;
-    if (router.path !== '/' && router.path !== '/library') return;
+    if (router.path !== '/' && !isLibraryPath(router.path)) return;
     if (e.key === 'u' || e.key === 'U') {
       e.preventDefault();
       openPicker();
@@ -110,7 +116,7 @@
 
 {#if view === 'app'}
   <Shell>
-    {#if router.path === '/' || router.path === '/library'}
+    {#if router.path === '/' || isLibraryPath(router.path)}
       <Library mode="library" />
     {:else if router.path === '/trash'}
       <Library mode="trash" />
@@ -126,6 +132,8 @@
     <DropOverlay />
   </Shell>
   <input bind:this={picker} type="file" multiple hidden accept={acceptAttr()} onchange={onpicked} />
+{:else if view === 'docs'}
+  <DocsApi />
 {:else if view === 'login'}
   <Login />
 {:else if view === 'setup'}

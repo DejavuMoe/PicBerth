@@ -20,6 +20,7 @@ type Image struct {
 	OwnerID      int64
 	TokenID      *int64
 	TokenName    string // joined from tokens; empty when not uploaded by a token
+	FolderID     *string
 	Source       string
 	ObjectKey    string
 	OriginalName string
@@ -31,7 +32,6 @@ type Image struct {
 	Frames       int
 	SHA256       string
 	HasGPS       bool
-	Visibility   string
 	State        string
 	Thumb        string
 	CreatedAt    int64
@@ -40,8 +40,8 @@ type Image struct {
 	BrokenAt     *int64
 }
 
-const imageCols = `i.id, i.owner_id, i.token_id, COALESCE(t.name, ''), i.source, i.object_key, i.original_name, i.mime, i.ext,
-	i.size, i.width, i.height, i.frames, i.sha256, i.has_gps, i.visibility, i.state, i.thumb,
+const imageCols = `i.id, i.owner_id, i.token_id, COALESCE(t.name, ''), i.folder_id, i.source, i.object_key, i.original_name, i.mime, i.ext,
+	i.size, i.width, i.height, i.frames, i.sha256, i.has_gps, i.state, i.thumb,
 	i.created_at, i.trashed_at, i.purged_at, i.broken_at`
 
 const imageFrom = ` FROM images i LEFT JOIN tokens t ON t.id = i.token_id`
@@ -51,8 +51,8 @@ type scanner interface{ Scan(...any) error }
 func scanImage(sc scanner) (*Image, error) {
 	var im Image
 	var gps int
-	err := sc.Scan(&im.ID, &im.OwnerID, &im.TokenID, &im.TokenName, &im.Source, &im.ObjectKey, &im.OriginalName, &im.Mime, &im.Ext,
-		&im.Size, &im.Width, &im.Height, &im.Frames, &im.SHA256, &gps, &im.Visibility, &im.State, &im.Thumb,
+	err := sc.Scan(&im.ID, &im.OwnerID, &im.TokenID, &im.TokenName, &im.FolderID, &im.Source, &im.ObjectKey, &im.OriginalName, &im.Mime, &im.Ext,
+		&im.Size, &im.Width, &im.Height, &im.Frames, &im.SHA256, &gps, &im.State, &im.Thumb,
 		&im.CreatedAt, &im.TrashedAt, &im.PurgedAt, &im.BrokenAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -81,28 +81,67 @@ func (db *DB) GetImageByKey(ctx context.Context, key string) (*Image, error) {
 	return scanImage(db.r.QueryRowContext(ctx, `SELECT `+imageCols+imageFrom+` WHERE i.object_key = ?`, key))
 }
 
-// FindActiveDuplicate returns the owner's active, healthy image with the same content hash.
-func (db *DB) FindActiveDuplicate(ctx context.Context, ownerID int64, sha string) (*Image, error) {
-	return scanImage(db.r.QueryRowContext(ctx,
-		`SELECT `+imageCols+imageFrom+` WHERE i.owner_id = ? AND i.sha256 = ? AND i.state = 'active' AND i.broken_at IS NULL ORDER BY i.created_at, i.id LIMIT 1`, ownerID, sha))
+// DupScope is the record set duplicate detection searches: one folder of the owner's active, healthy
+// images, restricted to one uploader token when the caller may only see its own uploads. A nil FolderID
+// means the root, which counts as a folder of its own.
+type DupScope struct {
+	OwnerID  int64
+	TokenID  *int64
+	FolderID *string
 }
 
-// InsertImage stores a new record. With dedupe, the duplicate check and the insert happen in one write
-// transaction: when an active image with the same owner and hash exists it is returned as dup and
-// nothing is inserted.
-func (db *DB) InsertImage(ctx context.Context, im Image, dedupe bool) (dup *Image, err error) {
-	return db.InsertImageWithTags(ctx, im, dedupe, nil)
+func (s DupScope) where() (string, []any) {
+	cond := "i.owner_id = ?"
+	args := []any{s.OwnerID}
+	if s.TokenID != nil {
+		cond += " AND i.token_id = ?"
+		args = append(args, *s.TokenID)
+	}
+	if s.FolderID == nil {
+		cond += " AND i.folder_id IS NULL"
+	} else {
+		cond += " AND i.folder_id = ?"
+		args = append(args, *s.FolderID)
+	}
+	return cond, args
 }
 
-// InsertImageWithTags is InsertImage plus the new record's tags (already normalized). A returned
-// duplicate keeps its own tags: nothing is written in that case.
-func (db *DB) InsertImageWithTags(ctx context.Context, im Image, dedupe bool, tags []string) (dup *Image, err error) {
+func findActiveDuplicate(ctx context.Context, q queryer, scope DupScope, sha string) (*Image, error) {
+	cond, args := scope.where()
+	args = append(args, sha)
+	return scanImage(q.QueryRowContext(ctx,
+		`SELECT `+imageCols+imageFrom+` WHERE `+cond+` AND i.sha256 = ? AND i.state = 'active' AND i.broken_at IS NULL ORDER BY i.created_at, i.id LIMIT 1`, args...))
+}
+
+type queryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// FindActiveDuplicate returns the earliest active, healthy image in scope with the same content hash.
+func (db *DB) FindActiveDuplicate(ctx context.Context, scope DupScope, sha string) (*Image, error) {
+	return findActiveDuplicate(ctx, db.r, scope, sha)
+}
+
+// InsertImage stores a new record. The destination folder is re-verified inside the same write
+// transaction (existence and ownership), so a record can never land in a folder deleted concurrently.
+// A non-nil scope enables dedupe inside the same transaction: when an active image in scope with the
+// same hash exists it is returned as dup and nothing is written.
+func (db *DB) InsertImage(ctx context.Context, im Image, dedupe *DupScope) (dup *Image, err error) {
 	err = db.WriteTx(ctx, func(tx *sql.Tx) error {
-		if dedupe {
-			row := tx.QueryRowContext(ctx,
-				`SELECT `+imageCols+imageFrom+` WHERE i.owner_id = ? AND i.sha256 = ? AND i.state = 'active' AND i.broken_at IS NULL ORDER BY i.created_at, i.id LIMIT 1`,
-				im.OwnerID, im.SHA256)
-			if d, err := scanImage(row); err == nil {
+		if im.FolderID != nil {
+			var one int
+			err := tx.QueryRowContext(ctx, `SELECT 1 FROM folders WHERE id = ? AND owner_id = ?`,
+				*im.FolderID, im.OwnerID).Scan(&one)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if dedupe != nil {
+			d, err := findActiveDuplicate(ctx, tx, *dedupe, im.SHA256)
+			if err == nil {
 				dup = d
 				return nil
 			} else if !errors.Is(err, ErrNotFound) {
@@ -110,27 +149,14 @@ func (db *DB) InsertImageWithTags(ctx context.Context, im Image, dedupe bool, ta
 			}
 		}
 		_, err := tx.ExecContext(ctx,
-			`INSERT INTO images(id, owner_id, token_id, source, object_key, original_name, mime, ext, size, width, height, frames,
-			                    sha256, has_gps, visibility, state, thumb, created_at)
+			`INSERT INTO images(id, owner_id, token_id, folder_id, source, object_key, original_name, mime, ext, size, width, height, frames,
+			                    sha256, has_gps, state, thumb, created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', '', ?)`,
-			im.ID, im.OwnerID, im.TokenID, im.Source, im.ObjectKey, im.OriginalName, im.Mime, im.Ext, im.Size, im.Width, im.Height,
-			im.Frames, im.SHA256, b2i(im.HasGPS), im.Visibility, im.CreatedAt)
-		if err != nil {
-			return err
-		}
-		return insertTags(ctx, tx, im.ID, tags)
+			im.ID, im.OwnerID, im.TokenID, im.FolderID, im.Source, im.ObjectKey, im.OriginalName, im.Mime, im.Ext, im.Size, im.Width, im.Height,
+			im.Frames, im.SHA256, b2i(im.HasGPS), im.CreatedAt)
+		return err
 	})
 	return dup, err
-}
-
-// SetVisibility updates visibility on a non-purged record; false when no such record.
-func (db *DB) SetVisibility(ctx context.Context, id, vis string) (bool, error) {
-	res, err := db.w.ExecContext(ctx, `UPDATE images SET visibility = ? WHERE id = ? AND state != 'purged'`, vis, id)
-	if err != nil {
-		return false, err
-	}
-	n, err := res.RowsAffected()
-	return n > 0, err
 }
 
 // MarkTrashed moves an active record to trashed; false when it was not active.
@@ -143,23 +169,9 @@ func (db *DB) MarkRestored(ctx context.Context, id string) (bool, error) {
 	return db.exec1(ctx, `UPDATE images SET state = 'active', trashed_at = NULL WHERE id = ? AND state = 'trashed'`, id)
 }
 
-// MarkPurged turns a trashed record into a tombstone and drops its tags; false when it was not trashed.
+// MarkPurged turns a trashed record into a tombstone and drops its folder; false when it was not trashed.
 func (db *DB) MarkPurged(ctx context.Context, id string, now int64) (bool, error) {
-	var ok bool
-	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE images SET state = 'purged', purged_at = ? WHERE id = ? AND state = 'trashed'`, now, id)
-		if err != nil {
-			return err
-		}
-		n, err := res.RowsAffected()
-		if err != nil || n == 0 {
-			return err
-		}
-		ok = true
-		_, err = tx.ExecContext(ctx, `DELETE FROM image_tags WHERE image_id = ?`, id)
-		return err
-	})
-	return ok && err == nil, err
+	return db.exec1(ctx, `UPDATE images SET state = 'purged', purged_at = ?, folder_id = NULL WHERE id = ? AND state = 'trashed'`, now, id)
 }
 
 func (db *DB) exec1(ctx context.Context, q string, args ...any) (bool, error) {
@@ -247,16 +259,18 @@ type SourceFilter struct {
 	TokenID int64 // Kind == "token" only
 }
 
-// ListQuery filters and orders the image listing.
+// ListQuery filters and orders the image listing. The three folder fields are exclusive: none means
+// every folder, FolderRoot means the root only, FolderID one folder, FolderIDs any of a subtree.
 type ListQuery struct {
 	State      string // active | trashed
 	Q          string
 	Exts       []string // any of these stored extensions ("jpg", "png", ...)
-	Tags       []string // all of these tags
 	Sources    []SourceFilter
-	Visibility string
 	TokenID    *int64 // filter: uploaded by this token
 	OwnerID    *int64 // filter: owned by this user
+	FolderRoot bool
+	FolderID   *string
+	FolderIDs  []string
 	Since      *int64 // created_at >= Since (unix ms)
 	Until      *int64 // created_at < Until (unix ms)
 	Sort       string // new | old | large | small | name
@@ -300,8 +314,6 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 			conds = append(conds, `i.sha256 LIKE ? ESCAPE '\'`)
 			args = append(args, escapeLike(lq)+"%")
 		}
-		conds = append(conds, `EXISTS (SELECT 1 FROM image_tags g WHERE g.image_id = i.id AND g.tag LIKE ? ESCAPE '\')`)
-		args = append(args, "%"+escapeLike(q.Q)+"%")
 		where = append(where, "("+strings.Join(conds, " OR ")+")")
 	}
 	if len(q.Exts) > 0 {
@@ -309,13 +321,6 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 		for _, e := range q.Exts {
 			args = append(args, e)
 		}
-	}
-	if len(q.Tags) > 0 {
-		where = append(where, "(SELECT COUNT(*) FROM image_tags g WHERE g.image_id = i.id AND g.tag IN ("+placeholders(len(q.Tags))+")) = ?")
-		for _, tg := range q.Tags {
-			args = append(args, tg)
-		}
-		args = append(args, len(q.Tags))
 	}
 	if len(q.Sources) > 0 {
 		var conds []string
@@ -330,6 +335,18 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 		}
 		where = append(where, "("+strings.Join(conds, " OR ")+")")
 	}
+	switch {
+	case q.FolderRoot:
+		where = append(where, "i.folder_id IS NULL")
+	case q.FolderID != nil:
+		where = append(where, "i.folder_id = ?")
+		args = append(args, *q.FolderID)
+	case len(q.FolderIDs) > 0:
+		where = append(where, "i.folder_id IN ("+placeholders(len(q.FolderIDs))+")")
+		for _, id := range q.FolderIDs {
+			args = append(args, id)
+		}
+	}
 	if q.Since != nil {
 		where = append(where, "i.created_at >= ?")
 		args = append(args, *q.Since)
@@ -337,10 +354,6 @@ func (db *DB) ListImages(ctx context.Context, q ListQuery) ([]Image, error) {
 	if q.Until != nil {
 		where = append(where, "i.created_at < ?")
 		args = append(args, *q.Until)
-	}
-	if q.Visibility != "" {
-		where = append(where, "i.visibility = ?")
-		args = append(args, q.Visibility)
 	}
 	if q.TokenID != nil {
 		where = append(where, "i.token_id = ?")

@@ -5,8 +5,8 @@
 - Product type: personal self-hosted image host (单二进制 + 数据目录), managed through a web console.
 - Primary users: the single administrator of the instance.
 - Primary jobs to be done: upload images and copy their links (URL / Markdown / HTML / BBCode); find
-  existing images again; manage them (rename, tags, trash, restore, permanent deletion, batch actions);
-  administer API tokens, settings and health.
+  existing images again; organise them into folders and manage them (rename, move, trash, restore, permanent
+  deletion, batch actions); administer API tokens, settings and health.
 - It is a management tool for one's own image files, not a photo album or gallery.
 - UI surface classification: operational
 - Content profile: operational-strict
@@ -24,9 +24,12 @@
 - Every capability listed in `docs/ui/capabilities.md` (upload with progress/retry, four link formats,
   search/filter/sort, batch trash/restore/purge with undo, token reveal-once, settings leave guard,
   checks/snapshots, audit log).
-- Every uploaded image is public (changed 2026-11-08 at the user's request): the console has no 公开 / 私有
-  concept, no visibility control, filter, badge or default-visibility setting. The backend `visibility` field
-  stays until a separate backend change removes it.
+- Every uploaded image is public (changed 2026-11-08; backend field removed 2026-11-09): there is no
+  公开 / 私有 concept anywhere — no visibility field, control, filter, badge or setting.
+- Folders (approved 2026-11-09): at most three levels, opaque ids, images and folders move without changing
+  image links; deleting a folder requires it to be empty; searches cover the current folder and its
+  descendants while browsing shows direct children. Tags are removed entirely, as is the `read` token scope;
+  token scopes are `upload` and `manage` only.
 - Strict CSP: no third-party scripts, fonts or images at runtime; server strings rendered as text only.
 - Purge is the only action with a confirmation dialog; token revocation confirms inline; reversible actions
   offer 撤销.
@@ -88,7 +91,9 @@
 
 ## Open decisions
 
-- Resolved: tags, rename, date-range and source filters are in scope and shipped (approved direction A with the
-  extension features on; backend in commit `75889c4`).
-- Still open: whether further backend-dependent capabilities (batch tagging / renaming, tag merge, size-range
-  filter, albums, notes, statistics) are in scope. None is in scope until the user says so.
+- Resolved: rename, date-range and source filters are in scope and shipped; tags were shipped and then
+  removed completely on 2026-11-09 along with the visibility concept and the `read` token scope; folders,
+  folder moves, the scoped search described above, `/docs/api`, `/api/v1/openapi.json` and the operation-log
+  retention setting are approved and shipping.
+- Still open: whether further backend-dependent capabilities (batch renaming, size-range filter, notes,
+  statistics) are in scope. None is in scope until the user says so.

@@ -9,7 +9,6 @@
 
   const SCOPES: { key: Scope; label: string }[] = [
     { key: 'upload', label: '上传' },
-    { key: 'read', label: '只读' },
     { key: 'manage', label: '管理' },
   ];
   const EXPIRY = [

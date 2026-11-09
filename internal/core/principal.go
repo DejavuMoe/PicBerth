@@ -33,11 +33,10 @@ func (k Kind) String() string {
 // Token scopes.
 const (
 	ScopeUpload = "upload"
-	ScopeRead   = "read"
 	ScopeManage = "manage"
 )
 
-var allScopes = []string{ScopeUpload, ScopeRead, ScopeManage}
+var allScopes = []string{ScopeUpload, ScopeManage}
 
 // Principal is who is acting. Every Service method authorizes against it.
 type Principal struct {
@@ -82,16 +81,32 @@ func (p Principal) CanUpload() bool {
 	return p.IsAdmin() || p.hasScope(ScopeUpload) || p.hasScope(ScopeManage)
 }
 
-// CanReadAll: may list/read every image of the owner, including private bytes.
+// CanReadAll: may list and read every image of the owner.
 func (p Principal) CanReadAll() bool {
-	return p.IsAdmin() || p.hasScope(ScopeRead) || p.hasScope(ScopeManage)
+	return p.IsAdmin() || p.hasScope(ScopeManage)
 }
 
-// CanManage: may change visibility, trash, restore and purge.
+// CanManage: may change images, folders, trash, restore and purge.
 func (p Principal) CanManage() bool { return p.IsAdmin() || p.hasScope(ScopeManage) }
 
-// CanReadOwnUploads: an upload-only token sees just what it uploaded itself.
+// canReadOwnUploads: an upload-only token sees just what it uploaded itself.
 func (p Principal) canReadOwnUploads() bool { return p.hasScope(ScopeUpload) }
+
+// dedupeScope is the record set an upload may deduplicate against: one folder of the owner-scoped
+// library the principal can see, i.e. its own uploads for an upload-only token.
+func (p Principal) dedupeScope(ownerID int64, folderID *string) meta.DupScope {
+	_, token := p.listScope()
+	return meta.DupScope{OwnerID: ownerID, TokenID: token, FolderID: folderID}
+}
+
+// folderOwner is the owner whose folders the principal works in (nil = every owner, CLI only).
+func (p Principal) folderOwner() *int64 {
+	if p.Kind == KindCLI && p.UserID == 0 {
+		return nil
+	}
+	uid := p.UserID
+	return &uid
+}
 
 // canSee applies ownership and scope rules to a record. Callers answer "not found" when it is false.
 func (p Principal) canSee(im *meta.Image) bool {
@@ -138,7 +153,7 @@ func normalizeScopes(in []string) ([]string, error) {
 	}
 	for _, s := range in {
 		if !slices.Contains(allScopes, s) {
-			return nil, validation("Unknown scope %q (valid: upload, read, manage).", s)
+			return nil, newErr(CodeInvalidScope, "Unknown scope %q (valid: upload, manage).", s)
 		}
 	}
 	return out, nil
