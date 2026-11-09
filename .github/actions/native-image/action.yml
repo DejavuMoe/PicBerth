@@ -50,7 +50,7 @@ runs:
           --entrypoint buildctl-daemonless.sh moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e build \
           --frontend dockerfile.v0 --local context=/src --local dockerfile=/src \
           --opt "platform=linux/$ARCH" \
-          --opt "build-arg:VERSION=${VERSION#v}" --opt "build-arg:COMMIT=$GITHUB_SHA" \
+          --opt "build-arg:VERSION=$VERSION" --opt "build-arg:COMMIT=$GITHUB_SHA" \
           --opt attest:provenance=mode=max --opt attest:sbom= \
           "${args[@]}" --export-cache type=local,dest=/output/buildkit-cache-new,mode=max \
           --output "$output"

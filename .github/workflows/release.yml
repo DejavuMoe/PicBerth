@@ -74,7 +74,7 @@ jobs:
           if [[ "$GOOS" == windows ]]; then binary=picberth.exe; fi
           mkdir -p package release
           cp LICENSE package/
-          go build -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=$version -X picberth/internal/buildinfo.Commit=$GITHUB_SHA" -o "package/$binary" ./cmd/picberth
+          go build -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=$TAG -X picberth/internal/buildinfo.Commit=$GITHUB_SHA" -o "package/$binary" ./cmd/picberth
           archive="picberth_${TAG}_${GOOS}_${GOARCH}"
           if [[ "$GOOS" == windows ]]; then
             (cd package && zip "../release/$archive.zip" "$binary" LICENSE)

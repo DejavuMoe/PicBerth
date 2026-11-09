@@ -27,7 +27,7 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=web /src/internal/webui/dist ./internal/webui/dist
-ARG VERSION=0.0.1-dev
+ARG VERSION=v0.0.1-dev
 ARG COMMIT=unknown
 ARG TARGETOS
 ARG TARGETARCH
