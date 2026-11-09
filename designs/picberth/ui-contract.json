@@ -51,7 +51,6 @@
           "image-detail-sheet",
           "image-detail-trashed",
           "image-rename-inline",
-          "tag-combobox",
           "link-copy-last-format",
           "upload-tray-progress-error-duplicate",
           "upload-copy-all",
@@ -78,7 +77,41 @@
           "tablet-1024",
           "mobile-390",
           "reduced-motion",
-          "theme-follow-system"
+          "theme-follow-system",
+          "route-root-redirect",
+          "folder-tree-pane",
+          "folder-tree-expanded",
+          "folder-breadcrumb",
+          "folder-empty",
+          "folder-create-inline",
+          "folder-create-duplicate-name",
+          "folder-rename-inline",
+          "folder-menu",
+          "folder-menu-depth-limit",
+          "folder-delete-disabled-not-empty",
+          "folder-delete-undo",
+          "folder-move-menu",
+          "folder-move-depth-blocked",
+          "folder-missing",
+          "folders-none",
+          "folders-loading",
+          "folders-error",
+          "image-move-row-menu",
+          "image-move-bulk-menu",
+          "image-move-detail-folder",
+          "image-move-drag-over-tree",
+          "image-move-drag-over-breadcrumb",
+          "image-move-undo",
+          "library-scoped-search-folder-column",
+          "trash-folder-column",
+          "tree-popover-tablet",
+          "tree-popover-phone",
+          "upload-into-folder",
+          "drop-overlay-folder",
+          "audit-kind-filter",
+          "audit-load-more",
+          "settings-audit-retention",
+          "tokens-api-docs-link"
         ],
         "stableIds": [
           "library",
@@ -88,7 +121,8 @@
           "tokens",
           "settings",
           "status",
-          "not-found"
+          "not-found",
+          "folders"
         ]
       },
       "production": {
@@ -128,7 +162,16 @@
           "/api/v1/tokens",
           "/api/v1/settings",
           "/api/v1/status",
-          "/api/v1/audit"
+          "/api/v1/audit",
+          "GET /api/v1/folders",
+          "POST /api/v1/folders",
+          "PATCH /api/v1/folders/{id}",
+          "DELETE /api/v1/folders/{id}",
+          "PATCH /api/v1/images/{id} folder",
+          "POST /api/v1/images/batch action move",
+          "POST /api/v1/images folder",
+          "GET /api/v1/audit kind",
+          "PATCH /api/v1/settings auditRetentionDays"
         ],
         "tests": [
           "internal/core/tags_test.go",
@@ -136,7 +179,7 @@
           "internal/meta/tags_test.go"
         ]
       },
-      "status": "implemented"
+      "status": "approved"
     },
     {
       "id": "auth",
@@ -182,7 +225,39 @@
         ],
         "tests": []
       },
-      "status": "implemented"
+      "status": "approved"
+    },
+    {
+      "id": "api-docs",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "api-docs.html",
+        "assetPath": "api-docs.html",
+        "files": [
+          "api-docs.html",
+          "api-docs.js",
+          "styles.css"
+        ],
+        "states": [
+          "api-docs-desktop",
+          "api-docs-tablet-toc-row",
+          "api-docs-phone",
+          "code-copy",
+          "light-dark"
+        ],
+        "stableIds": [
+          "api-docs"
+        ]
+      },
+      "production": {
+        "routeOrWindow": "/docs/api",
+        "files": [],
+        "interfaces": [
+          "GET /api/v1/openapi.json"
+        ],
+        "tests": []
+      },
+      "status": "approved"
     }
   ]
 }

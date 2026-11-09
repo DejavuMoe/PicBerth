@@ -8,9 +8,18 @@ const NAV = [
   { group: 1, key: 'status', label: '状态', icon: 'pulse' },
 ];
 
-function readRoute() {
-  const r = location.hash.replace(/^#\/?/, '').split('?')[0] || 'library';
-  return r;
+// Routes mirror the production paths: #/library, #/library/<folder names>, #/trash, #/tokens, #/settings, #/status.
+// An empty hash is `/`: signed-in users go to the library.
+function readLoc() {
+  const raw = location.hash.replace(/^#\/?/, '').split('?')[0];
+  const segs = raw.split('/').filter(Boolean).map((s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch (e) {
+      return s;
+    }
+  });
+  return { raw, route: segs[0] || 'library', rest: segs.slice(1) };
 }
 
 function useUploads(setImages, settings) {
@@ -39,7 +48,7 @@ function useUploads(setImages, settings) {
             thumb: u.thumb,
             size: u.size,
             source: 'web',
-            tags: [],
+            folderId: u.folderId,
             createdAt: NOW,
           };
           im.links = makeLinks(im.id, im.ext, im.filename);
@@ -54,10 +63,10 @@ function useUploads(setImages, settings) {
     clearInterval(timers.current[id]);
     timers.current[id] = setInterval(() => step(id), 260);
   };
-  const add = (files) => {
+  const add = (files, folderId = null) => {
     const next = files.map((f) => {
       const id = Math.random().toString(36).slice(2);
-      const base = { id, name: f.name, size: f.size, thumb: f.thumb || (f instanceof Blob ? URL.createObjectURL(f) : ''), progress: 0, failAt: f.failAt, duplicateOf: f.duplicateOf };
+      const base = { id, name: f.name, size: f.size, folderId, thumb: f.thumb || (f instanceof Blob ? URL.createObjectURL(f) : ''), progress: 0, failAt: f.failAt, duplicateOf: f.duplicateOf };
       if (f.type && !/^image\/(jpeg|png|gif|webp|avif)$/.test(f.type)) return { ...base, status: 'error', error: '不支持的格式', retryable: false };
       if (f.size > settings.maxUploadMB * 1048576) return { ...base, status: 'error', error: `超过单文件上限 ${settings.maxUploadMB} MB`, retryable: false };
       return { ...base, status: 'queued' };
@@ -77,8 +86,11 @@ function useUploads(setImages, settings) {
 
 function App() {
   const [themePref, setThemePref] = useTheme();
-  const [route, setRoute] = useState(readRoute);
+  const [loc, setLoc] = useState(readLoc);
+  const route = loc.route;
   const [images, setImages] = useState(initialImages);
+  const [folders, setFolders] = useState(FOLDERS);
+  const [folderState, setFolderState] = useState(() => new URLSearchParams(location.search).get('folders') || 'ready');
   const [settings, setSettings] = useState(SETTINGS);
   const [dataState, setDataState] = useState(() => new URLSearchParams(location.search).get('data') || 'ready');
   const [leave, setLeave] = useState(null);
@@ -89,23 +101,44 @@ function App() {
   const initialOpen = useMemo(() => new URLSearchParams(location.search).get('open'), []);
 
   useEffect(() => {
+    if (!loc.raw) {
+      history.replaceState(null, '', '#/library');
+      setLoc(readLoc());
+    }
+  }, []);
+  useEffect(() => {
     const on = () => {
-      const r = readRoute();
-      if (guard.current && route === 'settings' && r !== 'settings') {
-        history.replaceState(null, '', '#/settings');
-        setLeave(r);
+      const l = readLoc();
+      if (!l.raw) {
+        history.replaceState(null, '', '#/library');
+        setLoc(readLoc());
         return;
       }
-      setRoute(r);
+      if (guard.current && route === 'settings' && l.route !== 'settings') {
+        history.replaceState(null, '', '#/settings');
+        setLeave(l.raw);
+        return;
+      }
+      setLoc(l);
     };
     addEventListener('hashchange', on);
     return () => removeEventListener('hashchange', on);
   }, [route]);
   const go = (r) => {
-    if (r === route) return;
+    if (r === (loc.raw || 'library')) return;
     if (guard.current && route === 'settings') return setLeave(r);
     location.hash = '#/' + r;
   };
+  // Folder renames and moves keep the address in step with the folder being viewed.
+  const navigateHash = (hash, opts = {}) => {
+    if (opts.replace) {
+      history.replaceState(null, '', hash);
+      setLoc(readLoc());
+    } else location.hash = hash;
+  };
+  const resolvedFolder = route === 'library' && folderState === 'ready' ? resolvePath(folders, loc.rest) : null;
+  const uploadFolder = typeof resolvedFolder === 'string' ? resolvedFolder : null;
+  const dropLabel = uploadFolder ? `松开以上传到 ${folderLabel(folders, uploadFolder)}` : '松开以上传';
 
   // window-wide drop and paste
   useEffect(() => {
@@ -119,14 +152,14 @@ function App() {
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      uploads.add([...e.dataTransfer.files]);
+      uploads.add([...e.dataTransfer.files], uploadFolder);
       if (route !== 'library') location.hash = '#/library';
     };
     const paste = (e) => {
       if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
       const files = [...(e.clipboardData?.files || [])];
       if (files.length) {
-        uploads.add(files);
+        uploads.add(files, uploadFolder);
         if (route !== 'library') location.hash = '#/library';
       }
     };
@@ -142,7 +175,7 @@ function App() {
       removeEventListener('drop', drop);
       removeEventListener('paste', paste);
     };
-  }, [route]);
+  }, [route, uploadFolder]);
 
   const simulateUploads = () =>
     uploads.add([
@@ -150,11 +183,10 @@ function App() {
       { name: 'IMG_5012.jpg', size: 2400123, thumb: 'assets/fixtures/desert-noon.jpg', type: 'image/jpeg', failAt: 60 },
       { name: 'handler-retry.png', size: 650000, thumb: 'assets/fixtures/code-snippet.png', type: 'image/png', duplicateOf: images[1]?.id },
       { name: 'scan-raw.tiff', size: 31000000, thumb: 'assets/fixtures/receipt-scan.jpg', type: 'image/tiff' },
-    ]);
+    ], uploadFolder);
 
   const warnings = STATUS.warnings.length;
   const trashCount = images.filter((im) => im.state === 'trashed').length;
-  const known = NAV.some((n) => n.key === route);
 
   let page;
   if (route === 'library' || route === 'trash')
@@ -163,6 +195,12 @@ function App() {
         mode={route === 'trash' ? 'trash' : 'active'}
         images={dataState === 'empty' ? [] : images}
         setImages={setImages}
+        folders={folderState === 'none' ? [] : folders}
+        setFolders={setFolders}
+        folderState={folderState === 'none' ? 'ready' : folderState}
+        folderPath={route === 'library' ? loc.rest : []}
+        onNavigate={navigateHash}
+        onRetryFolders={() => setFolderState('ready')}
         uploads={uploads.items}
         uploadApi={uploads}
         settings={settings}
@@ -173,7 +211,7 @@ function App() {
     );
   else if (route === 'tokens') page = <Tokens dataState={dataState} onRetryLoad={() => setDataState('ready')} />;
   else if (route === 'settings') page = <Settings settings={settings} setSettings={setSettings} guard={guard} />;
-  else if (route === 'status') page = <Status dataState={dataState} onRetryLoad={() => setDataState('ready')} />;
+  else if (route === 'status') page = <Status dataState={dataState} onRetryLoad={() => setDataState('ready')} settings={settings} />;
   else
     page = (
       <div className="panel-main">
@@ -244,7 +282,7 @@ function App() {
       <main className="main">
         <div className="panel">
           {page}
-          {dragging && <div className="dropzone">松开以上传</div>}
+          {dragging && <div className="dropzone">{dropLabel}</div>}
         </div>
       </main>
 
@@ -286,13 +324,13 @@ function App() {
         </Dialog>
       )}
 
-      <ProtoControls dataState={dataState} setDataState={setDataState} themePref={themePref} setThemePref={setThemePref} onUploads={simulateUploads} />
+      <ProtoControls dataState={dataState} setDataState={setDataState} folderState={folderState} setFolderState={setFolderState} themePref={themePref} setThemePref={setThemePref} onUploads={simulateUploads} />
     </div>
   );
 }
 
 /** Review-only control for switching prototype states. Not part of the product. */
-function ProtoControls({ dataState, setDataState, themePref, setThemePref, onUploads }) {
+function ProtoControls({ dataState, setDataState, folderState, setFolderState, themePref, setThemePref, onUploads }) {
   return (
     <Popover
       trigger={(p) => (
@@ -315,6 +353,18 @@ function ProtoControls({ dataState, setDataState, themePref, setThemePref, onUpl
             </MenuItem>
           ))}
           <div className="menu-sep" />
+          <div className="menu-group">文件夹</div>
+          {[
+            ['ready', '正常'],
+            ['none', '没有文件夹'],
+            ['loading', '加载中'],
+            ['error', '加载失败'],
+          ].map(([v, l]) => (
+            <MenuItem key={v} checked={folderState === v} onClick={() => (setFolderState(v), close())}>
+              {l}
+            </MenuItem>
+          ))}
+          <div className="menu-sep" />
           <div className="menu-group">主题</div>
           {THEMES.map((t) => (
             <MenuItem key={t.value} checked={themePref === t.value} onClick={() => (setThemePref(t.value), close())}>
@@ -322,11 +372,17 @@ function ProtoControls({ dataState, setDataState, themePref, setThemePref, onUpl
             </MenuItem>
           ))}
           <div className="menu-sep" />
-          <MenuItem icon="upload" onClick={() => ((location.hash = '#/library'), onUploads(), close())}>
+          <MenuItem icon="upload" onClick={() => (onUploads(), close())}>
             模拟上传
           </MenuItem>
           <MenuItem icon="alert" onClick={() => ((location.hash = '#/missing'), close())}>
             不存在的页面
+          </MenuItem>
+          <MenuItem icon="folder" onClick={() => ((location.hash = '#/library/' + encodeURIComponent('不存在')), close())}>
+            不存在的文件夹
+          </MenuItem>
+          <MenuItem icon="external" onClick={() => (location.href = 'api-docs.html')}>
+            API 文档
           </MenuItem>
           <MenuItem icon="logout" onClick={() => (location.href = 'auth.html')}>
             登录与初始化

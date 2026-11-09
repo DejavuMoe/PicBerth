@@ -1,5 +1,11 @@
 // 登录 and 初始化.
 
+// After signing in: back to the page that asked for it (?next=/library/...), otherwise the library.
+function consoleUrl() {
+  const n = new URLSearchParams(location.search).get('next');
+  return 'index.html#' + (n && n.startsWith('/') && !n.startsWith('//') ? n : '/library');
+}
+
 function AuthShell({ title, children }) {
   return (
     <div className="auth">
@@ -37,7 +43,7 @@ function Login({ scenario }) {
     setTimeout(() => {
       setBusy(false);
       if (pass === 'wrong') setError('用户名或密码不正确');
-      else location.href = 'index.html';
+      else location.href = consoleUrl();
     }, 900);
   };
   return (
@@ -78,7 +84,7 @@ function Setup({ scenario }) {
     if (Object.values(errs).some(Boolean)) return;
     setBusy(true);
     setError('');
-    setTimeout(() => (location.href = 'index.html'), 900);
+    setTimeout(() => (location.href = consoleUrl()), 900);
   };
   const field = (k, id, label, props, hint) => (
     <div className="field">
@@ -158,7 +164,7 @@ function AuthApp() {
               </MenuItem>
             ))}
             <div className="menu-sep" />
-            <MenuItem icon="image" onClick={() => (location.href = 'index.html')}>
+            <MenuItem icon="image" onClick={() => (location.href = 'index.html#/library')}>
               控制台
             </MenuItem>
           </>

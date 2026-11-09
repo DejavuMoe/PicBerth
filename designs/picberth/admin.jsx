@@ -192,6 +192,10 @@ function Tokens({ dataState, onRetryLoad }) {
   return (
     <div className="panel-main">
       <Head title="令牌">
+        <a className="btn btn-ghost" href="api-docs.html" target="_blank" rel="noopener">
+          API 文档
+          <Icon name="external" size="s" />
+        </a>
         <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
           <Icon name="plus" />
           新建令牌
@@ -275,11 +279,8 @@ function Settings({ settings, setSettings, guard }) {
   const range = (v, lo, hi) => (v === '' || Number(v) < lo || Number(v) > hi ? `请输入 ${lo} 到 ${hi} 之间的数字` : '');
   const errs = {
     maxUploadMB: range(form.maxUploadMB, 1, settings.hardMaxMB),
-    maxPixelsM: range(form.maxPixelsM, 1, 500),
-    uploadsPerMinute: range(form.uploadsPerMinute, 1, 6000),
     trashRetentionDays: range(form.trashRetentionDays, 1, 365),
-    sessionIdleMinutes: range(form.sessionIdleMinutes, 5, 1440),
-    sessionAbsoluteHours: range(form.sessionAbsoluteHours, 1, 720),
+    auditRetentionDays: range(form.auditRetentionDays, 7, 3650),
     allowedFormats: form.allowedFormats.length ? '' : '至少保留一种格式',
   };
   const invalid = Object.values(errs).some(Boolean);
@@ -311,7 +312,6 @@ function Settings({ settings, setSettings, guard }) {
             <h2>上传</h2>
             <div className="form-rows">
               {row('单文件上限', 's-max', <NumField id="s-max" value={form.maxUploadMB} onChange={set('maxUploadMB')} unit="MB" err={errs.maxUploadMB} />)}
-              {row('像素上限', 's-px', <NumField id="s-px" value={form.maxPixelsM} onChange={set('maxPixelsM')} unit="MP" err={errs.maxPixelsM} />)}
               {row(
                 '格式',
                 null,
@@ -332,7 +332,6 @@ function Settings({ settings, setSettings, guard }) {
                 </>,
                 true,
               )}
-              {row('频率上限', 's-rate', <NumField id="s-rate" value={form.uploadsPerMinute} onChange={set('uploadsPerMinute')} unit="次/分" err={errs.uploadsPerMinute} />)}
               {row('重复检测', null, <Switch on={form.dedupe} onChange={set('dedupe')} label="重复检测" />)}
             </div>
           </section>
@@ -343,10 +342,9 @@ function Settings({ settings, setSettings, guard }) {
             </div>
           </section>
           <section className="section">
-            <h2>会话</h2>
+            <h2>操作记录</h2>
             <div className="form-rows">
-              {row('空闲超时', 's-idle', <NumField id="s-idle" value={form.sessionIdleMinutes} onChange={set('sessionIdleMinutes')} unit="分钟" err={errs.sessionIdleMinutes} />)}
-              {row('最长有效', 's-abs', <NumField id="s-abs" value={form.sessionAbsoluteHours} onChange={set('sessionAbsoluteHours')} unit="小时" err={errs.sessionAbsoluteHours} />)}
+              {row('保留时间', 's-audit', <NumField id="s-audit" value={form.auditRetentionDays} onChange={set('auditRetentionDays')} unit="天" err={errs.auditRetentionDays} />)}
             </div>
           </section>
           <section className="section">
@@ -374,7 +372,7 @@ function Settings({ settings, setSettings, guard }) {
 }
 
 // ---------------------------------------------------------------- status
-function Status({ dataState, onRetryLoad }) {
+function Status({ dataState, onRetryLoad, settings }) {
   const toast = useToast();
   const [running, setRunning] = useState(null);
   const [results, setResults] = useState({
@@ -383,7 +381,15 @@ function Status({ dataState, onRetryLoad }) {
     snapshot: { tone: 'warning', text: '', at: STATUS.lastSnapshot },
   });
   const [warnings, setWarnings] = useState(STATUS.warnings);
-  const [audit, setAudit] = useState(AUDIT.slice(0, 6));
+  const [kind, setKind] = useState('');
+  const [shown, setShown] = useState(AUDIT_PAGE);
+  const [more, setMore] = useState(false);
+  const auditAll = AUDIT.filter((a) => !kind || a.kind === kind);
+  const audit = auditAll.slice(0, shown);
+  const loadMore = () => {
+    setMore(true);
+    setTimeout(() => (setShown((n) => n + AUDIT_PAGE), setMore(false)), 700);
+  };
   const run = (k) => {
     setRunning(k);
     setTimeout(() => {
@@ -493,27 +499,45 @@ function Status({ dataState, onRetryLoad }) {
           </section>
 
           <section className="section">
-            <h2>操作记录</h2>
-            <div className="list" role="table" aria-label="操作记录">
-              <div className="list-row list-head audit-row" role="row">
-                <span>时间</span>
-                <span>操作者</span>
-                <span>操作</span>
-                <span>对象</span>
+            <div className="section-head">
+              <div className="head-title">
+                <h2>操作记录</h2>
+                <span className="s muted">保留 {settings.auditRetentionDays} 天</span>
               </div>
-              {audit.map((a, i) => (
-                <div key={i} className="list-row audit-row" role="row">
-                  <span className="c-at muted num">{fmtDate(a.at)}</span>
-                  <span className="c-actor ellipsis">{a.actor}</span>
-                  <span className="c-action medium">{a.action}</span>
-                  <span className="c-target ellipsis muted">{a.target}</span>
-                </div>
-              ))}
+              <Select
+                label="操作类型"
+                value={kind}
+                options={AUDIT_KINDS}
+                width={128}
+                onChange={(v) => (setKind(v), setShown(AUDIT_PAGE))}
+              />
             </div>
-            {audit.length < AUDIT.length && (
+            {audit.length ? (
+              <div className="list" role="table" aria-label="操作记录">
+                <div className="list-row list-head audit-row" role="row">
+                  <span>时间</span>
+                  <span>操作者</span>
+                  <span>操作</span>
+                  <span>对象</span>
+                </div>
+                {audit.map((a, i) => (
+                  <div key={i} className="list-row audit-row" role="row">
+                    <span className="c-at muted num">{fmtDate(a.at)}</span>
+                    <span className="c-actor ellipsis">{a.actor}</span>
+                    <span className="c-action medium">{a.action}</span>
+                    <span className="c-target ellipsis muted">{a.target}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="state" style={{ padding: '32px 0' }}>
+                <span className="t">没有匹配的记录</span>
+              </div>
+            )}
+            {audit.length < auditAll.length && (
               <div>
-                <button type="button" className="btn btn-ghost" style={{ marginLeft: -12 }} onClick={() => setAudit(AUDIT)}>
-                  加载更多
+                <button type="button" className="btn btn-ghost" style={{ marginLeft: -12 }} disabled={more} onClick={loadMore}>
+                  {more ? '加载中…' : '加载更多'}
                 </button>
               </div>
             )}
