@@ -27,7 +27,7 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=web /src/internal/webui/dist ./internal/webui/dist
-ARG VERSION=0.1.0
+ARG VERSION=0.0.1-dev
 ARG COMMIT=unknown
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=${VERSION} -X picberth/internal/buildinfo.Commit=${COMMIT}" -o /out/picberth ./cmd/picberth && mkdir -p /out/root && mkdir -m 0700 /out/root/data
 

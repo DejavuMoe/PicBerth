@@ -49,7 +49,7 @@ docker compose -f deploy/compose.yaml up -d
 | `PICBERTH_SNAPSHOT_DIR` | `--snapshot-dir` | `<数据目录>/snapshots` | 快照输出目录 |
 | `PICBERTH_LOG_LEVEL` / `PICBERTH_LOG_FORMAT` | `--log-level` / `--log-format` | `info` / `text` | 日志级别 / 格式（`text` 或 `json`） |
 
-上传限制、允许的格式、回收站保留天数、会话时长等业务设置在管理界面的「设置」中修改。
+上传限制、允许的格式、重复文件处理、回收站和操作日志保留天数在管理界面的「设置」中修改。
 
 ### 反向代理要点
 
@@ -112,3 +112,8 @@ linux-task.ps1 -Mode build -Project <项目路径> -Command 'export PATH="$HOME/
 
 图片从备份恢复后，运行 `picberth check --full`（或状态页的完整检查）验证内容并清除损坏标记；
 快速检查只检查结构和文件位置，不会清除已有损坏标记。
+
+## 发布
+
+发布演练与正式发布步骤见 [`docs/releasing.md`](docs/releasing.md)。
+项目使用 [MIT 许可证](LICENSE)。

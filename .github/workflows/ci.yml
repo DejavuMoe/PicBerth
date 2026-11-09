@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     # Validate a commit before a direct fast-forward to protected master.
-    branches: ['**']
+    branches: [master, 'maintenance/**']
   pull_request:
   workflow_call:
 
@@ -78,6 +78,7 @@ jobs:
               cd ".agents/skills/baoyu-design/agents/$tool"
               npm ci --ignore-scripts
               npm audit --audit-level moderate
+              npm run typecheck
               npm run build
               npm test
             )
@@ -87,31 +88,17 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: windows
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-        with:
-          go-cache-suffix: ${{ matrix.goos }}-${{ matrix.goarch }}
       - run: mise run web:build
       - name: Cross-compile smoke build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -o dist/ ./cmd/picberth
+        run: |
+          for target in linux/amd64 linux/arm64 windows/amd64 darwin/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -o "dist/${target//\//-}/" ./cmd/picberth
+          done
 
   e2e:
     needs: test
