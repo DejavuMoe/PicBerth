@@ -13,5 +13,8 @@ export const phone = watch('(max-width: 720px)');
 /** Tablet layout: the sidebar collapses to an icon rail. */
 export const tablet = watch('(min-width: 721px) and (max-width: 1099px)');
 
-/** Wide layout: room for a docked detail column. */
-export const wide = watch('(min-width: 1280px)');
+/** Wide layout: room for the folder tree pane beside the list. */
+export const wideNav = watch('(min-width: 1100px)');
+
+/** Wide layout: room for the tree pane, the list and a docked 360px detail column. */
+export const wide = watch('(min-width: 1440px)');

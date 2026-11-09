@@ -2,17 +2,15 @@
   import { onDestroy, onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import Modal from '../components/Modal.svelte';
-  import Seg from '../components/Seg.svelte';
   import Switch from '../components/Switch.svelte';
   import { api, errorMessage } from '../lib/api';
   import { FORMAT_NAMES } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
   import { phone } from '../lib/media.svelte';
-  import { canLeave, addGuard } from '../lib/router.svelte';
-  import { logout, refreshSession, session } from '../lib/session.svelte';
-  import { setTheme, theme, THEME_OPTIONS } from '../lib/theme.svelte';
+  import { addGuard } from '../lib/router.svelte';
+  import { refreshSession } from '../lib/session.svelte';
   import { bottomBar, toast } from '../lib/toast.svelte';
-  import type { ImageFormat, Settings } from '../lib/types';
+  import type { ImageFormat, Settings, WritableSettings } from '../lib/types';
 
   const ALL_FORMATS: ImageFormat[] = ['jpeg', 'png', 'gif', 'webp', 'avif'];
   const MB = 1024 * 1024;
@@ -20,27 +18,21 @@
   // Numbers are edited as text so partial input never fights the user.
   interface Form {
     maxMB: string;
-    maxMP: string;
     formats: Record<ImageFormat, boolean>;
     dedupe: boolean;
     retention: string;
-    perMinute: string;
-    idle: string;
-    absolute: string;
+    audit: string;
   }
-  type NumberKey = 'maxMB' | 'maxMP' | 'retention' | 'perMinute' | 'idle' | 'absolute';
+  type NumberKey = 'maxMB' | 'retention' | 'audit';
 
   const trimNum = (n: number) => String(Math.round(n * 1e6) / 1e6);
   function toForm(s: Settings): Form {
     return {
       maxMB: trimNum(s.maxUploadBytes / MB),
-      maxMP: trimNum(s.maxPixels / 1e6),
       formats: Object.fromEntries(ALL_FORMATS.map((f) => [f, s.allowedFormats.includes(f)])) as Record<ImageFormat, boolean>,
       dedupe: s.dedupe,
       retention: String(s.trashRetentionDays),
-      perMinute: String(s.uploadsPerMinute),
-      idle: String(s.sessionIdleMinutes),
-      absolute: String(s.sessionAbsoluteHours),
+      audit: String(s.auditRetentionDays),
     };
   }
 
@@ -49,13 +41,10 @@
   let loadError = $state('');
   let form = $state<Form>({
     maxMB: '',
-    maxMP: '',
     formats: { jpeg: false, png: false, gif: false, webp: false, avif: false },
     dedupe: false,
     retention: '',
-    perMinute: '',
-    idle: '',
-    absolute: '',
+    audit: '',
   });
 
   async function load() {
@@ -74,16 +63,13 @@
 
   const num = (v: string) => (/^\s*\d+(\.\d+)?\s*$/.test(v) ? Number(v) : NaN);
 
-  // What the form would send, in API units. Every image is public, so no visibility field exists.
+  // What the form would send, in API units.
   const values = $derived({
     maxUploadBytes: Math.round(num(form.maxMB) * MB),
-    maxPixels: Math.round(num(form.maxMP) * 1e6),
     allowedFormats: ALL_FORMATS.filter((f) => form.formats[f]),
     dedupe: form.dedupe,
     trashRetentionDays: num(form.retention),
-    uploadsPerMinute: num(form.perMinute),
-    sessionIdleMinutes: num(form.idle),
-    sessionAbsoluteHours: num(form.absolute),
+    auditRetentionDays: num(form.audit),
   });
 
   const range = (lo: number, hi: number) => `请输入 ${lo} 到 ${hi} 之间的数字`;
@@ -93,15 +79,11 @@
     if (!baseline) return {};
     const hard = baseline.hardMaxUploadBytes;
     const mb = num(form.maxMB);
-    const mp = num(form.maxMP);
     return {
       maxMB: Number.isNaN(mb) || values.maxUploadBytes < 1024 || values.maxUploadBytes > hard ? range(1, Math.floor(hard / MB)) : '',
-      maxMP: Number.isNaN(mp) || mp < 1 || mp > 200 ? range(1, 200) : '',
       formats: values.allowedFormats.length === 0 ? '至少保留一种格式' : '',
-      retention: intIn(values.trashRetentionDays, 0, 365),
-      perMinute: intIn(values.uploadsPerMinute, 1, 10000),
-      idle: intIn(values.sessionIdleMinutes, 5, 10080),
-      absolute: intIn(values.sessionAbsoluteHours, 1, 8760),
+      retention: intIn(values.trashRetentionDays, 1, 365),
+      audit: intIn(values.auditRetentionDays, 7, 3650),
     };
   });
   const invalid = $derived(Object.values(errors).some(Boolean));
@@ -127,7 +109,7 @@
     const patch: Record<string, unknown> = {};
     for (const k of changed) patch[k] = values[k];
     try {
-      const s = await api.patchSettings(patch as Parameters<typeof api.patchSettings>[0]);
+      const s = await api.patchSettings(patch as Partial<WritableSettings>);
       baseline = s;
       form = toForm(s);
       toast('设置已保存');
@@ -175,18 +157,6 @@
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   });
-
-  // ---- account (phone only: the phone layout has no sidebar) -----------------------------------
-  // Same sign-out flow as the Shell account menu; the settings leave guard covers unsaved changes.
-  async function signOut() {
-    if (!(await canLeave('/login'))) return;
-    try {
-      await logout();
-      toast('已退出登录');
-    } catch {
-      toast('退出失败，请重试');
-    }
-  }
 </script>
 
 {#snippet numberField(key: NumberKey, id: string, unit: string)}
@@ -194,7 +164,7 @@
     <input
       {id}
       class="input num"
-      inputmode={key === 'maxMB' || key === 'maxMP' ? 'decimal' : 'numeric'}
+      inputmode={key === 'maxMB' ? 'decimal' : 'numeric'}
       aria-invalid={errors[key] ? 'true' : undefined}
       bind:value={form[key]}
     />
@@ -231,12 +201,6 @@
                 {@render numberField('maxMB', 's-max', 'MB')}
               </div>
             </div>
-            <div class="form-row">
-              <label class="k" for="s-px">像素上限</label>
-              <div class="ctl">
-                {@render numberField('maxMP', 's-px', 'MP')}
-              </div>
-            </div>
             <div class="form-row stack">
               <span class="k">格式</span>
               <div class="ctl">
@@ -252,12 +216,6 @@
                   </button>
                 {/each}
                 {#if errors.formats}<span class="field-error">{errors.formats}</span>{/if}
-              </div>
-            </div>
-            <div class="form-row">
-              <label class="k" for="s-rate">频率上限</label>
-              <div class="ctl">
-                {@render numberField('perMinute', 's-rate', '次/分')}
               </div>
             </div>
             <div class="form-row">
@@ -282,18 +240,12 @@
         </section>
 
         <section class="section">
-          <h2>会话</h2>
+          <h2>操作记录</h2>
           <div class="form-rows">
             <div class="form-row">
-              <label class="k" for="s-idle">空闲超时</label>
+              <label class="k" for="s-audit">保留时间</label>
               <div class="ctl">
-                {@render numberField('idle', 's-idle', '分钟')}
-              </div>
-            </div>
-            <div class="form-row">
-              <label class="k" for="s-abs">最长有效</label>
-              <div class="ctl">
-                {@render numberField('absolute', 's-abs', '小时')}
+                {@render numberField('audit', 's-audit', '天')}
               </div>
             </div>
           </div>
@@ -316,32 +268,7 @@
             </div>
           </div>
         </section>
-
-        {#if phone.matches}
-          <section class="section">
-            <h2>账户</h2>
-            <div class="form-rows">
-              <div class="form-row">
-                <span class="k">用户名</span>
-                <div class="ctl">
-                  <span>{session.user?.name ?? ''}</span>
-                </div>
-              </div>
-              <div class="form-row">
-                <span class="k">主题</span>
-                <div class="ctl">
-                  <Seg label="主题" value={theme.choice} onchange={setTheme} options={THEME_OPTIONS.map((t) => ({ key: t.key, label: t.label }))} />
-                </div>
-              </div>
-            </div>
-            <div>
-              <button type="button" class="btn btn-ghost" style="margin-left: -12px" onclick={() => void signOut()}>
-                <Icon name="logout" />
-                退出
-              </button>
-            </div>
-          </section>
-        {/if}
+        {#if saveError}<span class="field-error" role="alert">{saveError}</span>{/if}
       {/if}
     </div>
   </div>

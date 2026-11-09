@@ -16,8 +16,8 @@ const multipartSlack = 64 << 10 // headroom for multipart framing on top of maxU
 
 const maxFormParts = 8
 
-// maxTagPartBytes bounds one `tag` part: 32 characters of up to 4 bytes each plus surrounding blanks.
-const maxTagPartBytes = 512
+// maxFolderPartBytes bounds the `folder` part: a 16-character id plus surrounding blanks.
+const maxFolderPartBytes = 64
 
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 	ctx := r.Context()
@@ -56,7 +56,7 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 			s.writeError(w, r, multipartError(err))
 			return
 		}
-		if part.FormName() != "tag" { // tag parts have their own limit (20 per image)
+		if part.FormName() != "tag" { // legacy `tag` parts are ignored entirely, including the part limit
 			parts++
 			if parts > maxFormParts {
 				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "Too many form parts."})
@@ -73,30 +73,17 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request, c *call) {
 				s.writeError(w, r, uploadReadError(err))
 				return
 			}
-		case "visibility":
-			v, err := io.ReadAll(io.LimitReader(part, 33))
+		case "folder":
+			v, err := io.ReadAll(io.LimitReader(part, maxFolderPartBytes+1))
 			if err != nil {
 				s.writeError(w, r, multipartError(err))
 				return
 			}
-			if err := up.SetVisibility(strings.TrimSpace(string(v))); err != nil {
-				s.writeError(w, r, err)
+			if len(v) > maxFolderPartBytes {
+				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "The folder value is too long."})
 				return
 			}
-		case "tag":
-			v, err := io.ReadAll(io.LimitReader(part, maxTagPartBytes+1))
-			if err != nil {
-				s.writeError(w, r, multipartError(err))
-				return
-			}
-			if len(v) > maxTagPartBytes {
-				s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "A tag must be at most 32 characters."})
-				return
-			}
-			if err := up.AddTag(string(v)); err != nil {
-				s.writeError(w, r, err)
-				return
-			}
+			up.SetFolder(string(v))
 		}
 		// anything else is ignored; NextPart skips the unread remainder
 	}
@@ -146,8 +133,18 @@ func uploadReadError(err error) error {
 func (s *Server) listImages(w http.ResponseWriter, r *http.Request, c *call) {
 	q := r.URL.Query()
 	lp := core.ListParams{
-		State: q.Get("state"), Q: q.Get("q"), Formats: q["format"], Tags: q["tag"], Sources: q["source"],
-		Visibility: q.Get("visibility"), Sort: q.Get("sort"), Cursor: q.Get("cursor"),
+		State: q.Get("state"), Q: q.Get("q"), Formats: q["format"], Sources: q["source"],
+		Folder: q.Get("folder"), Sort: q.Get("sort"), Cursor: q.Get("cursor"),
+	}
+	if v := q.Get("recursive"); v != "" {
+		switch v {
+		case "true":
+			lp.Recursive = true
+		case "false":
+		default:
+			s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "recursive must be true or false."})
+			return
+		}
 	}
 	for name, dst := range map[string]**time.Time{"since": &lp.Since, "until": &lp.Until} {
 		if v := q.Get(name); v != "" {
@@ -216,15 +213,16 @@ func (s *Server) patchImage(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Visibility *string   `json:"visibility"`
-		Filename   *string   `json:"filename"`
-		Tags       *[]string `json:"tags"`
+		Filename *string        `json:"filename"`
+		FolderID nullableString `json:"folderId"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	v, err := s.core.PatchImage(r.Context(), c.p, r.PathValue("id"), core.ImagePatch{Visibility: req.Visibility, Filename: req.Filename, Tags: req.Tags})
+	v, err := s.core.PatchImage(r.Context(), c.p, r.PathValue("id"), core.ImagePatch{
+		Filename: req.Filename, FolderID: req.FolderID.Value, MoveFolder: req.FolderID.Set,
+	})
 	if err != nil {
 		s.writeError(w, r, err)
 		return
@@ -262,15 +260,15 @@ func (s *Server) batchImages(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Action     string   `json:"action"`
-		IDs        []string `json:"ids"`
-		Visibility string   `json:"visibility"`
+		Action   string         `json:"action"`
+		IDs      []string       `json:"ids"`
+		FolderID nullableString `json:"folderId"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.Visibility)
+	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.FolderID.Value)
 	if err != nil {
 		s.writeError(w, r, err)
 		return

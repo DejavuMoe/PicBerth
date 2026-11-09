@@ -60,8 +60,11 @@ func TestSetupFlow(t *testing.T) {
 	sess = decode[map[string]any](t, body)
 	user, _ := sess["user"].(map[string]any)
 	limits, _ := sess["limits"].(map[string]any)
-	if sess["authenticated"] != true || sess["setupRequired"] != false || user["name"] != "admin" || limits["maxUploadBytes"] != float64(20<<20) || limits["defaultVisibility"] != "public" {
+	if sess["authenticated"] != true || sess["setupRequired"] != false || user["name"] != "admin" || limits["maxUploadBytes"] != float64(20<<20) {
 		t.Fatalf("session after setup: %s", body)
+	}
+	if _, ok := limits["defaultVisibility"]; ok {
+		t.Fatalf("defaultVisibility must be gone: %s", body)
 	}
 	if fmt.Sprint(limits["allowedFormats"]) != "[jpeg png gif webp avif]" {
 		t.Fatalf("allowedFormats: %v", limits["allowedFormats"])
@@ -154,9 +157,15 @@ func TestUploadNewThenDuplicate(t *testing.T) {
 	wantStatus(t, resp, body, 201)
 	img := decode[map[string]any](t, body)
 	id := img["id"].(string)
-	if len(id) != 20 || img["duplicate"] != false || img["state"] != "active" || img["visibility"] != "public" || img["ext"] != "png" ||
+	if len(id) != 20 || img["duplicate"] != false || img["state"] != "active" || img["folderId"] != nil || img["ext"] != "png" ||
 		img["mime"] != "image/png" || img["width"] != float64(6) || img["height"] != float64(4) || img["frames"] != float64(1) || img["filename"] != "shot.png" {
 		t.Fatalf("image: %s", body)
+	}
+	if _, ok := img["visibility"]; ok {
+		t.Fatalf("visibility must be gone: %s", body)
+	}
+	if _, ok := img["tags"]; ok {
+		t.Fatalf("tags must be gone: %s", body)
 	}
 	if img["url"] != "https://img.example.com/i/"+id+".png" {
 		t.Fatalf("url: %v", img["url"])
@@ -220,9 +229,10 @@ func TestUploadRejections(t *testing.T) {
 	resp, body := h.uploadWeb(append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{7}, 50)...))
 	wantProblem(t, resp, body, 422, "invalid-image")
 
+	// 50 MP is fixed and no longer a setting
 	resp, body = h.jsonReq("PATCH", "/api/v1/settings", map[string]any{"maxPixels": 1000000}, h.asWeb()...)
-	wantStatus(t, resp, body, 200)
-	resp, body = h.uploadWeb(pngOfSize(t, 1100, 1100))
+	wantProblem(t, resp, body, 400, "validation")
+	resp, body = h.uploadWeb(pngHeader(t, 8000, 6251))
 	wantProblem(t, resp, body, 422, "too-many-pixels")
 }
 
@@ -253,9 +263,11 @@ func TestMultipartRules(t *testing.T) {
 		return h.do("POST", "/api/v1/images", body, append(h.asWeb(), withHeader("Content-Type", ct))...)
 	}
 	file := part{name: "file", filename: "a.png", data: png}
+	_, folderBody := h.web("POST", "/api/v1/folders", map[string]any{"name": "uploads"})
+	folder := decode[map[string]any](t, folderBody)["id"].(string)
 
 	// no file part
-	resp, body := do(part{name: "visibility", data: []byte("public")})
+	resp, body := do(part{name: "folder", data: []byte(folder)})
 	wantProblem(t, resp, body, 400, "validation")
 	// misnamed file field
 	resp, body = do(part{name: "image", filename: "a.png", data: png})
@@ -270,9 +282,9 @@ func TestMultipartRules(t *testing.T) {
 	}
 	resp, body = do(many...)
 	wantProblem(t, resp, body, 400, "validation")
-	// bad visibility value
-	resp, body = do(file, part{name: "visibility", data: []byte("hidden")})
-	wantProblem(t, resp, body, 400, "validation")
+	// an unknown folder is 404, never created implicitly
+	resp, body = do(file, part{name: "folder", data: []byte("0000000000000000")})
+	wantProblem(t, resp, body, 404, "not-found")
 	// not multipart at all
 	resp, body = h.do("POST", "/api/v1/images", bytes.NewReader(png), append(h.asWeb(), withHeader("Content-Type", "image/png"))...)
 	wantProblem(t, resp, body, 400, "validation")
@@ -281,18 +293,36 @@ func TestMultipartRules(t *testing.T) {
 		t.Fatalf("garbage multipart: %d %s", resp.StatusCode, body)
 	}
 
-	// visibility before the file, unknown text parts ignored
-	resp, body = do(part{name: "visibility", data: []byte("private")}, part{name: "note", data: []byte("ignored")}, file)
+	// folder before the file, unknown text parts ignored
+	resp, body = do(part{name: "folder", data: []byte(folder)}, part{name: "note", data: []byte("ignored")}, file)
 	wantStatus(t, resp, body, 201)
-	if v := decode[imageJSON](t, body); v.Visibility != "private" {
-		t.Fatalf("visibility before file: %s", body)
+	if v := decode[imageJSON](t, body); v.FolderID == nil || *v.FolderID != folder {
+		t.Fatalf("folder before file: %s", body)
 	}
-	// visibility after the file
-	resp, body = do(part{name: "file", filename: "b.png", data: makePNG(t, 13)}, part{name: "visibility", data: []byte(" private\n")})
+	// folder after the file; blanks mean the root
+	resp, body = do(part{name: "file", filename: "b.png", data: makePNG(t, 13)}, part{name: "folder", data: []byte(folder)})
 	wantStatus(t, resp, body, 201)
-	if v := decode[imageJSON](t, body); v.Visibility != "private" {
-		t.Fatalf("visibility after file: %s", body)
+	if v := decode[imageJSON](t, body); v.FolderID == nil || *v.FolderID != folder {
+		t.Fatalf("folder after file: %s", body)
 	}
+	resp, body = do(part{name: "file", filename: "c.png", data: makePNG(t, 14)}, part{name: "folder", data: []byte("  ")})
+	wantStatus(t, resp, body, 201)
+	if v := decode[imageJSON](t, body); v.FolderID != nil {
+		t.Fatalf("blank folder must mean root: %s", body)
+	}
+	// legacy tag parts are ignored and do not count against the part limit
+	tagged := []part{file}
+	for i := 0; i < 20; i++ {
+		tagged = append(tagged, part{name: "tag", data: []byte(fmt.Sprint("t", i))})
+	}
+	resp, body = do(tagged...)
+	wantStatus(t, resp, body, 201)
+	if strings.Contains(string(body), `"tags"`) {
+		t.Fatalf("tags must be gone: %s", body)
+	}
+	// an over-long folder value is a rejection
+	resp, body = do(part{name: "file", filename: "d.png", data: makePNG(t, 15)}, part{name: "folder", data: []byte(strings.Repeat("x", 100))})
+	wantProblem(t, resp, body, 400, "validation")
 	if tmp, _ := os.ReadDir(filepath.Join(h.dir.Path(), "tmp")); len(tmp) != 0 {
 		t.Fatalf("temp files left: %d", len(tmp))
 	}
@@ -317,7 +347,6 @@ func TestTokenScopeMatrix(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	_, upSecret := h.createToken("upload")
 	_, upSecret2 := h.createToken("upload")
-	_, rdSecret := h.createToken("read")
 	_, mgSecret := h.createToken("manage")
 
 	webImg := h.mustUploadWeb(31)
@@ -327,9 +356,7 @@ func TestTokenScopeMatrix(t *testing.T) {
 	if own.Source.Kind != "token" || !strings.HasPrefix(own.Source.TokenName, "t upload") {
 		t.Fatalf("source: %+v", own.Source)
 	}
-	resp, body = h.upload(makePNG(t, 33), []reqOpt{withBearer(rdSecret)})
-	wantProblem(t, resp, body, 403, "forbidden")
-	resp, body = h.upload(makePNG(t, 34), []reqOpt{withBearer(mgSecret)})
+	resp, body = h.upload(makePNG(t, 33), []reqOpt{withBearer(mgSecret)})
 	wantStatus(t, resp, body, 201)
 	mgImg := decode[imageJSON](t, body)
 
@@ -355,8 +382,8 @@ func TestTokenScopeMatrix(t *testing.T) {
 	resp, body = get(upSecret, "/api/v1/images/"+webImg.ID+"/raw")
 	wantProblem(t, resp, body, 404, "not-found")
 
-	// upload token cannot mutate
-	resp, body = send(upSecret, "PATCH", "/api/v1/images/"+own.ID, map[string]string{"visibility": "private"})
+	// upload token cannot mutate images or folders, but may list folders
+	resp, body = send(upSecret, "PATCH", "/api/v1/images/"+own.ID, map[string]any{"filename": "x.png"})
 	wantProblem(t, resp, body, 403, "forbidden")
 	resp, body = send(upSecret, "DELETE", "/api/v1/images/"+own.ID, nil)
 	wantProblem(t, resp, body, 403, "forbidden")
@@ -366,13 +393,17 @@ func TestTokenScopeMatrix(t *testing.T) {
 	wantProblem(t, resp, body, 403, "forbidden")
 	resp, body = send(upSecret, "POST", "/api/v1/images/batch", map[string]any{"action": "trash", "ids": []string{own.ID}})
 	wantProblem(t, resp, body, 403, "forbidden")
+	resp, body = send(upSecret, "POST", "/api/v1/folders", map[string]any{"name": "x"})
+	wantProblem(t, resp, body, 403, "forbidden")
+	resp, body = get(upSecret, "/api/v1/folders")
+	wantStatus(t, resp, body, 200)
 
 	// no token can touch tokens, settings, status, operations, audit
-	for _, secret := range []string{upSecret, rdSecret, mgSecret} {
+	for _, secret := range []string{upSecret, mgSecret} {
 		for _, c := range []struct{ method, path string }{
 			{"GET", "/api/v1/tokens"}, {"POST", "/api/v1/tokens"}, {"DELETE", "/api/v1/tokens/1"},
 			{"GET", "/api/v1/settings"}, {"PATCH", "/api/v1/settings"}, {"GET", "/api/v1/status"},
-			{"POST", "/api/v1/checks"}, {"POST", "/api/v1/snapshots"}, {"GET", "/api/v1/audit"},
+			{"POST", "/api/v1/checks"}, {"POST", "/api/v1/snapshots"}, {"GET", "/api/v1/audit"}, {"GET", "/api/v1/audit/actions"},
 		} {
 			var payload any
 			if c.method == "POST" || c.method == "PATCH" {
@@ -388,23 +419,12 @@ func TestTokenScopeMatrix(t *testing.T) {
 		t.Fatal("a token changed the settings")
 	}
 
-	// read token: sees everything, including private bytes, cannot mutate
-	resp, body = h.web("PATCH", "/api/v1/images/"+webImg.ID, map[string]string{"visibility": "private"})
+	// manage token: full image control, including moves
+	resp, body = send(mgSecret, "PATCH", "/api/v1/images/"+mgImg.ID, map[string]any{"filename": "managed.png"})
 	wantStatus(t, resp, body, 200)
-	resp, body = get(rdSecret, "/api/v1/images")
-	if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 3 {
-		t.Fatalf("read token list: %s", body)
+	if v := decode[imageJSON](t, body); v.URL == "" {
+		t.Fatalf("patch: %s", body)
 	}
-	resp, body = get(rdSecret, "/api/v1/images/"+webImg.ID+"/raw")
-	wantStatus(t, resp, body, 200)
-	resp, body = send(rdSecret, "DELETE", "/api/v1/images/"+webImg.ID, nil)
-	wantProblem(t, resp, body, 403, "forbidden")
-	resp, body = get(rdSecret, "/api/v1/images?state=trashed")
-	wantProblem(t, resp, body, 403, "forbidden")
-
-	// manage token: full image control
-	resp, body = send(mgSecret, "PATCH", "/api/v1/images/"+mgImg.ID, map[string]string{"visibility": "private"})
-	wantStatus(t, resp, body, 200)
 	resp, body = send(mgSecret, "DELETE", "/api/v1/images/"+own.ID, nil)
 	wantStatus(t, resp, body, 204)
 	resp, body = get(upSecret, "/api/v1/images/"+own.ID)
@@ -430,7 +450,7 @@ func TestTokenScopeMatrix(t *testing.T) {
 		}](t, b).Items
 	}
 	toks := list()
-	if len(toks) != 4 {
+	if len(toks) != 3 {
 		t.Fatalf("tokens: %d", len(toks))
 	}
 	for _, tk := range toks {
@@ -457,12 +477,16 @@ func TestTokenCreateValidation(t *testing.T) {
 	for _, bad := range []map[string]any{
 		{"name": "", "scopes": []string{"upload"}},
 		{"name": "x", "scopes": []string{}},
-		{"name": "x", "scopes": []string{"admin"}},
 		{"name": "x", "scopes": []string{"upload"}, "expiresInDays": 0},
 		{"name": "x", "scopes": []string{"upload"}, "unknownField": true},
 	} {
 		resp, body := h.web("POST", "/api/v1/tokens", bad)
 		wantProblem(t, resp, body, 400, "validation")
+	}
+	// unknown and removed scopes are 422; read no longer exists
+	for _, scopes := range [][]string{{"admin"}, {"read"}, {"upload", "read"}} {
+		resp, body := h.web("POST", "/api/v1/tokens", map[string]any{"name": "x", "scopes": scopes})
+		wantProblem(t, resp, body, 422, "invalid-scope")
 	}
 	resp, body := h.web("POST", "/api/v1/tokens", map[string]any{"name": "PicGo", "scopes": []string{"upload"}, "expiresInDays": 30})
 	wantStatus(t, resp, body, 201)
@@ -515,7 +539,7 @@ func TestCSRF(t *testing.T) {
 	resp, body = h.do("GET", "/api/v1/tokens", nil, cookie)
 	wantStatus(t, resp, body, 200)
 	// token requests need neither header
-	resp, body = h.jsonReq("PATCH", "/api/v1/images/"+img.ID, map[string]string{"visibility": "private"}, withBearer(secret))
+	resp, body = h.jsonReq("PATCH", "/api/v1/images/"+img.ID, map[string]any{"filename": "csrf.png"}, withBearer(secret))
 	wantStatus(t, resp, body, 200)
 	resp, body = h.upload(makePNG(t, 42), []reqOpt{withBearer(secret)})
 	wantStatus(t, resp, body, 201)
@@ -619,24 +643,14 @@ func TestPublicImageRangeHeadAndWrongExt(t *testing.T) {
 	}
 }
 
-func TestPrivateImage(t *testing.T) {
+func TestPublicImageAlwaysPublic(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
-	img := h.mustUploadWeb(61, part{name: "visibility", data: []byte("private")})
-	if img.Visibility != "private" {
-		t.Fatalf("visibility %q", img.Visibility)
-	}
+	img := h.mustUploadWeb(61)
 	resp, body := h.do("GET", "/i/"+img.ID+".png", nil)
-	wantStatus(t, resp, body, 404)
-	// the 404 for a private image looks exactly like the 404 for an unknown one
-	resp2, body2 := h.do("GET", "/i/00000000000000000000.png", nil)
-	if !bytes.Equal(body, body2) || resp.Header.Get("Content-Type") != resp2.Header.Get("Content-Type") {
-		t.Fatalf("private vs unknown differ: %q vs %q", body, body2)
-	}
-	// even a session cookie does not unlock public delivery
-	resp, _ = h.do("GET", "/i/"+img.ID+".png", nil, withHeader("Cookie", h.cookie))
-	if resp.StatusCode != 404 {
-		t.Fatalf("cookie unlocked /i: %d", resp.StatusCode)
-	}
+	wantStatus(t, resp, body, 200)
+	// a session cookie changes nothing on the public route
+	resp, body = h.do("GET", "/i/"+img.ID+".png", nil, withHeader("Cookie", h.cookie))
+	wantStatus(t, resp, body, 200)
 	resp, body = h.do("GET", "/api/v1/images/"+img.ID+"/raw", nil, withHeader("Cookie", h.cookie))
 	wantStatus(t, resp, body, 200)
 	if resp.Header.Get("Cache-Control") != "private, no-store" || resp.Header.Get("Cross-Origin-Resource-Policy") != "same-origin" ||
@@ -650,22 +664,23 @@ func TestPrivateImage(t *testing.T) {
 	resp, body = h.do("GET", "/api/v1/images/"+img.ID+"/raw", nil)
 	wantProblem(t, resp, body, 401, "unauthorized")
 
-	// making it public publishes it, private again withdraws it
-	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"visibility": "public"})
-	wantStatus(t, resp, body, 200)
-	resp, _ = h.do("GET", "/i/"+img.ID+".png", nil)
-	if resp.StatusCode != 200 {
-		t.Fatalf("public after patch: %d", resp.StatusCode)
-	}
-	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"visibility": "private"})
-	wantStatus(t, resp, body, 200)
+	// trashed and purged images are 404 on the public route, and an unknown id answers identically
+	h.web("DELETE", "/api/v1/images/"+img.ID, nil)
 	resp, _ = h.do("GET", "/i/"+img.ID+".png", nil)
 	if resp.StatusCode != 404 {
-		t.Fatalf("private after patch: %d", resp.StatusCode)
+		t.Fatalf("trashed image still public: %d", resp.StatusCode)
 	}
-	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"visibility": "secret"})
+	h.web("POST", "/api/v1/images/"+img.ID+"/restore", nil)
+	resp, _ = h.do("GET", "/i/"+img.ID+".png", nil)
+	if resp.StatusCode != 200 {
+		t.Fatalf("restored image not public: %d", resp.StatusCode)
+	}
+	// unknown JSON fields on PATCH are rejected
+	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]any{"visibility": "private"})
 	wantProblem(t, resp, body, 400, "validation")
-	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{})
+	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]any{"tags": []string{"x"}})
+	wantProblem(t, resp, body, 400, "validation")
+	resp, body = h.web("PATCH", "/api/v1/images/"+img.ID, map[string]any{})
 	wantProblem(t, resp, body, 400, "validation")
 }
 
@@ -869,9 +884,10 @@ func atoi(s string) int {
 
 func TestUploadRateLimitHTTP(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
+	// the upload rate limit is a fixed 60 per minute and no longer a setting
 	resp, body := h.web("PATCH", "/api/v1/settings", map[string]any{"uploadsPerMinute": 2})
-	wantStatus(t, resp, body, 200)
-	for i := 0; i < 2; i++ {
+	wantProblem(t, resp, body, 400, "validation")
+	for i := 0; i < 60; i++ {
 		resp, body = h.uploadWeb(makePNG(t, 200+i))
 		wantStatus(t, resp, body, 201)
 	}
@@ -887,43 +903,45 @@ func TestSettingsEndpoints(t *testing.T) {
 	resp, body := h.web("GET", "/api/v1/settings", nil)
 	wantStatus(t, resp, body, 200)
 	cur := decode[map[string]any](t, body)
-	for _, k := range []string{"maxUploadBytes", "maxPixels", "allowedFormats", "dedupe", "defaultVisibility", "trashRetentionDays",
-		"uploadsPerMinute", "sessionIdleMinutes", "sessionAbsoluteHours", "publicUrl", "imageUrl", "hardMaxUploadBytes"} {
+	for _, k := range []string{"maxUploadBytes", "allowedFormats", "dedupe", "trashRetentionDays", "auditRetentionDays", "publicUrl", "imageUrl", "hardMaxUploadBytes"} {
 		if _, ok := cur[k]; !ok {
 			t.Errorf("settings lack %q", k)
+		}
+	}
+	for _, gone := range []string{"maxPixels", "defaultVisibility", "uploadsPerMinute", "sessionIdleMinutes", "sessionAbsoluteHours"} {
+		if _, ok := cur[gone]; ok {
+			t.Errorf("settings still expose %q", gone)
 		}
 	}
 	if cur["publicUrl"] != "https://pics.example.com" || cur["imageUrl"] != "https://img.example.com" || cur["hardMaxUploadBytes"] != float64(100<<20) {
 		t.Fatalf("read-only values: %v", cur)
 	}
-	resp, body = h.web("PATCH", "/api/v1/settings", map[string]any{"dedupe": false, "defaultVisibility": "private", "trashRetentionDays": 7, "allowedFormats": []string{"png"}})
+	if cur["auditRetentionDays"] != float64(180) || cur["trashRetentionDays"] != float64(30) || cur["dedupe"] != true {
+		t.Fatalf("defaults: %v", cur)
+	}
+	resp, body = h.web("PATCH", "/api/v1/settings", map[string]any{"dedupe": false, "trashRetentionDays": 7, "auditRetentionDays": 30, "allowedFormats": []string{"png"}})
 	wantStatus(t, resp, body, 200)
 	upd := decode[map[string]any](t, body)
-	if upd["dedupe"] != false || upd["defaultVisibility"] != "private" || upd["trashRetentionDays"] != float64(7) || fmt.Sprint(upd["allowedFormats"]) != "[png]" {
+	if upd["dedupe"] != false || upd["trashRetentionDays"] != float64(7) || upd["auditRetentionDays"] != float64(30) || fmt.Sprint(upd["allowedFormats"]) != "[png]" {
 		t.Fatalf("patched: %s", body)
 	}
 	// echoing a whole GET response back is accepted
 	resp, body = h.web("PATCH", "/api/v1/settings", upd)
 	wantStatus(t, resp, body, 200)
-	// read-only changes and bad values are rejected
+	// read-only changes, bad values and removed keys are rejected
 	for _, bad := range []map[string]any{
 		{"publicUrl": "https://evil.example"}, {"hardMaxUploadBytes": 1}, {"maxUploadBytes": 1}, {"maxUploadBytes": 1 << 40},
-		{"maxPixels": 10}, {"allowedFormats": []string{"svg"}}, {"trashRetentionDays": 400}, {"uploadsPerMinute": 0},
-		{"sessionIdleMinutes": 1}, {"sessionAbsoluteHours": 100000}, {"nonsense": 1}, {"dedupe": "yes"},
+		{"maxPixels": 1000000}, {"allowedFormats": []string{"svg"}}, {"trashRetentionDays": 400}, {"trashRetentionDays": -1},
+		{"auditRetentionDays": 6}, {"auditRetentionDays": 3651}, {"uploadsPerMinute": 10}, {"sessionIdleMinutes": 10},
+		{"defaultVisibility": "private"}, {"nonsense": 1}, {"dedupe": "yes"},
 	} {
 		resp, body = h.web("PATCH", "/api/v1/settings", bad)
 		wantProblem(t, resp, body, 400, "validation")
 	}
-	// new default visibility applies to uploads without a visibility part
-	resp, body = h.uploadWeb(makePNG(t, 300))
-	wantStatus(t, resp, body, 201)
-	if decode[imageJSON](t, body).Visibility != "private" {
-		t.Fatalf("default visibility ignored: %s", body)
-	}
 	// format restriction applies
 	resp, body = h.uploadWeb(makeJPEGish())
 	wantProblem(t, resp, body, 415, "unsupported-format")
-	// dedupe off: same bytes twice make two images
+	// dedupe off: same bytes twice make two images in the same folder
 	a := h.uploadAndDecode(makePNG(t, 301))
 	b := h.uploadAndDecode(makePNG(t, 301))
 	if a.ID == b.ID || b.Duplicate {
@@ -945,7 +963,11 @@ func (h *harness) uploadAndDecode(data []byte) imageJSON {
 func TestStatusChecksSnapshotsAudit(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	img := h.mustUploadWeb(401)
-	h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"visibility": "private"})
+	h.web("PATCH", "/api/v1/images/"+img.ID, map[string]any{"filename": "renamed.png"})
+	_, fbody := h.web("POST", "/api/v1/folders", map[string]any{"name": "ops"})
+	folder := decode[map[string]any](t, fbody)["id"].(string)
+	h.web("PATCH", "/api/v1/folders/"+folder, map[string]any{"name": "ops2"})
+	h.web("DELETE", "/api/v1/folders/"+folder, nil)
 	h.web("DELETE", "/api/v1/images/"+img.ID, nil)
 	h.web("POST", "/api/v1/images/"+img.ID+"/restore", nil)
 	h.web("DELETE", "/api/v1/images/"+img.ID, nil)
@@ -991,7 +1013,7 @@ func TestStatusChecksSnapshotsAudit(t *testing.T) {
 	}
 
 	// audit trail
-	resp, body = h.web("GET", "/api/v1/audit?limit=200", nil)
+	resp, body = h.web("GET", "/api/v1/audit?limit=100", nil)
 	wantStatus(t, resp, body, 200)
 	items := decode[struct {
 		Items []struct {
@@ -1011,13 +1033,53 @@ func TestStatusChecksSnapshotsAudit(t *testing.T) {
 			t.Fatalf("incomplete audit item: %+v", it)
 		}
 	}
-	for _, want := range []string{"login.success", "image.visibility", "image.trash", "image.restore", "image.purge", "token.create", "check.full", "snapshot", "settings.update"} {
-		if want == "settings.update" {
-			continue // no settings change in this test
-		}
+	for _, want := range []string{"login.success", "image.rename", "image.trash", "image.restore", "image.purge",
+		"folder.create", "folder.rename", "folder.delete", "token.create", "check.full", "snapshot"} {
 		if !seen[want] {
 			t.Errorf("audit lacks %q (have %v)", want, seen)
 		}
+	}
+	// action filter: exactly that action, still newest first
+	resp, body = h.web("GET", "/api/v1/audit?action=image.trash&limit=10", nil)
+	wantStatus(t, resp, body, 200)
+	filtered := decode[struct{ Items []struct{ Action string } }](t, body)
+	if len(filtered.Items) == 0 {
+		t.Fatalf("filtered audit empty: %s", body)
+	}
+	for _, it := range filtered.Items {
+		if it.Action != "image.trash" {
+			t.Fatalf("filter leaked %q", it.Action)
+		}
+	}
+	// kind filter: one category of actions
+	resp, body = h.web("GET", "/api/v1/audit?kind=image&limit=100", nil)
+	wantStatus(t, resp, body, 200)
+	byKind := decode[struct{ Items []struct{ Action string } }](t, body)
+	if len(byKind.Items) == 0 {
+		t.Fatalf("kind=image empty: %s", body)
+	}
+	for _, it := range byKind.Items {
+		if !strings.HasPrefix(it.Action, "image.") {
+			t.Fatalf("kind filter leaked %q", it.Action)
+		}
+	}
+	resp, body = h.web("GET", "/api/v1/audit?kind=tag", nil)
+	wantStatus(t, resp, body, 400)
+	// distinct actions
+	resp, body = h.web("GET", "/api/v1/audit/actions", nil)
+	wantStatus(t, resp, body, 200)
+	actions := decode[struct{ Items []string }](t, body).Items
+	if len(actions) == 0 || actions[0] > actions[len(actions)-1] {
+		t.Fatalf("actions: %v", actions)
+	}
+	found := false
+	for _, a := range actions {
+		if a == "image.trash" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("actions lack image.trash: %v", actions)
 	}
 	// paging
 	resp, body = h.web("GET", "/api/v1/audit?limit=2", nil)
@@ -1028,12 +1090,12 @@ func TestStatusChecksSnapshotsAudit(t *testing.T) {
 	if len(p1.Items) != 2 || p1.NextCursor == nil {
 		t.Fatalf("page 1: %s", body)
 	}
-	resp, body = h.web("GET", "/api/v1/audit?limit=200&cursor="+*p1.NextCursor, nil)
+	resp, body = h.web("GET", "/api/v1/audit?limit=100&cursor="+*p1.NextCursor, nil)
 	p2 := decode[struct{ Items []struct{ ID int64 } }](t, body)
 	if len(p2.Items) == 0 || p2.Items[0].ID >= p1.Items[1].ID {
 		t.Fatalf("page 2 overlaps: %s", body)
 	}
-	for _, bad := range []string{"limit=0", "limit=201", "limit=x", "cursor=abc"} {
+	for _, bad := range []string{"limit=0", "limit=101", "limit=x", "cursor=abc"} {
 		resp, body = h.web("GET", "/api/v1/audit?"+bad, nil)
 		wantProblem(t, resp, body, 400, "validation")
 	}
@@ -1069,11 +1131,13 @@ func TestListFiltersAndPagination(t *testing.T) {
 	if len(seen) != 5 {
 		t.Fatalf("paged %d items", len(seen))
 	}
-	for _, bad := range []string{"limit=0", "limit=500", "limit=x", "sort=sideways", "state=purged", "format=bmp", "visibility=maybe", "tokenId=x", "cursor=%25%25"} {
+	for _, bad := range []string{"limit=0", "limit=500", "limit=x", "sort=sideways", "state=purged", "format=bmp", "tokenId=x", "cursor=%25%25", "recursive=maybe"} {
 		resp, body := h.web("GET", "/api/v1/images?"+bad, nil)
 		wantProblem(t, resp, body, 400, "validation")
 	}
-	resp, body := h.web("GET", "/api/v1/images?q="+ids[2]+"&format=png&visibility=public", nil)
+	resp, body := h.web("GET", "/api/v1/images?folder=0000000000000000", nil)
+	wantProblem(t, resp, body, 404, "not-found")
+	resp, body = h.web("GET", "/api/v1/images?q="+ids[2]+"&format=png", nil)
 	wantStatus(t, resp, body, 200)
 	if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 1 || l.Items[0].ID != ids[2] {
 		t.Fatalf("filtered: %s", body)
@@ -1090,7 +1154,7 @@ func TestListFiltersAndPagination(t *testing.T) {
 
 func TestSPAAndNamespaces(t *testing.T) {
 	h := newHarness(t, harnessOpts{imageURL: "https://img.example.com"})
-	for _, p := range []string{"/", "/login", "/setup", "/library", "/trash", "/tokens", "/settings", "/status"} {
+	for _, p := range []string{"/", "/login", "/setup", "/library", "/library/旅行", "/library/旅行/2026/云南", "/library/", "/docs/api", "/trash", "/tokens", "/settings", "/status"} {
 		resp, body := h.do("GET", p, nil)
 		wantStatus(t, resp, body, 200)
 		if !strings.Contains(string(body), "<title>PicBerth</title>") {
@@ -1108,7 +1172,13 @@ func TestSPAAndNamespaces(t *testing.T) {
 			t.Errorf("%s headers: %v", p, resp.Header)
 		}
 	}
-	resp, body := h.do("GET", "/assets/app.abc123.js", nil)
+	// the machine-readable contract needs no session
+	resp, body := h.do("GET", "/api/v1/openapi.json", nil)
+	wantStatus(t, resp, body, 200)
+	if !strings.Contains(resp.Header.Get("Content-Type"), "application/json") || !strings.Contains(string(body), `"openapi": "3.1.0"`) {
+		t.Fatalf("openapi.json: %v %.120s", resp.Header, body)
+	}
+	resp, body = h.do("GET", "/assets/app.abc123.js", nil)
 	wantStatus(t, resp, body, 200)
 	if resp.Header.Get("Cache-Control") != "public, max-age=31536000, immutable" || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/javascript") {
 		t.Fatalf("asset headers: %v", resp.Header)
@@ -1123,7 +1193,7 @@ func TestSPAAndNamespaces(t *testing.T) {
 		t.Fatalf("favicon headers: %v", resp.Header)
 	}
 	// everything else is a 404
-	for _, p := range []string{"/nope", "/library/", "/library/extra", "/assets/missing.js", "/assets/", "/assets/../index.html", "/index.html", "/.env", "/api", "/api/", "/api/v1", "/api/v2/images", "/login/x", "/i", "/i/x/y"} {
+	for _, p := range []string{"/nope", "/assets/missing.js", "/assets/", "/assets/../index.html", "/index.html", "/.env", "/api", "/api/", "/api/v1", "/api/v2/images", "/login/x", "/i", "/i/x/y"} {
 		resp, body = h.do("GET", p, nil)
 		if resp.StatusCode != 404 && resp.StatusCode != 301 {
 			t.Errorf("GET %s: %d, want 404", p, resp.StatusCode)

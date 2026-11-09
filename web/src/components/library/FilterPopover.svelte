@@ -19,11 +19,6 @@
     const a = lib.filters.sources;
     lib.setFilters({ sources: a.includes(v) ? a.filter((x) => x !== v) : [...a, v] });
   }
-
-  function toggleTag(v: string) {
-    const a = lib.filters.tags;
-    lib.setFilters({ tags: a.includes(v) ? a.filter((x) => x !== v) : [...a, v] });
-  }
 </script>
 
 <Menu align="right" class="popover" label="筛选">
@@ -82,19 +77,6 @@
             <span class="check" data-on={String(on)}>{#if on}<Icon name="check" />{/if}</span>
             {sourceLabel(s)}
             <span class="n">{s.count}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-    <div class="fp-section">
-      <div class="fp-label">标签</div>
-      <div class="fp-list">
-        {#each lib.facets?.tags ?? [] as t (t.tag)}
-          {@const on = lib.filters.tags.includes(t.tag)}
-          <button type="button" class="fp-opt" role="checkbox" aria-checked={on} onclick={() => toggleTag(t.tag)}>
-            <span class="check" data-on={String(on)}>{#if on}<Icon name="check" />{/if}</span>
-            {t.tag}
-            <span class="n">{t.count}</span>
           </button>
         {/each}
       </div>

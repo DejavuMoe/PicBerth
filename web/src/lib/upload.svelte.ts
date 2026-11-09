@@ -4,11 +4,17 @@
 import { ApiError, errorDetail, errorMessage, handleUnauthorized, isRetryable, networkError, noteVersion, problemFrom } from './api';
 import { formatBytes, formatLimit, formatNames } from './format';
 import { dropBlocked, isTypingTarget } from './modal';
-import { navigate, router } from './router.svelte';
+import { isLibraryPath, navigate, router } from './router.svelte';
 import { session } from './session.svelte';
 import type { Image, ImageFormat, LinkFormat } from './types';
 
 export type UploadStatus = 'queued' | 'uploading' | 'processing' | 'done' | 'error';
+
+/** The folder new uploads go into. `id` is the `folder` part sent with each file (absent at the root). */
+export interface UploadTarget {
+  id: string | null;
+  label: string;
+}
 
 export interface UploadItem {
   id: number;
@@ -26,6 +32,8 @@ export interface UploadItem {
   /** Do not start before this timestamp (automatic retry after a short 429). */
   notBefore: number;
   autoRetries: number;
+  folderId: string | null;
+  folderLabel: string;
 }
 
 export const FORMAT_MIME: Record<ImageFormat, string[]> = {
@@ -78,6 +86,15 @@ export const uploads = $state({
   drag: { active: false, count: 0 },
   announcement: '',
 });
+
+/** Where the library screen is; drops and pastes on other screens go to the root. */
+export const uploadTarget = $state<{ current: UploadTarget }>({
+  current: { id: null, label: '图片' },
+});
+
+export function setUploadTarget(target: UploadTarget | null) {
+  uploadTarget.current = target ?? { id: null, label: '图片' };
+}
 
 export function setLinkFormat(f: LinkFormat) {
   uploads.format = f;
@@ -141,8 +158,9 @@ function announce(message: string) {
   uploads.announcement = message;
 }
 
-export function addFiles(files: File[]) {
+export function addFiles(files: File[], target: UploadTarget | null = uploadTarget.current) {
   if (files.length === 0) return;
+  const folder = target ?? { id: null, label: '图片' };
   const batch: UploadItem[] = files.map((file) => {
     const problem = precheck(file);
     return {
@@ -158,6 +176,8 @@ export function addFiles(files: File[]) {
       retryable: false,
       notBefore: 0,
       autoRetries: 0,
+      folderId: folder.id,
+      folderLabel: folder.label,
     };
   });
   const rejected = batch.filter((i) => i.status === 'error').length;
@@ -199,8 +219,8 @@ function start(item: UploadItem) {
   item.error = null;
 
   const body = new FormData();
-  // Every uploaded image is public; the text part comes first so a streaming server knows it before the file.
-  body.append('visibility', 'public');
+  // The text part comes first so a streaming server knows the destination before the file.
+  if (item.folderId) body.append('folder', item.folderId);
   body.append('file', item.file, item.name);
 
   const xhr = new XMLHttpRequest();
@@ -326,7 +346,7 @@ function pastedName(file: File): File {
 
 /** Files can only be watched on the library screen, so a drop or paste elsewhere goes there. */
 function goToLibrary() {
-  if (router.path !== '/' && router.path !== '/library') void navigate('/library');
+  if (!isLibraryPath(router.path)) void navigate('/library');
 }
 
 /** Install on authenticated routes. */

@@ -3,8 +3,10 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/gif"
@@ -97,6 +99,24 @@ func makeGIF(t testing.TB) []byte {
 	if err := gif.Encode(&buf, image.NewPaletted(image.Rect(0, 0, 3, 3), color.Palette{color.Black, color.White}), nil); err != nil {
 		t.Fatal(err)
 	}
+	return buf.Bytes()
+}
+
+// pngHeader builds a PNG with a valid IHDR chunk and no pixel data. DecodeConfig (and the sniff/inspect
+// fakes) accept it, which lets a test declare huge dimensions without allocating them.
+func pngHeader(w, h int) []byte {
+	var buf bytes.Buffer
+	buf.WriteString("\x89PNG\r\n\x1a\n")
+	data := make([]byte, 13)
+	binary.BigEndian.PutUint32(data[0:], uint32(w))
+	binary.BigEndian.PutUint32(data[4:], uint32(h))
+	data[8] = 8 // bit depth
+	data[9] = 6 // colour type RGBA
+	binary.Write(&buf, binary.BigEndian, uint32(len(data)))
+	typ := []byte("IHDR")
+	buf.Write(typ)
+	buf.Write(data)
+	binary.Write(&buf, binary.BigEndian, crc32.ChecksumIEEE(append(typ, data...)))
 	return buf.Bytes()
 }
 

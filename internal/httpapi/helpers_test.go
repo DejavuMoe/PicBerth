@@ -3,8 +3,10 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/png"
@@ -272,18 +274,37 @@ func decode[T any](t *testing.T, data []byte) T {
 }
 
 type imageJSON struct {
-	ID         string `json:"id"`
-	URL        string `json:"url"`
-	Visibility string `json:"visibility"`
-	State      string `json:"state"`
-	Duplicate  bool   `json:"duplicate"`
-	Ext        string `json:"ext"`
-	SHA256     string `json:"sha256"`
-	HasThumb   bool   `json:"hasThumb"`
-	Source     struct {
+	ID        string  `json:"id"`
+	URL       string  `json:"url"`
+	FolderID  *string `json:"folderId"`
+	State     string  `json:"state"`
+	Duplicate bool    `json:"duplicate"`
+	Ext       string  `json:"ext"`
+	SHA256    string  `json:"sha256"`
+	HasThumb  bool    `json:"hasThumb"`
+	Source    struct {
 		Kind      string `json:"kind"`
 		TokenName string `json:"tokenName"`
 	} `json:"source"`
+}
+
+// pngHeader builds a PNG with a valid IHDR chunk and no pixel data; image.DecodeConfig accepts it, so a
+// test can declare more than 50 MP without allocating anything.
+func pngHeader(t testing.TB, w, h int) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	buf.WriteString("\x89PNG\r\n\x1a\n")
+	data := make([]byte, 13)
+	binary.BigEndian.PutUint32(data[0:], uint32(w))
+	binary.BigEndian.PutUint32(data[4:], uint32(h))
+	data[8] = 8
+	data[9] = 6
+	binary.Write(&buf, binary.BigEndian, uint32(len(data)))
+	typ := []byte("IHDR")
+	buf.Write(typ)
+	buf.Write(data)
+	binary.Write(&buf, binary.BigEndian, crc32.ChecksumIEEE(append(typ, data...)))
+	return buf.Bytes()
 }
 
 func (h *harness) mustUploadWeb(seed int, extra ...part) imageJSON {

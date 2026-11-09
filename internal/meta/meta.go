@@ -224,7 +224,39 @@ func (db *DB) backupBeforeMigration(ctx context.Context, from int) (string, erro
 	if _, err := db.w.ExecContext(ctx, `VACUUM INTO ?`, name); err != nil {
 		return "", err
 	}
+	rotateBackups(dir, 5) // keep the newest five; a rotation failure must not block the migration
 	return name, nil
+}
+
+// rotateBackups deletes the oldest automatic pre-migration copies beyond keep. Failures are ignored:
+// rotation is housekeeping, never a reason to block an upgrade.
+func rotateBackups(dir string, keep int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	type backup struct {
+		name string
+		mod  time.Time
+	}
+	var backups []backup
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "picberth-schema") || !strings.HasSuffix(e.Name(), ".db") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		backups = append(backups, backup{name: e.Name(), mod: info.ModTime()})
+	}
+	if len(backups) <= keep {
+		return
+	}
+	sort.Slice(backups, func(i, j int) bool { return backups[i].mod.Before(backups[j].mod) })
+	for _, b := range backups[:len(backups)-keep] {
+		_ = os.Remove(filepath.Join(dir, b.name))
+	}
 }
 
 func (db *DB) apply(ctx context.Context, m migration) error {

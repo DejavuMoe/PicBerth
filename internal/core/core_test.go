@@ -91,7 +91,7 @@ func TestUploadDedupeAndLifecycle(t *testing.T) {
 	if v.Filename != "My Shot.PNG" {
 		t.Fatalf("filename not sanitized: %q", v.Filename)
 	}
-	if v.Visibility != "public" || v.Source.Kind != "web" {
+	if v.FolderID != nil || v.Source.Kind != "web" {
 		t.Fatalf("defaults: %+v", v)
 	}
 	wantURL := "https://img.example.com/i/" + v.ID + ".png"
@@ -170,6 +170,124 @@ func TestUploadDedupeAndLifecycle(t *testing.T) {
 	assertInvariants(t, e)
 }
 
+func TestUploadDedupeScopeByPrincipal(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	data := makePNG(t, 10, 10, 21)
+	now := time.Now()
+	e.svc.Now = func() time.Time { return now }
+
+	adminImg := e.mustUpload(e.admin, "admin.png", data)
+	if _, err := e.svc.PatchImage(ctx, e.admin, adminImg.ID, ImagePatch{Filename: ptr("admin-x.png")}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Keep the admin record strictly earlier; equal timestamps are ordered by random ID.
+	now = now.Add(time.Second)
+	tokenA, tokenB := e.tokenPrincipal(ScopeUpload), e.tokenPrincipal(ScopeUpload)
+	b := e.mustUpload(tokenB, "b.png", data)
+	if b.ID == adminImg.ID || b.Duplicate {
+		t.Fatalf("upload-only token B reused a record it cannot see: %+v", b)
+	}
+	if b.Source.TokenID == nil || *b.Source.TokenID != tokenB.TokenID {
+		t.Fatalf("token B record source: %+v", b.Source)
+	}
+	if _, err := e.svc.GetImage(ctx, tokenB, b.ID); err != nil {
+		t.Fatalf("token B cannot read its own record: %v", err)
+	}
+	if _, err := e.svc.GetImage(ctx, tokenB, adminImg.ID); ErrorCode(err) != CodeNotFound {
+		t.Fatalf("token B read the admin's record: %v", err)
+	}
+
+	a := e.mustUpload(tokenA, "a.png", data)
+	if a.ID == adminImg.ID || a.ID == b.ID || a.Duplicate {
+		t.Fatalf("upload-only token A reused another scope's record: %+v", a)
+	}
+	if a.Filename != "a.png" || a.Source.TokenID == nil || *a.Source.TokenID != tokenA.TokenID {
+		t.Fatalf("token A inherited another scope's metadata: %+v", a)
+	}
+	if _, err := e.svc.GetImage(ctx, tokenA, a.ID); err != nil {
+		t.Fatalf("token A cannot read its own record: %v", err)
+	}
+	list, _, err := e.svc.ListImages(ctx, tokenA, ListParams{})
+	if err != nil || len(list) != 1 || list[0].ID != a.ID {
+		t.Fatalf("token A list: %+v %v", list, err)
+	}
+
+	// A second upload from the same token reuses its own record, even though an older invisible
+	// duplicate exists in the same folder.
+	again := e.mustUpload(tokenA, "a2.png", data)
+	if !again.Duplicate || again.ID != a.ID || again.Filename != "a.png" {
+		t.Fatalf("token A dedupe: %+v", again)
+	}
+
+	// Sessions and manage tokens dedupe against the whole root folder.
+	for name, p := range map[string]Principal{"admin": e.admin, "manage": e.tokenPrincipal(ScopeManage)} {
+		d := e.mustUpload(p, name+".png", data)
+		if !d.Duplicate || d.ID != adminImg.ID {
+			t.Fatalf("%s did not dedupe in the root folder: %+v", name, d)
+		}
+		if d.Filename != "admin-x.png" {
+			t.Fatalf("%s duplicate lost existing metadata: %+v", name, d)
+		}
+	}
+
+	// read is no longer a valid scope
+	if _, _, err := e.svc.CreateToken(ctx, e.admin, "x", []string{"read"}, nil); ErrorCode(err) != CodeInvalidScope {
+		t.Fatalf("read scope: %v", err)
+	}
+}
+
+func TestUploadDedupeTransactionScope(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	data := makePNG(t, 10, 10, 31)
+	sum := sha256.Sum256(data)
+	sha := hex.EncodeToString(sum[:])
+
+	insertCompetitor := func(id string, tokenID *int64) {
+		t.Helper()
+		im := meta.Image{ID: id, OwnerID: e.admin.UserID, TokenID: tokenID, Source: "web",
+			ObjectKey: id[0:2] + "/" + id[2:4] + "/" + id + ".png", OriginalName: "race.png",
+			Mime: "image/png", Ext: "png", Size: int64(len(data)), Width: 10, Height: 10, Frames: 1,
+			SHA256: sha, CreatedAt: 1}
+		if dup, err := e.db.InsertImage(ctx, im, nil); err != nil || dup != nil {
+			t.Fatalf("insert competitor: %+v %v", dup, err)
+		}
+	}
+
+	// A record the token cannot see is committed between the pre-check and the INSERT: the
+	// transaction must still create the token's own record.
+	tokenA := e.tokenPrincipal(ScopeUpload)
+	e.svc.Fault = func(point string) error {
+		if point == FaultUploadAfterRename {
+			insertCompetitor("cccccccccccccccccccc", nil)
+		}
+		return nil
+	}
+	a := e.mustUpload(tokenA, "a.png", data)
+	if a.Duplicate || a.ID == "cccccccccccccccccccc" {
+		t.Fatalf("invisible race record was returned: %+v", a)
+	}
+	if _, err := e.svc.GetImage(ctx, tokenA, a.ID); err != nil {
+		t.Fatalf("token A cannot read its own record: %v", err)
+	}
+
+	// A record of the same token is committed in that window: the transaction must reuse it.
+	tokenC := e.tokenPrincipal(ScopeUpload)
+	e.svc.Fault = func(point string) error {
+		if point == FaultUploadAfterRename {
+			insertCompetitor("dddddddddddddddddddd", &tokenC.TokenID)
+		}
+		return nil
+	}
+	c := e.mustUpload(tokenC, "c.png", data)
+	if !c.Duplicate || c.ID != "dddddddddddddddddddd" {
+		t.Fatalf("same-token race record not reused: %+v", c)
+	}
+	e.svc.Fault = nil
+}
+
 func mustErr(err error) error { return err }
 
 func TestUploadValidation(t *testing.T) {
@@ -187,11 +305,8 @@ func TestUploadValidation(t *testing.T) {
 	_, err = e.upload(e.admin, "x.png", append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{1}, 40)...))
 	wantCode(t, err, CodeInvalidImage)
 
-	// too many pixels
-	if _, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{MaxPixels: ptr(int64(1_000_000))}); err != nil {
-		t.Fatal(err)
-	}
-	_, err = e.upload(e.admin, "big.png", makePNG(t, 1100, 1100, 3))
+	// too many pixels: the limit is a fixed 50 MP; a header-only PNG declares more without carrying pixels
+	_, err = e.upload(e.admin, "big.png", pngHeader(8000, 6251))
 	wantCode(t, err, CodeTooManyPixels)
 
 	// format not allowed
@@ -256,10 +371,7 @@ func TestUploadConcurrencyAndDiskWatermark(t *testing.T) {
 
 func TestUploadRateLimit(t *testing.T) {
 	e := newEnv(t)
-	if _, err := e.svc.UpdateSettings(context.Background(), e.admin, SettingsPatch{UploadsPerMinute: ptr(2)}); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < uploadsPerMinute; i++ {
 		u, err := e.svc.BeginUpload(context.Background(), e.admin)
 		if err != nil {
 			t.Fatal(err)
@@ -278,7 +390,6 @@ func TestAuthorizationMatrix(t *testing.T) {
 	ctx := context.Background()
 	anon := Principal{}
 	upTok := e.tokenPrincipal(ScopeUpload)
-	rdTok := e.tokenPrincipal(ScopeRead)
 	mgTok := e.tokenPrincipal(ScopeManage)
 	upTok2 := e.tokenPrincipal(ScopeUpload)
 
@@ -286,11 +397,6 @@ func TestAuthorizationMatrix(t *testing.T) {
 	other := e.mustUpload(e.admin, "other.png", makePNG(t, 5, 5, 11)) // uploaded by session
 	if own.Source.Kind != "token" || own.Source.TokenID == nil || own.Source.TokenName == "" {
 		t.Fatalf("token source: %+v", own.Source)
-	}
-	if _, err := e.upload(rdTok, "x.png", makePNG(t, 5, 5, 12)); err == nil {
-		t.Fatal("read token uploaded")
-	} else {
-		wantCode(t, err, CodeForbidden)
 	}
 	if _, err := e.upload(anon, "x.png", makePNG(t, 5, 5, 12)); err == nil {
 		t.Fatal("anonymous uploaded")
@@ -301,7 +407,7 @@ func TestAuthorizationMatrix(t *testing.T) {
 		t.Fatalf("manage token upload: %v", err)
 	}
 
-	// visibility of records
+	// record visibility by ownership
 	_, err := e.svc.GetImage(ctx, upTok, other.ID)
 	wantCode(t, err, CodeNotFound)
 	_, err = e.svc.GetImage(ctx, upTok2, own.ID)
@@ -309,7 +415,7 @@ func TestAuthorizationMatrix(t *testing.T) {
 	if _, err := e.svc.GetImage(ctx, upTok, own.ID); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []Principal{rdTok, mgTok, e.admin} {
+	for _, p := range []Principal{mgTok, e.admin} {
 		if _, err := e.svc.GetImage(ctx, p, other.ID); err != nil {
 			t.Fatalf("%v cannot read: %v", p.Actor(), err)
 		}
@@ -321,9 +427,9 @@ func TestAuthorizationMatrix(t *testing.T) {
 	if err != nil || len(items) != 1 || items[0].ID != own.ID {
 		t.Fatalf("upload token list: %v %v", items, err)
 	}
-	items, _, _ = e.svc.ListImages(ctx, rdTok, ListParams{})
+	items, _, _ = e.svc.ListImages(ctx, mgTok, ListParams{})
 	if len(items) != 3 {
-		t.Fatalf("read token list: %d", len(items))
+		t.Fatalf("manage token list: %d", len(items))
 	}
 	// upload token may not widen the view with tokenId
 	items, _, _ = e.svc.ListImages(ctx, upTok, ListParams{TokenID: ptr(int64(mgTok.TokenID))})
@@ -332,32 +438,30 @@ func TestAuthorizationMatrix(t *testing.T) {
 	}
 	_, _, err = e.svc.ListImages(ctx, upTok, ListParams{State: "trashed"})
 	wantCode(t, err, CodeForbidden)
-	_, _, err = e.svc.ListImages(ctx, rdTok, ListParams{State: "trashed"})
-	wantCode(t, err, CodeForbidden)
 
-	// mutations
-	for _, p := range []Principal{upTok, rdTok} {
-		_, err := e.svc.SetVisibility(ctx, p, own.ID, "private")
-		wantCode(t, err, CodeForbidden)
-		wantCode(t, e.svc.Trash(ctx, p, own.ID), CodeForbidden)
-		_, err = e.svc.Restore(ctx, p, own.ID)
-		wantCode(t, err, CodeForbidden)
-		wantCode(t, e.svc.Purge(ctx, p, own.ID), CodeForbidden)
-		_, err = e.svc.Batch(ctx, p, "trash", []string{own.ID}, "")
-		wantCode(t, err, CodeForbidden)
-	}
+	// mutations: upload-only tokens cannot change anything
+	_, err = e.svc.PatchImage(ctx, upTok, own.ID, ImagePatch{Filename: ptr("x.png")})
+	wantCode(t, err, CodeForbidden)
+	wantCode(t, e.svc.Trash(ctx, upTok, own.ID), CodeForbidden)
+	_, err = e.svc.Restore(ctx, upTok, own.ID)
+	wantCode(t, err, CodeForbidden)
+	wantCode(t, e.svc.Purge(ctx, upTok, own.ID), CodeForbidden)
+	_, err = e.svc.Batch(ctx, upTok, "trash", []string{own.ID}, nil)
+	wantCode(t, err, CodeForbidden)
+	_, err = e.svc.PatchImage(ctx, upTok, own.ID, ImagePatch{FolderID: nil, MoveFolder: true})
+	wantCode(t, err, CodeForbidden)
 	wantCode(t, e.svc.Trash(ctx, anon, own.ID), CodeUnauthorized)
-	if _, err := e.svc.SetVisibility(ctx, mgTok, other.ID, "private"); err != nil {
+	if _, err := e.svc.PatchImage(ctx, mgTok, other.ID, ImagePatch{Filename: ptr("renamed.png")}); err != nil {
 		t.Fatalf("manage token: %v", err)
 	}
 
-	// raw bytes of private images
+	// raw bytes stay within the ownership scope
 	if _, err := e.svc.OpenRaw(ctx, upTok, other.ID); err == nil {
 		t.Fatal("upload token read someone else's bytes")
 	}
-	o, err := e.svc.OpenRaw(ctx, rdTok, other.ID)
+	o, err := e.svc.OpenRaw(ctx, mgTok, other.ID)
 	if err != nil {
-		t.Fatalf("read token raw of private: %v", err)
+		t.Fatalf("manage token raw: %v", err)
 	}
 	o.File.Close()
 	o, err = e.svc.OpenRaw(ctx, upTok, own.ID)
@@ -370,7 +474,7 @@ func TestAuthorizationMatrix(t *testing.T) {
 	}
 
 	// admin-only surfaces
-	for _, p := range []Principal{upTok, rdTok, mgTok} {
+	for _, p := range []Principal{upTok, mgTok} {
 		_, _, err := e.svc.CreateToken(ctx, p, "x", []string{"upload"}, nil)
 		wantCode(t, err, CodeForbidden)
 		_, err = e.svc.ListTokens(ctx, p)
@@ -386,13 +490,15 @@ func TestAuthorizationMatrix(t *testing.T) {
 		wantCode(t, err, CodeForbidden)
 		_, err = e.svc.Snapshot(ctx, p, "")
 		wantCode(t, err, CodeForbidden)
-		_, _, err = e.svc.ListAudit(ctx, p, 10, "")
+		_, _, err = e.svc.ListAudit(ctx, p, AuditQuery{}, 10, "")
+		wantCode(t, err, CodeForbidden)
+		_, err = e.svc.ListAuditActions(ctx, p)
 		wantCode(t, err, CodeForbidden)
 	}
 	_, err = e.svc.GetSettings(anon)
 	wantCode(t, err, CodeUnauthorized)
 
-	// trashed images are invisible to non-manage tokens
+	// trashed images are invisible to upload-only tokens
 	if err := e.svc.Trash(ctx, mgTok, own.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -402,11 +508,11 @@ func TestAuthorizationMatrix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// revoked and expired tokens stop working
-	if err := e.svc.RevokeToken(ctx, e.admin, rdTok.TokenID); err != nil {
+	// revoked tokens stop working
+	if err := e.svc.RevokeToken(ctx, e.admin, upTok2.TokenID); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.svc.RevokeToken(ctx, e.admin, rdTok.TokenID); err != nil {
+	if err := e.svc.RevokeToken(ctx, e.admin, upTok2.TokenID); err != nil {
 		t.Fatalf("revoke must be idempotent: %v", err)
 	}
 	wantCode(t, e.svc.RevokeToken(ctx, e.admin, 9999), CodeNotFound)
@@ -444,11 +550,16 @@ func TestTokenLifecycle(t *testing.T) {
 		scopes []string
 		days   *int
 	}{
-		{"", []string{"upload"}, nil}, {strings.Repeat("x", 81), []string{"upload"}, nil}, {"ok", nil, nil}, {"ok", []string{"root"}, nil},
+		{"", []string{"upload"}, nil}, {strings.Repeat("x", 81), []string{"upload"}, nil}, {"ok", nil, nil},
 		{"ok", []string{"upload"}, ptr(0)}, {"ok", []string{"upload"}, ptr(3651)}, {"bad\nname", []string{"upload"}, nil},
 	} {
 		_, _, err := e.svc.CreateToken(ctx, e.admin, bad.name, bad.scopes, bad.days)
 		wantCode(t, err, CodeValidation)
+	}
+	// unknown and removed scopes are 422: read no longer exists
+	for _, scopes := range [][]string{{"root"}, {"read"}, {"upload", "read"}} {
+		_, _, err := e.svc.CreateToken(ctx, e.admin, "ok", scopes, nil)
+		wantCode(t, err, CodeInvalidScope)
 	}
 	list, _ := e.svc.ListTokens(ctx, e.admin)
 	if len(list) != 1 {
@@ -478,7 +589,7 @@ func TestSetupLoginSessions(t *testing.T) {
 	if req, _ := svc.SetupRequired(ctx); !req {
 		t.Fatal("setup should be required")
 	}
-	_, err = svc.Login(ctx, "1.1.1.1", "ua", "admin", "whatever1234")
+	_, err = svc.Login(ctx, "1.1.1.1", "admin", "whatever1234")
 	wantCode(t, err, CodeSetupRequired)
 	code, err := svc.EnsureSetupCode(ctx)
 	if err != nil || len(code) != 14 {
@@ -487,17 +598,17 @@ func TestSetupLoginSessions(t *testing.T) {
 	if again, _ := svc.EnsureSetupCode(ctx); again != code {
 		t.Fatal("setup code changed between calls")
 	}
-	_, err = svc.Setup(ctx, "1.1.1.1", "ua", "AAAA-AAAA-AAAA", "admin", "correct horse battery")
+	_, err = svc.Setup(ctx, "1.1.1.1", "AAAA-AAAA-AAAA", "admin", "correct horse battery")
 	wantCode(t, err, CodeForbidden)
-	_, err = svc.Setup(ctx, "1.1.1.1", "ua", code, "bad name!", "correct horse battery")
+	_, err = svc.Setup(ctx, "1.1.1.1", code, "bad name!", "correct horse battery")
 	wantCode(t, err, CodeValidation)
-	_, err = svc.Setup(ctx, "1.1.1.1", "ua", code, "admin", "short")
+	_, err = svc.Setup(ctx, "1.1.1.1", code, "admin", "short")
 	wantCode(t, err, CodeValidation)
-	sess, err := svc.Setup(ctx, "1.1.1.1", "ua", strings.ToLower(code), "admin", "correct horse battery")
+	sess, err := svc.Setup(ctx, "1.1.1.1", strings.ToLower(code), "admin", "correct horse battery")
 	if err != nil || sess.ID == "" {
 		t.Fatalf("setup: %v", err)
 	}
-	_, err = svc.Setup(ctx, "1.1.1.1", "ua", code, "admin2", "correct horse battery")
+	_, err = svc.Setup(ctx, "1.1.1.1", code, "admin2", "correct horse battery")
 	wantCode(t, err, CodeSetupDone)
 	if c, _ := svc.EnsureSetupCode(ctx); c != "" {
 		t.Fatal("setup code still offered after setup")
@@ -518,11 +629,11 @@ func TestSetupLoginSessions(t *testing.T) {
 		t.Fatalf("session id stored unhashed: %q", raw)
 	}
 
-	_, err = svc.Login(ctx, "1.1.1.1", "ua", "admin", "wrong password!!")
+	_, err = svc.Login(ctx, "1.1.1.1", "admin", "wrong password!!")
 	wantCode(t, err, CodeUnauthorized)
-	_, err = svc.Login(ctx, "1.1.1.1", "ua", "nobody", "wrong password!!")
+	_, err = svc.Login(ctx, "1.1.1.1", "nobody", "wrong password!!")
 	wantCode(t, err, CodeUnauthorized)
-	login, err := svc.Login(ctx, "1.1.1.1", "ua", "ADMIN", "correct horse battery")
+	login, err := svc.Login(ctx, "1.1.1.1", "ADMIN", "correct horse battery")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,15 +644,15 @@ func TestSetupLoginSessions(t *testing.T) {
 		t.Fatal("logged-out session still valid")
 	}
 
-	// idle and absolute expiry
-	svc.Now = func() time.Time { return time.Now().Add(31 * time.Minute) }
+	// fixed lifetimes: 7 days idle, 30 days absolute
+	svc.Now = func() time.Time { return time.Now().Add(8 * 24 * time.Hour) }
 	if _, err := svc.AuthenticateSession(ctx, sess.ID, "ip"); err == nil {
 		t.Fatal("idle-expired session accepted")
 	}
 	svc.Now = time.Now
-	s2, _ := svc.Login(ctx, "1.1.1.1", "ua", "admin", "correct horse battery")
-	for i := 1; i <= 13; i++ { // keep it active every 20 minutes, but cross the 12 h absolute limit
-		at := time.Now().Add(time.Duration(i) * 55 * time.Minute)
+	s2, _ := svc.Login(ctx, "1.1.1.1", "admin", "correct horse battery")
+	for i := 1; i <= 16; i++ { // keep it active every two days, but cross the 30 day absolute limit
+		at := time.Now().Add(time.Duration(i) * 48 * time.Hour)
 		svc.Now = func() time.Time { return at }
 		_, err = svc.AuthenticateSession(ctx, s2.ID, "ip")
 		if err != nil {
@@ -553,7 +664,7 @@ func TestSetupLoginSessions(t *testing.T) {
 	}
 
 	// audit trail
-	items, _, err := svc.ListAudit(ctx, p, 100, "")
+	items, _, err := svc.ListAudit(ctx, p, AuditQuery{}, 100, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -579,23 +690,23 @@ func TestLoginRateLimits(t *testing.T) {
 	ctx := context.Background()
 	e.svc.SetLoginLimits(ratelimit.PerMinute(5), ratelimit.New(10.0/600, 10))
 	for i := 0; i < 5; i++ {
-		_, err := e.svc.Login(ctx, "9.9.9.9", "ua", "admin", "wrong password!!")
+		_, err := e.svc.Login(ctx, "9.9.9.9", "admin", "wrong password!!")
 		wantCode(t, err, CodeUnauthorized)
 	}
-	_, err := e.svc.Login(ctx, "9.9.9.9", "ua", "admin", "correct horse battery")
+	_, err := e.svc.Login(ctx, "9.9.9.9", "admin", "correct horse battery")
 	wantCode(t, err, CodeRateLimited)
 	if err.(*Error).RetryAfter < time.Second {
 		t.Fatal("missing retry-after")
 	}
 	// another IP is not affected by the per-IP bucket
-	if _, err := e.svc.Login(ctx, "9.9.9.8", "ua", "admin", "correct horse battery"); err != nil {
+	if _, err := e.svc.Login(ctx, "9.9.9.8", "admin", "correct horse battery"); err != nil {
 		t.Fatalf("other ip: %v", err)
 	}
 	// the per-username bucket (10 / 10 min) still applies across IPs: 1 success above refunded, so burn it with failures
 	for i := 0; i < 12; i++ {
-		e.svc.Login(ctx, fmt.Sprintf("8.8.8.%d", i), "ua", "admin", "wrong password!!")
+		e.svc.Login(ctx, fmt.Sprintf("8.8.8.%d", i), "admin", "wrong password!!")
 	}
-	_, err = e.svc.Login(ctx, "7.7.7.7", "ua", "admin", "correct horse battery")
+	_, err = e.svc.Login(ctx, "7.7.7.7", "admin", "correct horse battery")
 	wantCode(t, err, CodeRateLimited)
 }
 
@@ -603,14 +714,15 @@ func TestSettingsValidationAndAudit(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	v, err := e.svc.GetSettings(e.admin)
-	if err != nil || v.MaxUploadBytes != 20<<20 || v.HardMaxUploadBytes != 100<<20 || v.PublicURL != "https://pics.example.com" || len(v.AllowedFormats) != 5 {
+	if err != nil || v.MaxUploadBytes != 20<<20 || v.HardMaxUploadBytes != 100<<20 || v.PublicURL != "https://pics.example.com" ||
+		len(v.AllowedFormats) != 5 || v.TrashRetentionDays != 30 || v.AuditRetentionDays != 180 {
 		t.Fatalf("defaults: %+v %v", v, err)
 	}
 	bad := []SettingsPatch{
-		{MaxUploadBytes: ptr(int64(10))}, {MaxUploadBytes: ptr(int64(200 << 20))}, {MaxPixels: ptr(int64(5))}, {MaxPixels: ptr(int64(3e8))},
+		{MaxUploadBytes: ptr(int64(10))}, {MaxUploadBytes: ptr(int64(200 << 20))},
 		{AllowedFormats: &[]string{}}, {AllowedFormats: &[]string{"svg"}}, {AllowedFormats: &[]string{"png", "png"}},
-		{DefaultVisibility: ptr("secret")}, {TrashRetentionDays: ptr(-1)}, {TrashRetentionDays: ptr(366)},
-		{UploadsPerMinute: ptr(0)}, {UploadsPerMinute: ptr(10001)}, {SessionIdleMinutes: ptr(4)}, {SessionAbsoluteHours: ptr(0)},
+		{TrashRetentionDays: ptr(-1)}, {TrashRetentionDays: ptr(366)},
+		{AuditRetentionDays: ptr(6)}, {AuditRetentionDays: ptr(3651)},
 		{PublicURL: ptr("https://evil.example")}, {HardMaxUploadBytes: ptr(int64(1))},
 	}
 	for i, p := range bad {
@@ -621,8 +733,11 @@ func TestSettingsValidationAndAudit(t *testing.T) {
 		}
 	}
 	// echoing the read-only fields back unchanged is fine
-	v2, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{PublicURL: &v.PublicURL, ImageURL: &v.ImageURL, HardMaxUploadBytes: &v.HardMaxUploadBytes, Dedupe: ptr(false), TrashRetentionDays: ptr(0)})
-	if err != nil || v2.Dedupe || v2.TrashRetentionDays != 0 {
+	v2, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{
+		PublicURL: &v.PublicURL, ImageURL: &v.ImageURL, HardMaxUploadBytes: &v.HardMaxUploadBytes,
+		Dedupe: ptr(false), TrashRetentionDays: ptr(0), AuditRetentionDays: ptr(3650),
+	})
+	if err != nil || v2.Dedupe || v2.TrashRetentionDays != 0 || v2.AuditRetentionDays != 3650 {
 		t.Fatalf("update: %+v %v", v2, err)
 	}
 	// persisted across a restart of the service
@@ -631,13 +746,13 @@ func TestSettingsValidationAndAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer svc2.Close()
-	if st := svc2.Settings(); st.Dedupe || st.TrashRetentionDays != 0 {
+	if st := svc2.Settings(); st.Dedupe || st.TrashRetentionDays != 0 || st.AuditRetentionDays != 3650 {
 		t.Fatalf("settings not persisted: %+v", st)
 	}
-	items, _, _ := e.svc.ListAudit(ctx, e.admin, 10, "")
+	items, _, _ := e.svc.ListAudit(ctx, e.admin, AuditQuery{}, 10, "")
 	found := false
 	for _, it := range items {
-		if it.Action == "settings.update" && strings.Contains(it.Detail, "dedupe") {
+		if it.Action == "settings.update" && strings.Contains(it.Detail, "dedupe") && strings.Contains(it.Detail, "auditRetentionDays") {
 			found = true
 		}
 	}
@@ -1205,7 +1320,7 @@ func TestListPaginationViaService(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("q filter: %d", len(items))
 	}
-	items, _, _ = e.svc.ListImages(ctx, e.admin, ListParams{Format: "jpeg"})
+	items, _, _ = e.svc.ListImages(ctx, e.admin, ListParams{Formats: []string{"jpeg"}})
 	if len(items) != 0 {
 		t.Fatalf("format filter: %d", len(items))
 	}
@@ -1216,34 +1331,50 @@ func TestBatch(t *testing.T) {
 	ctx := context.Background()
 	a := e.mustUpload(e.admin, "a.png", makePNG(t, 5, 5, 600))
 	b := e.mustUpload(e.admin, "b.png", makePNG(t, 5, 5, 601))
-	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, "")
+	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res) != 4 || !res[0].OK || !res[1].OK || res[2].OK || res[2].Code != CodeNotFound || res[3].Code != CodeNotFound {
 		t.Fatalf("results: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, "")
+	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, nil)
 	if !res[0].OK {
 		t.Fatalf("purge: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "visibility", []string{b.ID}, "private")
+	// move a trashed image and restore it
+	f := e.folder(e.admin, "batch", nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, &f.ID)
 	if !res[0].OK {
-		t.Fatalf("visibility on trashed: %+v", res)
+		t.Fatalf("move on trashed: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, "")
+	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, nil)
 	if !res[0].OK {
 		t.Fatalf("restore: %+v", res)
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, ""); err == nil {
+	if got, _ := e.svc.GetImage(ctx, e.admin, b.ID); got.FolderID == nil || *got.FolderID != f.ID {
+		t.Fatalf("move not applied: %+v", got)
+	}
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, nil)
+	if !res[0].OK {
+		t.Fatalf("move to root: %+v", res)
+	}
+	if got, _ := e.svc.GetImage(ctx, e.admin, b.ID); got.FolderID != nil {
+		t.Fatalf("not at root: %+v", got)
+	}
+	// an unknown destination fails the whole batch
+	if _, err := e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, ptr("0000000000000000")); ErrorCode(err) != CodeNotFound {
+		t.Fatalf("unknown folder: %v", err)
+	}
+	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	tooMany := make([]string, 501)
-	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, ""); err == nil {
-		t.Fatal("501 ids accepted")
+	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{a.ID}, nil); err == nil {
+		t.Fatal("removed visibility action accepted")
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{b.ID}, "x"); err == nil {
-		t.Fatal("bad visibility accepted")
+	tooMany := make([]string, 501)
+	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, nil); err == nil {
+		t.Fatal("501 ids accepted")
 	}
 }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
+  import Select from '../components/Select.svelte';
   import { api, errorMessage } from '../lib/api';
   import { formatAbsolute, formatBytes, formatInt, formatRelative } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
@@ -64,10 +65,14 @@
     'image.trash': '移到回收站',
     'image.restore': '恢复',
     'image.purge': '永久删除',
-    'image.visibility': '修改可见性',
+    'image.upload': '上传',
+    'image.move': '移动',
     'image.update': '修改图片',
     'image.rename': '重命名',
-    'image.tags': '修改标签',
+    'folder.create': '创建文件夹',
+    'folder.rename': '重命名文件夹',
+    'folder.move': '移动文件夹',
+    'folder.delete': '删除文件夹',
     snapshot: '创建快照',
     'check.quick': '快速检查',
     'check.full': '完整检查',
@@ -161,19 +166,31 @@
   }
 
   // ---- audit -----------------------------------------------------------------------------------
+  const PAGE = 10;
+  const KIND_OPTIONS = [
+    { value: '', label: '全部操作' },
+    { value: 'image', label: '图片' },
+    { value: 'folder', label: '文件夹' },
+    { value: 'token', label: '令牌' },
+    { value: 'settings', label: '设置' },
+    { value: 'system', label: '系统' },
+    { value: 'session', label: '登录' },
+  ];
+
   let audit = $state<AuditEntry[]>([]);
   let auditCursor = $state<string | null>(null);
   let auditPhase = $state<'loading' | 'ready' | 'error'>('loading');
   let auditMore = $state(false);
   let auditError = $state('');
-  const PAGE = 20;
+  let kind = $state('');
+  let auditRetention = $state<number | null>(null);
 
   /** `quiet` reloads the first page without swapping the list for a loading line. */
   async function loadAudit(more = false, quiet = false) {
     if (more) auditMore = true;
     else if (!quiet || auditPhase !== 'ready') auditPhase = 'loading';
     try {
-      const page = await api.audit(PAGE, more ? auditCursor : null);
+      const page = await api.audit(PAGE, more ? auditCursor : null, kind);
       audit = more ? [...audit, ...page.items] : page.items;
       auditCursor = page.nextCursor;
       auditPhase = 'ready';
@@ -183,6 +200,14 @@
     } finally {
       auditMore = false;
     }
+  }
+
+  function setKind(value: string) {
+    if (value === kind) return;
+    kind = value;
+    audit = [];
+    auditCursor = null;
+    void loadAudit(false);
   }
 
   let refreshing = $state(false);
@@ -200,6 +225,10 @@
   onMount(() => {
     void loadStatus();
     void loadAudit();
+    api
+      .getSettings()
+      .then((s) => (auditRetention = s.auditRetentionDays))
+      .catch(() => {});
   });
 
   // ---- display ---------------------------------------------------------------------------------
@@ -330,7 +359,13 @@
         </section>
 
         <section class="section">
-          <h2>操作记录</h2>
+          <div class="section-head">
+            <div class="head-title">
+              <h2>操作记录</h2>
+              {#if auditRetention !== null}<span class="s muted">保留 {auditRetention} 天</span>{/if}
+            </div>
+            <Select label="操作类型" value={kind} options={KIND_OPTIONS} width={128} onchange={setKind} />
+          </div>
           {#if auditPhase === 'loading'}
             <div class="list" aria-busy="true">
               {#each [0, 1, 2] as i (i)}
@@ -346,7 +381,9 @@
               <button type="button" class="btn btn-secondary" onclick={() => void loadAudit()}>重试</button>
             </div>
           {:else if audit.length === 0}
-            <span class="muted">暂无记录</span>
+            <div class="state" style="padding: 32px 0;">
+              <span class="t">没有匹配的记录</span>
+            </div>
           {:else}
             <div class="list" role="table" aria-label="操作记录">
               {#if !phone.matches}

@@ -106,7 +106,7 @@ func (s *Service) thumbOne(id string) bool {
 	}
 
 	outcome, data := "none", []byte(nil)
-	info, err := s.Inspect(f, st.Size(), imaging.Limits{MaxPixels: s.Settings().MaxPixels})
+	info, err := s.Inspect(f, st.Size(), imaging.Limits{MaxPixels: maxPixels})
 	if err == nil && int64(info.Width)*int64(info.Height) <= thumbMaxPixels {
 		var ext string
 		data, ext, err = s.safeThumbnail(f, st.Size(), info)

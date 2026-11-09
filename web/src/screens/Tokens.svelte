@@ -8,7 +8,7 @@
   import { toast } from '../lib/toast.svelte';
   import type { Scope, Token } from '../lib/types';
 
-  const SCOPE_LABEL: Record<Scope, string> = { upload: '上传', read: '只读', manage: '管理' };
+  const SCOPE_LABEL: Record<Scope, string> = { upload: '上传', manage: '管理' };
 
   let tokens = $state<Token[]>([]);
   let phase = $state<'loading' | 'ready' | 'error'>('loading');
@@ -107,6 +107,10 @@
     <div class="head-title">
       <h1>令牌</h1>
     </div>
+    <a class="btn btn-ghost" href="/docs/api" target="_blank" rel="noopener">
+      API 文档
+      <Icon name="external" size="s" />
+    </a>
     <button type="button" class="btn btn-primary" onclick={() => (creating = true)}>
       <Icon name="plus" />
       新建令牌

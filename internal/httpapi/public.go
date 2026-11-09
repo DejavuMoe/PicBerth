@@ -31,8 +31,8 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok\n"))
 }
 
-// handlePublicImage serves /i/{id}.{ext}: public, active, healthy images only. Everything else is a 404
-// that reveals nothing about private, trashed or unknown images.
+// handlePublicImage serves /i/{id}.{ext}: active, healthy images only. Everything else is a 404 that
+// reveals nothing about trashed or unknown images.
 func (s *Server) handlePublicImage(w http.ResponseWriter, r *http.Request) {
 	file := r.PathValue("file")
 	dot := strings.LastIndexByte(file, '.')

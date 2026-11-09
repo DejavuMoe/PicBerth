@@ -8,6 +8,7 @@
 
   const trash = $derived(lib.mode === 'trash');
   const empty = $derived(lib.phase === 'ready' && lib.items.length === 0);
+  const failure = $derived(lib.phase === 'error' ? (lib.errorKind === 'folders' ? '文件夹加载失败' : '图片加载失败') : '');
 </script>
 
 {#if lib.phase === 'loading'}
@@ -27,9 +28,13 @@
   </div>
 {:else if lib.phase === 'error'}
   <div class="state" role="alert">
-    <span class="t">图片加载失败</span>
+    <span class="t">{failure}</span>
     <span class="d">{lib.errorText}</span>
-    <button type="button" class="btn btn-secondary" onclick={() => lib.reload()}>重试</button>
+    <button
+      type="button"
+      class="btn btn-secondary"
+      onclick={() => (lib.errorKind === 'folders' ? lib.loadFolders() : lib.reload())}>重试</button
+    >
   </div>
 {:else if empty && lib.filtered}
   <div class="state">
@@ -43,7 +48,7 @@
     </div>
   {:else}
     <div class="state">
-      <span class="t">还没有图片</span>
+      <span class="t">{lib.hasAnyImages ? '这里没有图片' : '还没有图片'}</span>
       <span class="d">拖入、粘贴或选择文件上传</span>
       <button type="button" class="btn btn-secondary" onclick={openPicker}>选择文件</button>
     </div>

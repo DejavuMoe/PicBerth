@@ -4,7 +4,7 @@
   import { health } from '../lib/health.svelte';
   import type { IconName } from '../lib/icons';
   import { phone } from '../lib/media.svelte';
-  import { canLeave, router } from '../lib/router.svelte';
+  import { canLeave, isLibraryPath, router } from '../lib/router.svelte';
   import { logout, session } from '../lib/session.svelte';
   import { setTheme, theme, THEME_OPTIONS } from '../lib/theme.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -31,7 +31,9 @@
     { href: '/status', match: ['/status'], label: '状态', icon: 'pulse', group: 1 },
   ];
 
-  const current = $derived(NAV.find((n) => n.match.includes(router.path)));
+  const isImages = $derived(router.path === '/' || isLibraryPath(router.path));
+  const isCurrent = (n: NavEntry) => (n.href === '/library' ? isImages : n.match.includes(router.path));
+  const screenKey = $derived(isImages ? 'library' : router.path);
   const warnings = $derived(health.status?.warnings.length ?? 0);
   const danger = $derived(health.lamp === 'danger');
   const trashCount = $derived(facets.trashed?.total ?? 0);
@@ -72,7 +74,7 @@
     {#each [0, 1] as g (g)}
       <div class="nav">
         {#each NAV.filter((n) => n.group === g) as n (n.href)}
-          <a class="nav-item" href={n.href} title={n.label} aria-current={n.match.includes(router.path) ? 'page' : undefined}>
+          <a class="nav-item" href={n.href} title={n.label} aria-current={isCurrent(n) ? 'page' : undefined}>
             <Icon name={n.icon} />
             <span class="label">{n.label}</span>
             {#if n.href === '/trash' && trashCount > 0}<span class="count">{trashCount}</span>{/if}
@@ -105,7 +107,7 @@
 
   <main class="main">
     <div class="panel" id="main" tabindex="-1" bind:this={main}>
-      {#key router.path === '/library' ? '/' : router.path}
+      {#key screenKey}
         {@render children()}
       {/key}
     </div>
@@ -114,7 +116,7 @@
   {#if phone.matches}
     <nav class="tabbar" aria-label="主导航">
       {#each NAV as n (n.href)}
-        <a class="tab" href={n.href} aria-current={n.match.includes(router.path) ? 'page' : undefined}>
+        <a class="tab" href={n.href} aria-current={isCurrent(n) ? 'page' : undefined}>
           <Icon name={n.icon} />
           {n.label}
           {#if n.href === '/status' && (warnings > 0 || danger)}

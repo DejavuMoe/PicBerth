@@ -14,6 +14,12 @@ import (
 
 var usernameRE = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
+// Fixed session lifetimes (approved 2026-11-09): 7 days idle, 30 days absolute.
+const (
+	sessionIdleTTL     = 7 * 24 * time.Hour
+	sessionAbsoluteTTL = 30 * 24 * time.Hour
+)
+
 func validateCredentials(username, pw string) error {
 	if !usernameRE.MatchString(username) {
 		return validation("Username must be 1-64 characters from A-Z a-z 0-9 . _ -")
@@ -53,7 +59,7 @@ func (s *Service) EnsureSetupCode(ctx context.Context) (string, error) {
 }
 
 // Setup creates the first administrator, authorized by the one-time setup code, and logs them in.
-func (s *Service) Setup(ctx context.Context, ip, userAgent, code, username, pw string) (NewSession, error) {
+func (s *Service) Setup(ctx context.Context, ip, code, username, pw string) (NewSession, error) {
 	if ok, wait := s.setupLimit.Allow("global"); !ok {
 		return NewSession{}, rateLimited(wait)
 	}
@@ -94,7 +100,7 @@ func (s *Service) Setup(ctx context.Context, ip, userAgent, code, username, pw s
 	s.setupCode = ""
 	s.setupMu.Unlock()
 	s.auditActor(ctx, "user:"+username, ip, "setup", "", "administrator created")
-	return s.issueSession(ctx, uid, ip, userAgent)
+	return s.issueSession(ctx, uid)
 }
 
 // CreateAdmin creates the first administrator from the local CLI. It fails when a user already exists.
@@ -141,7 +147,7 @@ func (s *Service) ResetPassword(ctx context.Context, username, pw string) error 
 }
 
 // Login verifies credentials and issues a session. Failures never reveal whether the user exists.
-func (s *Service) Login(ctx context.Context, ip, userAgent, username, pw string) (NewSession, error) {
+func (s *Service) Login(ctx context.Context, ip, username, pw string) (NewSession, error) {
 	userKey := strings.ToLower(printable(username, 64))
 	if ok, wait := s.loginIPLimit.Allow(ip); !ok {
 		return NewSession{}, rateLimited(wait)
@@ -185,7 +191,7 @@ func (s *Service) Login(ctx context.Context, ip, userAgent, username, pw string)
 	}
 	s.loginIPLimit.Refund(ip)
 	s.loginUserLimit.Refund(userKey)
-	sess, err := s.issueSession(ctx, u.ID, ip, userAgent)
+	sess, err := s.issueSession(ctx, u.ID)
 	if err != nil {
 		return NewSession{}, err
 	}
@@ -193,19 +199,16 @@ func (s *Service) Login(ctx context.Context, ip, userAgent, username, pw string)
 	return sess, nil
 }
 
-func (s *Service) issueSession(ctx context.Context, userID int64, ip, userAgent string) (NewSession, error) {
-	st := s.Settings()
+func (s *Service) issueSession(ctx context.Context, userID int64) (NewSession, error) {
 	now := s.now()
-	abs := time.Duration(st.SessionAbsoluteHours) * time.Hour
 	id := ids.NewSessionID()
 	err := s.db.CreateSession(ctx, meta.Session{
 		IDHash: ids.Hash(id), UserID: userID, CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(),
-		ExpiresAt: now.Add(abs).UnixMilli(), IP: ip, UserAgent: printable(userAgent, 200),
 	})
 	if err != nil {
 		return NewSession{}, err
 	}
-	return NewSession{ID: id, ExpiresAt: now.Add(abs), MaxAge: abs}, nil
+	return NewSession{ID: id, ExpiresAt: now.Add(sessionAbsoluteTTL), MaxAge: sessionAbsoluteTTL}, nil
 }
 
 // Logout ends a session. Unknown sessions are ignored.
@@ -235,11 +238,8 @@ func (s *Service) AuthenticateSession(ctx context.Context, sessionID, ip string)
 		}
 		return Principal{}, err
 	}
-	st := s.Settings()
 	now := s.now()
-	idle := time.Duration(st.SessionIdleMinutes) * time.Minute
-	abs := time.Duration(st.SessionAbsoluteHours) * time.Hour
-	if now.After(time.UnixMilli(sess.LastSeenAt).Add(idle)) || now.After(time.UnixMilli(sess.CreatedAt).Add(abs)) {
+	if now.After(time.UnixMilli(sess.LastSeenAt).Add(sessionIdleTTL)) || now.After(time.UnixMilli(sess.CreatedAt).Add(sessionAbsoluteTTL)) {
 		_ = s.db.DeleteSession(ctx, h)
 		return Principal{}, unauthorized()
 	}
@@ -289,9 +289,8 @@ type SessionState struct {
 
 // SessionLimits are the client-relevant upload limits.
 type SessionLimits struct {
-	MaxUploadBytes    int64    `json:"maxUploadBytes"`
-	AllowedFormats    []string `json:"allowedFormats"`
-	DefaultVisibility string   `json:"defaultVisibility"`
+	MaxUploadBytes int64    `json:"maxUploadBytes"`
+	AllowedFormats []string `json:"allowedFormats"`
 }
 
 // SessionInfo builds the session state for a (possibly anonymous) principal.
@@ -305,19 +304,12 @@ func (s *Service) SessionInfo(ctx context.Context, p Principal) (SessionState, e
 		cfg := s.Settings()
 		st.Authenticated = true
 		st.Username = p.Username
-		st.Limits = &SessionLimits{MaxUploadBytes: cfg.MaxUploadBytes, AllowedFormats: cfg.AllowedFormats, DefaultVisibility: cfg.DefaultVisibility}
+		st.Limits = &SessionLimits{MaxUploadBytes: cfg.MaxUploadBytes, AllowedFormats: cfg.AllowedFormats}
 	}
 	return st, nil
 }
 
-// SessionMaxAge is the cookie lifetime for new sessions.
-func (s *Service) SessionMaxAge() time.Duration {
-	return time.Duration(s.Settings().SessionAbsoluteHours) * time.Hour
-}
-
 // PurgeExpiredSessions deletes sessions past their idle or absolute lifetime.
 func (s *Service) PurgeExpiredSessions(ctx context.Context) (int64, error) {
-	st := s.Settings()
-	return s.db.DeleteExpiredSessions(ctx, s.nowMs(),
-		int64(st.SessionIdleMinutes)*60_000, int64(st.SessionAbsoluteHours)*3_600_000)
+	return s.db.DeleteExpiredSessions(ctx, s.nowMs(), sessionIdleTTL.Milliseconds(), sessionAbsoluteTTL.Milliseconds())
 }

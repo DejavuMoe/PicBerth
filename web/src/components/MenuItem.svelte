@@ -10,10 +10,12 @@
     /** Radio-style row with a leading tick column; omit for a plain menu item. */
     checked?: boolean;
     disabled?: boolean;
+    /** Extra left padding steps (16px each), for folder trees inside menus. */
+    indent?: number;
     onclick: () => void;
     children: Snippet;
   }
-  let { icon, danger = false, end, checked, disabled = false, onclick, children }: Props = $props();
+  let { icon, danger = false, end, checked, disabled = false, indent = 0, onclick, children }: Props = $props();
   const role = $derived(checked !== undefined ? 'menuitemradio' : 'menuitem');
 </script>
 
@@ -23,6 +25,7 @@
   aria-checked={checked}
   class="menu-item"
   class:danger
+  style:padding-left={indent ? `${8 + (indent - 1) * 16}px` : undefined}
   {disabled}
   {onclick}
 >

@@ -169,19 +169,20 @@ func TestCreateFirstUserIsAtomic(t *testing.T) {
 func sampleImage(id string, owner int64, sha string, created int64, size int64) Image {
 	return Image{ID: id, OwnerID: owner, Source: "web", ObjectKey: id[0:2] + "/" + id[2:4] + "/" + id + ".png",
 		OriginalName: "pic " + id + ".png", Mime: "image/png", Ext: "png", Size: size, Width: 2, Height: 2, Frames: 1,
-		SHA256: sha, Visibility: "public", CreatedAt: created}
+		SHA256: sha, CreatedAt: created}
 }
 
 func TestInsertDedupeAndLifecycle(t *testing.T) {
 	db := openTemp(t)
 	ctx := context.Background()
 	uid, _, _ := db.CreateFirstUser(ctx, "a", "h", 1)
+	root := DupScope{OwnerID: uid}
 	a := sampleImage("aaaaaaaaaaaaaaaaaaaa", uid, "s1", 10, 100)
-	if dup, err := db.InsertImage(ctx, a, true); err != nil || dup != nil {
+	if dup, err := db.InsertImage(ctx, a, &root); err != nil || dup != nil {
 		t.Fatalf("first insert: %v %v", dup, err)
 	}
 	b := sampleImage("bbbbbbbbbbbbbbbbbbbb", uid, "s1", 11, 100)
-	dup, err := db.InsertImage(ctx, b, true)
+	dup, err := db.InsertImage(ctx, b, &root)
 	if err != nil || dup == nil || dup.ID != a.ID {
 		t.Fatalf("expected duplicate of a, got %v %v", dup, err)
 	}
@@ -189,13 +190,13 @@ func TestInsertDedupeAndLifecycle(t *testing.T) {
 		t.Fatal("duplicate was inserted anyway")
 	}
 	// dedupe off inserts anyway
-	if dup, err := db.InsertImage(ctx, b, false); err != nil || dup != nil {
+	if dup, err := db.InsertImage(ctx, b, nil); err != nil || dup != nil {
 		t.Fatalf("insert without dedupe: %v %v", dup, err)
 	}
 	// duplicate object key violates the unique constraint (I5)
 	c := sampleImage("cccccccccccccccccccc", uid, "s2", 12, 5)
 	c.ObjectKey = a.ObjectKey
-	if _, err := db.InsertImage(ctx, c, false); err == nil {
+	if _, err := db.InsertImage(ctx, c, nil); err == nil {
 		t.Fatal("two records share one object key")
 	}
 
@@ -206,7 +207,7 @@ func TestInsertDedupeAndLifecycle(t *testing.T) {
 		t.Fatal("trashing twice should report no change")
 	}
 	// after trashing, the hash is no longer a duplicate
-	if d, err := db.FindActiveDuplicate(ctx, uid, "s1"); err != nil || d.ID != b.ID {
+	if d, err := db.FindActiveDuplicate(ctx, root, "s1"); err != nil || d.ID != b.ID {
 		t.Fatalf("active duplicate after trash: %v %v", d, err)
 	}
 	if ok, _ := db.MarkPurged(ctx, a.ID, 60); !ok {
@@ -216,12 +217,89 @@ func TestInsertDedupeAndLifecycle(t *testing.T) {
 	if got.State != StatePurged || got.PurgedAt == nil || *got.PurgedAt != 60 {
 		t.Fatalf("tombstone: %+v", got)
 	}
-	if ok, _ := db.SetVisibility(ctx, a.ID, "private"); ok {
-		t.Fatal("tombstones must not be modified")
-	}
 	st, _ := db.ImageStats(ctx)
 	if st.Active != 1 || st.Trashed != 0 || st.Bytes != 100 {
 		t.Fatalf("stats %+v", st)
+	}
+}
+
+func TestDupScopeLimitsDedupe(t *testing.T) {
+	db := openTemp(t)
+	ctx := context.Background()
+	uid, _, _ := db.CreateFirstUser(ctx, "a", "h", 1)
+	tokA, err := db.CreateToken(ctx, Token{OwnerID: uid, Name: "a", Prefix: "pa", SecretHash: "ha", Scopes: "upload", CreatedAt: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokB, err := db.CreateToken(ctx, Token{OwnerID: uid, Name: "b", Prefix: "pb", SecretHash: "hb", Scopes: "upload", CreatedAt: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := tokA.ID, tokB.ID
+	scopeA := DupScope{OwnerID: uid, TokenID: &a}
+	scopeB := DupScope{OwnerID: uid, TokenID: &b}
+
+	insert := func(im Image, scope *DupScope) *Image {
+		t.Helper()
+		dup, err := db.InsertImage(ctx, im, scope)
+		if err != nil {
+			t.Fatalf("insert %s: %v", im.ID, err)
+		}
+		return dup
+	}
+	active := func(scope DupScope) (string, error) {
+		d, err := db.FindActiveDuplicate(ctx, scope, "shared")
+		if err != nil {
+			return "", err
+		}
+		return d.ID, nil
+	}
+
+	admin := sampleImage("aaaaaaaaaaaaaaaaaaaa", uid, "shared", 10, 100)
+	if dup := insert(admin, nil); dup != nil {
+		t.Fatalf("first insert deduped: %+v", dup)
+	}
+
+	// The root scope still finds the earliest record.
+	if id, err := active(DupScope{OwnerID: uid}); err != nil || id != admin.ID {
+		t.Fatalf("root duplicate: %q %v", id, err)
+	}
+
+	// A token that cannot see the admin record must not deduplicate against it, in the pre-check
+	// or in the INSERT transaction.
+	bImg := sampleImage("bbbbbbbbbbbbbbbbbbbb", uid, "shared", 11, 100)
+	bImg.TokenID, bImg.Source = &b, "token"
+	if dup := insert(bImg, &scopeB); dup != nil {
+		t.Fatalf("token B reused an invisible record: %+v", dup)
+	}
+	bDup := sampleImage("cccccccccccccccccccc", uid, "shared", 12, 100)
+	bDup.TokenID, bDup.Source = &b, "token"
+	if dup := insert(bDup, &scopeB); dup == nil || dup.ID != bImg.ID {
+		t.Fatalf("token B transaction dedupe: %+v", dup)
+	}
+	if _, err := db.GetImage(ctx, bDup.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal("token B duplicate was inserted")
+	}
+
+	if _, err := active(scopeA); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("token A saw another scope's record: %v", err)
+	}
+	aImg := sampleImage("dddddddddddddddddddd", uid, "shared", 13, 100)
+	aImg.TokenID, aImg.Source = &a, "token"
+	if dup := insert(aImg, &scopeA); dup != nil {
+		t.Fatalf("token A reused an invisible record: %+v", dup)
+	}
+	// Even with earlier matching rows, token A dedupes to its own record.
+	if id, err := active(scopeA); err != nil || id != aImg.ID {
+		t.Fatalf("token A duplicate: %q %v", id, err)
+	}
+	aDup := sampleImage("eeeeeeeeeeeeeeeeeeee", uid, "shared", 14, 100)
+	aDup.TokenID, aDup.Source = &a, "token"
+	if dup := insert(aDup, &scopeA); dup == nil || dup.ID != aImg.ID {
+		t.Fatalf("token A transaction dedupe: %+v", dup)
+	}
+	if id, err := active(DupScope{OwnerID: uid}); err != nil || id != admin.ID {
+		t.Fatalf("root duplicate changed: %q %v", id, err)
 	}
 }
 
@@ -232,7 +310,7 @@ func TestListPagination(t *testing.T) {
 	for i := 0; i < 7; i++ {
 		id := fmt.Sprintf("%020d", i)
 		im := sampleImage(id, uid, fmt.Sprintf("sha%02d", i), int64(100+i/2), int64(10-i%3)) // equal keys exercise the id tiebreak
-		if _, err := db.InsertImage(ctx, im, false); err != nil {
+		if _, err := db.InsertImage(ctx, im, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -290,7 +368,7 @@ func TestVacuumIntoViaReaderAndOpenReadOnly(t *testing.T) {
 	db := openTemp(t)
 	ctx := context.Background()
 	uid, _, _ := db.CreateFirstUser(ctx, "a", "h", 1)
-	db.InsertImage(ctx, sampleImage("aaaaaaaaaaaaaaaaaaaa", uid, "s", 1, 1), false)
+	db.InsertImage(ctx, sampleImage("aaaaaaaaaaaaaaaaaaaa", uid, "s", 1, 1), nil)
 	dest := filepath.Join(t.TempDir(), "snap dir")
 	os.MkdirAll(dest, 0o700)
 	dest = filepath.Join(dest, "picberth.db")
@@ -336,9 +414,25 @@ func TestSettingsKVAudit(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		db.AddAudit(ctx, AuditEntry{At: int64(i), Actor: "x", Action: fmt.Sprint("a", i)})
 	}
-	page1, _ := db.ListAudit(ctx, 0, 2)
-	page2, _ := db.ListAudit(ctx, page1[len(page1)-1].ID, 10)
+	page1, _ := db.ListAudit(ctx, 0, AuditFilter{}, 2)
+	page2, _ := db.ListAudit(ctx, page1[len(page1)-1].ID, AuditFilter{}, 10)
 	if len(page1) != 2 || len(page2) != 3 || page1[0].Action != "a4" || page2[2].Action != "a0" {
 		t.Fatalf("audit paging: %v %v", page1, page2)
+	}
+	filtered, _ := db.ListAudit(ctx, 0, AuditFilter{Action: "a2"}, 10)
+	if len(filtered) != 1 || filtered[0].Action != "a2" {
+		t.Fatalf("audit action filter: %v", filtered)
+	}
+	actions, _ := db.AuditActions(ctx)
+	if len(actions) != 5 || actions[0] != "a0" || actions[4] != "a4" {
+		t.Fatalf("audit actions: %v", actions)
+	}
+	// pruning removes the oldest rows first and only below the cutoff
+	n, err := db.DeleteAuditBefore(ctx, 3, 10)
+	if err != nil || n != 3 {
+		t.Fatalf("prune: %d %v", n, err)
+	}
+	if left, _ := db.ListAudit(ctx, 0, AuditFilter{}, 10); len(left) != 2 {
+		t.Fatalf("rows left after prune: %v", left)
 	}
 }

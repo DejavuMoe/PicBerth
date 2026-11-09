@@ -34,6 +34,10 @@ var problemMeta = map[string]struct {
 	core.CodeSetupDone:           {http.StatusConflict, "Setup already completed"},
 	core.CodeRateLimited:         {http.StatusTooManyRequests, "Too many requests"},
 	core.CodeInsufficientStorage: {http.StatusInsufficientStorage, "Insufficient storage"},
+	core.CodeFolderExists:        {http.StatusConflict, "Folder already exists"},
+	core.CodeFolderNotEmpty:      {http.StatusConflict, "Folder not empty"},
+	core.CodeFolderDepth:         {http.StatusUnprocessableEntity, "Folder depth exceeded"},
+	core.CodeInvalidScope:        {http.StatusUnprocessableEntity, "Invalid token scope"},
 	core.CodeInternal:            {http.StatusInternalServerError, "Internal error"},
 }
 

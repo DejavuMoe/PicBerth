@@ -6,7 +6,8 @@
   import type { Image, LinkFormat } from '../../lib/types';
   import { LINK_FORMATS } from '../../lib/upload.svelte';
   import Icon from '../Icon.svelte';
-  import TagEditor from './TagEditor.svelte';
+  import Menu from '../Menu.svelte';
+  import FolderTargets from './FolderTargets.svelte';
 
   interface Props {
     lib: Library;
@@ -197,18 +198,34 @@
     {/if}
 
     <dl class="props">
-      <dt>标签</dt>
+      <dt>文件夹</dt>
       {#if trash}
-        <dd class="flex">
-          {#if image.tags.length}
-            {#each image.tags as t (t)}<span class="tag">{t}</span>{/each}
-          {:else}
-            <span class="muted">无</span>
-          {/if}
-        </dd>
+        <dd class="ellipsis">{lib.label(image.folderId)}</dd>
       {:else}
-        <dd class="flex">
-          <TagEditor tags={image.tags} all={lib.facets?.tags ?? []} onchange={(tags) => lib.setTags(image.id, tags)} />
+        <dd>
+          <Menu align="left" label="文件夹">
+            {#snippet trigger(open, toggle)}
+              <button
+                type="button"
+                class="folder-btn"
+                aria-label={`文件夹，${lib.label(image.folderId)}`}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onclick={toggle}
+              >
+                <span class="ellipsis">{lib.label(image.folderId)}</span>
+                <Icon name="down" size="s" />
+              </button>
+            {/snippet}
+            {#snippet children(close)}
+              <FolderTargets
+                {lib}
+                currentId={image.folderId ?? null}
+                onpick={(id) => void lib.moveImages([image.id], id)}
+                {close}
+              />
+            {/snippet}
+          </Menu>
         </dd>
       {/if}
     </dl>

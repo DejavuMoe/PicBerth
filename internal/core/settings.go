@@ -10,17 +10,19 @@ import (
 	"picberth/internal/imaging"
 )
 
+// Fixed limits that are no longer runtime settings (approved 2026-11-09).
+const (
+	maxPixels        = 50_000_000
+	uploadsPerMinute = 60
+)
+
 // Settings are the runtime-editable business settings (docs/api.md §3).
 type Settings struct {
-	MaxUploadBytes       int64    `json:"maxUploadBytes"`
-	MaxPixels            int64    `json:"maxPixels"`
-	AllowedFormats       []string `json:"allowedFormats"`
-	Dedupe               bool     `json:"dedupe"`
-	DefaultVisibility    string   `json:"defaultVisibility"`
-	TrashRetentionDays   int      `json:"trashRetentionDays"`
-	UploadsPerMinute     int      `json:"uploadsPerMinute"`
-	SessionIdleMinutes   int      `json:"sessionIdleMinutes"`
-	SessionAbsoluteHours int      `json:"sessionAbsoluteHours"`
+	MaxUploadBytes     int64    `json:"maxUploadBytes"`
+	AllowedFormats     []string `json:"allowedFormats"`
+	Dedupe             bool     `json:"dedupe"`
+	TrashRetentionDays int      `json:"trashRetentionDays"`
+	AuditRetentionDays int      `json:"auditRetentionDays"`
 }
 
 // SettingsView is Settings plus the read-only infrastructure values.
@@ -32,27 +34,19 @@ type SettingsView struct {
 }
 
 // SettingsPatch is a partial update. Read-only fields are accepted only when they equal the current value
-// (clients may echo a whole GET response back).
+// (clients may echo a whole GET response back). Removed keys are unknown fields and are rejected.
 type SettingsPatch struct {
-	MaxUploadBytes       *int64    `json:"maxUploadBytes"`
-	MaxPixels            *int64    `json:"maxPixels"`
-	AllowedFormats       *[]string `json:"allowedFormats"`
-	Dedupe               *bool     `json:"dedupe"`
-	DefaultVisibility    *string   `json:"defaultVisibility"`
-	TrashRetentionDays   *int      `json:"trashRetentionDays"`
-	UploadsPerMinute     *int      `json:"uploadsPerMinute"`
-	SessionIdleMinutes   *int      `json:"sessionIdleMinutes"`
-	SessionAbsoluteHours *int      `json:"sessionAbsoluteHours"`
-	PublicURL            *string   `json:"publicUrl"`
-	ImageURL             *string   `json:"imageUrl"`
-	HardMaxUploadBytes   *int64    `json:"hardMaxUploadBytes"`
+	MaxUploadBytes     *int64    `json:"maxUploadBytes"`
+	AllowedFormats     *[]string `json:"allowedFormats"`
+	Dedupe             *bool     `json:"dedupe"`
+	TrashRetentionDays *int      `json:"trashRetentionDays"`
+	AuditRetentionDays *int      `json:"auditRetentionDays"`
+	PublicURL          *string   `json:"publicUrl"`
+	ImageURL           *string   `json:"imageUrl"`
+	HardMaxUploadBytes *int64    `json:"hardMaxUploadBytes"`
 }
 
-const (
-	minUploadBytes = 1 << 10
-	minMaxPixels   = 1_000_000
-	maxMaxPixels   = 200_000_000
-)
+const minUploadBytes = 1 << 10
 
 func defaultSettings(hardMax int64) Settings {
 	formats := make([]string, len(imaging.AllFormats))
@@ -64,15 +58,11 @@ func defaultSettings(hardMax int64) Settings {
 		up = hardMax
 	}
 	return Settings{
-		MaxUploadBytes:       up,
-		MaxPixels:            50_000_000,
-		AllowedFormats:       formats,
-		Dedupe:               true,
-		DefaultVisibility:    "public",
-		TrashRetentionDays:   30,
-		UploadsPerMinute:     60,
-		SessionIdleMinutes:   30,
-		SessionAbsoluteHours: 12,
+		MaxUploadBytes:     up,
+		AllowedFormats:     formats,
+		Dedupe:             true,
+		TrashRetentionDays: 30,
+		AuditRetentionDays: 180,
 	}
 }
 
@@ -80,9 +70,6 @@ func defaultSettings(hardMax int64) Settings {
 func (st *Settings) validate(hardMax int64) error {
 	if st.MaxUploadBytes < minUploadBytes || st.MaxUploadBytes > hardMax {
 		return validation("maxUploadBytes must be between %d and %d.", minUploadBytes, hardMax)
-	}
-	if st.MaxPixels < minMaxPixels || st.MaxPixels > maxMaxPixels {
-		return validation("maxPixels must be between %d and %d.", minMaxPixels, maxMaxPixels)
 	}
 	if len(st.AllowedFormats) == 0 {
 		return validation("allowedFormats must contain at least one format.")
@@ -97,20 +84,11 @@ func (st *Settings) validate(hardMax int64) error {
 		}
 		seen[f] = true
 	}
-	if st.DefaultVisibility != "public" && st.DefaultVisibility != "private" {
-		return validation("defaultVisibility must be public or private.")
-	}
 	if st.TrashRetentionDays < 0 || st.TrashRetentionDays > 365 {
 		return validation("trashRetentionDays must be between 0 and 365.")
 	}
-	if st.UploadsPerMinute < 1 || st.UploadsPerMinute > 10000 {
-		return validation("uploadsPerMinute must be between 1 and 10000.")
-	}
-	if st.SessionIdleMinutes < 5 || st.SessionIdleMinutes > 10080 {
-		return validation("sessionIdleMinutes must be between 5 and 10080.")
-	}
-	if st.SessionAbsoluteHours < 1 || st.SessionAbsoluteHours > 8760 {
-		return validation("sessionAbsoluteHours must be between 1 and 8760.")
+	if st.AuditRetentionDays < 7 || st.AuditRetentionDays > 3650 {
+		return validation("auditRetentionDays must be between 7 and 3650.")
 	}
 	return nil
 }
@@ -119,7 +97,7 @@ func (st Settings) allows(f imaging.Format) bool {
 	return slices.Contains(st.AllowedFormats, string(f))
 }
 
-// settingKeys maps persisted keys to accessors, keeping the JSON names in one place (the struct tags).
+// toMap exposes the JSON view so persisted values are matched by their JSON names.
 func (st Settings) toMap() map[string]any {
 	b, _ := json.Marshal(st)
 	var m map[string]any
@@ -128,7 +106,8 @@ func (st Settings) toMap() map[string]any {
 }
 
 // loadSettings reads persisted values over the defaults. Invalid stored values fall back to the default
-// for that key (and are logged), so a bad row can never lock the admin out.
+// for that key (and are logged), so a bad row can never lock the admin out. Keys that no longer exist as
+// settings (from older schemas or hand edits) are ignored.
 func (s *Service) loadSettings(ctx context.Context) error {
 	st := defaultSettings(s.cfg.HardMaxUpload)
 	stored, err := s.db.AllSettings(ctx)
@@ -156,12 +135,7 @@ func (s *Service) loadSettings(ctx context.Context) error {
 		st = cand
 	}
 	s.settings.Store(&st)
-	s.applySettingSideEffects(st)
 	return nil
-}
-
-func (s *Service) applySettingSideEffects(st Settings) {
-	s.uploadLimit.Configure(float64(st.UploadsPerMinute)/60, st.UploadsPerMinute)
 }
 
 // Settings returns a copy of the current settings (no authorization: used internally and for limits).
@@ -200,29 +174,17 @@ func (s *Service) UpdateSettings(ctx context.Context, p Principal, patch Setting
 	if patch.MaxUploadBytes != nil {
 		nw.MaxUploadBytes = *patch.MaxUploadBytes
 	}
-	if patch.MaxPixels != nil {
-		nw.MaxPixels = *patch.MaxPixels
-	}
 	if patch.AllowedFormats != nil {
 		nw.AllowedFormats = slices.Clone(*patch.AllowedFormats)
 	}
 	if patch.Dedupe != nil {
 		nw.Dedupe = *patch.Dedupe
 	}
-	if patch.DefaultVisibility != nil {
-		nw.DefaultVisibility = *patch.DefaultVisibility
-	}
 	if patch.TrashRetentionDays != nil {
 		nw.TrashRetentionDays = *patch.TrashRetentionDays
 	}
-	if patch.UploadsPerMinute != nil {
-		nw.UploadsPerMinute = *patch.UploadsPerMinute
-	}
-	if patch.SessionIdleMinutes != nil {
-		nw.SessionIdleMinutes = *patch.SessionIdleMinutes
-	}
-	if patch.SessionAbsoluteHours != nil {
-		nw.SessionAbsoluteHours = *patch.SessionAbsoluteHours
+	if patch.AuditRetentionDays != nil {
+		nw.AuditRetentionDays = *patch.AuditRetentionDays
 	}
 	if err := nw.validate(s.cfg.HardMaxUpload); err != nil {
 		return SettingsView{}, err
@@ -246,7 +208,6 @@ func (s *Service) UpdateSettings(ctx context.Context, p Principal, patch Setting
 		return SettingsView{}, err
 	}
 	s.settings.Store(&nw)
-	s.applySettingSideEffects(nw)
 	slices.Sort(summary)
 	s.audit(ctx, p, "settings.update", "", strings.Join(summary, "; "))
 	return s.settingsView(), nil
