@@ -1,0 +1,103 @@
+name: Recover release publication
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        default: v0.0.1
+        type: string
+      run_id:
+        required: true
+        default: '42577194958'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-recovery-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require original tagged build and successful build jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          RUN: ${{ inputs.run_id }}
+        run: |
+          git check-ref-format "refs/tags/$TAG"
+          sha=$(git rev-parse "refs/tags/$TAG^{commit}")
+          git merge-base --is-ancestor "$sha" origin/master
+          gh run view "$RUN" --json headSha,event,workflowName,attempt,jobs > run.json
+          jq -e --arg sha "$sha" '.headSha == $sha and .event == "push" and .workflowName == "Release" and .attempt == 1 and ([.jobs[] | select((.name | startswith("binaries (")) or (.name | startswith("image (")))] | length == 6 and all(.conclusion == "success"))' run.json
+  manifest:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge native images and retain attestations
+        env:
+          TAGS: ghcr.io/dejavumoe/picberth:${{ inputs.tag }}
+        shell: bash
+        run: |
+          regctl() {
+            docker run --rm -i -v "$HOME/.docker/config.json:/home/appuser/.docker/config.json:ro" regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b "$@"
+          }
+          image=ghcr.io/dejavumoe/picberth
+          source="$image:build-${{ inputs.run_id }}-1"
+          while IFS= read -r tag; do
+            regctl manifest get "$source-amd64" --format raw-body > amd64.json
+            regctl manifest get "$source-arm64" --format raw-body > arm64.json
+            jq -s '.[0].manifests += .[1].manifests | .[0]' amd64.json arm64.json | regctl manifest put "$tag"
+            regctl manifest get "$tag" --format raw-body | jq -e '
+              [.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]'
+          done <<< "$TAGS"
+
+  release:
+    needs: manifest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: binary-*
+          path: release
+          merge-multiple: true
+      - name: Checksums and GitHub Release
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          flags=()
+          if [[ "${TAG%%+*}" == *-* ]]; then flags+=(--prerelease --latest=false); fi
+          gh release create "$TAG" ./*.tar.gz ./*.zip SHA256SUMS --verify-tag --title "PicBerth $TAG" --notes-file "../docs/releases/$TAG.md" "${flags[@]}"

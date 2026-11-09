@@ -145,12 +145,14 @@ jobs:
         shell: bash
         run: |
           regctl() {
-            docker run --rm -v "$HOME/.docker/config.json:/home/appuser/.docker/config.json:ro" regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b "$@"
+            docker run --rm -i -v "$HOME/.docker/config.json:/home/appuser/.docker/config.json:ro" regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b "$@"
           }
           image=ghcr.io/dejavumoe/picberth
           source="$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           while IFS= read -r tag; do
-            regctl index create "$tag" --ref "$source-amd64" --ref "$source-arm64"
+            regctl manifest get "$source-amd64" --format raw-body > amd64.json
+            regctl manifest get "$source-arm64" --format raw-body > arm64.json
+            jq -s '.[0].manifests += .[1].manifests | .[0]' amd64.json arm64.json | regctl manifest put "$tag"
             regctl manifest get "$tag" --format raw-body | jq -e '
               [.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]'
           done <<< "$TAGS"
