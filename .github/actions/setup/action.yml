@@ -1,0 +1,40 @@
+name: Set up PicBerth
+description: Install the locked toolchain and restore dependency and build caches.
+inputs:
+  go-cache-suffix:
+    description: Separate cross-compiled build caches by target.
+    default: native
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      with:
+        install_args: --locked
+        cache: true
+    - name: Locate caches
+      id: paths
+      shell: bash
+      working-directory: web
+      run: |
+        echo "pnpm=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.paths.outputs.pnpm }}
+        key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'web/pnpm-lock.yaml') }}
+        restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.paths.outputs.gomod }}
+        key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}
+        restore-keys: gomod-${{ runner.os }}-${{ runner.arch }}-
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.paths.outputs.gobuild }}
+        key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-${{ hashFiles('**/*.go', 'web/**', '!web/node_modules/**') }}
+        restore-keys: |
+          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-
+          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-
+    - shell: bash
+      run: mise run web:install
