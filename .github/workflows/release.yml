@@ -27,7 +27,7 @@ jobs:
 
   binaries:
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     permissions:
       contents: read
@@ -39,12 +39,16 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            runner: ubuntu-24.04
           - goos: linux
             goarch: arm64
+            runner: ubuntu-24.04-arm
           - goos: windows
             goarch: amd64
+            runner: ubuntu-24.04
           - goos: darwin
             goarch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,8 +95,16 @@ jobs:
           retention-days: 7
 
   image:
-    needs: binaries
-    runs-on: ubuntu-24.04
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -101,41 +113,51 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         if: github.event_name == 'push'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        id: meta
+      - uses: ./.github/actions/native-image
         with:
-          images: ghcr.io/dejavumoe/picberth
-          flavor: latest=auto
-          tags: |
-            type=semver,pattern={{version}},value=${{ inputs.version || github.ref_name }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version || github.ref_name }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
+          arch: ${{ matrix.arch }}
+          version: ${{ inputs.version || github.ref_name }}
           push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
-            COMMIT=${{ github.sha }}
-          provenance: mode=max
-          sbom: true
-          cache-from: |
-            type=gha,scope=picberth-release
-            type=gha,scope=picberth-ci
-          cache-to: type=gha,mode=max,scope=picberth-release
+
+  manifest:
+    if: github.event_name == 'push'
+    needs: [binaries, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge native images and retain attestations
+        env:
+          TAGS: ghcr.io/dejavumoe/picberth:${{ github.ref_name }}
+        shell: bash
+        run: |
+          regctl() {
+            docker run --rm -v "$HOME/.docker/config.json:/home/appuser/.docker/config.json:ro" regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b "$@"
+          }
+          image=ghcr.io/dejavumoe/picberth
+          source="$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          while IFS= read -r tag; do
+            regctl index create "$tag" --ref "$source-amd64" --ref "$source-arm64"
+            regctl manifest get "$tag" --format raw-body | jq -e '
+              [.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]'
+          done <<< "$TAGS"
 
   release:
     if: github.event_name == 'push'
-    needs: [binaries, image]
+    needs: [binaries, manifest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -161,4 +183,4 @@ jobs:
           sha256sum --check SHA256SUMS
           flags=()
           if [[ "${TAG%%+*}" == *-* ]]; then flags+=(--prerelease --latest=false); fi
-          gh release create "$TAG" ./*.tar.gz ./*.zip SHA256SUMS --verify-tag --notes-file "../docs/releases/$TAG.md" "${flags[@]}"
+          gh release create "$TAG" ./*.tar.gz ./*.zip SHA256SUMS --verify-tag --title "PicBerth $TAG" --notes-file "../docs/releases/$TAG.md" "${flags[@]}"
