@@ -28,6 +28,7 @@ FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c
 # The container listens on all interfaces *inside its network namespace*. Never publish
 # the port on all host interfaces: deploy/compose.yaml binds it to 127.0.0.1 only.
 COPY --from=build /out/picberth /picberth
+COPY LICENSE /LICENSE
 # Copy the parent so the data/ entry keeps its 0700 mode (copying a directory itself only copies its
 # contents and recreates the target with 0755).
 COPY --from=build --chown=65532:65532 /out/root/ /
