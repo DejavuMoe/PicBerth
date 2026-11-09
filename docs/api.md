@@ -157,7 +157,7 @@ max 50 MP per frame.
 
 | Method & path | Request | Response |
 |---|---|---|
-| `GET /api/v1/session` | — | `200 {"authenticated": bool, "setupRequired": bool, "user": {"name": "admin"} \| null, "limits": {"maxUploadBytes", "allowedFormats"} \| null, "version": "0.1.0"}` |
+| `GET /api/v1/session` | — | `200 {"authenticated": bool, "setupRequired": bool, "user": {"name": "admin"} \| null, "limits": {"maxUploadBytes", "allowedFormats"} \| null, "version": "0.0.1"}` |
 | `POST /api/v1/session` | `{"username", "password"}` | `204` + session cookie; `401 unauthorized`; `429 rate-limited` |
 | `DELETE /api/v1/session` | — | `204`, cookie cleared |
 | `POST /api/v1/setup` | `{"setupCode", "username", "password"}` | `204` + session cookie; `409 setup-done`; `403 forbidden` (bad code) |
@@ -297,7 +297,7 @@ curl -H "Authorization: Bearer pb_…" -F file=@shot.png https://pics.example.co
 
 ```json
 {
-  "version": "0.1.0", "commit": "…", "goVersion": "go1.27.3", "sqliteVersion": "3.53.4",
+  "version": "0.0.1", "commit": "…", "goVersion": "go1.27.3", "sqliteVersion": "3.53.4",
   "startedAt": "…", "uptimeSeconds": 3600,
   "images": { "active": 1204, "trashed": 12, "bytes": 734003200, "broken": 0 },
   "database": { "bytes": 2490368, "walBytes": 41200 },

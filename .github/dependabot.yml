@@ -1,6 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 1
     directory: /
     schedule:
       interval: weekly
@@ -8,6 +9,7 @@ updates:
       actions:
         patterns: ["*"]
   - package-ecosystem: gomod
+    open-pull-requests-limit: 1
     directory: /
     schedule:
       interval: weekly
@@ -16,28 +18,42 @@ updates:
         patterns: ["*"]
   - package-ecosystem: npm
     directory: /web
+    open-pull-requests-limit: 1
     schedule:
       interval: weekly
     ignore:
       # svelte-check currently needs a separate migration for TypeScript 7.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
       web:
         patterns: ["*"]
   - package-ecosystem: npm
+    open-pull-requests-limit: 1
     directories:
       - /.agents/skills/baoyu-design/agents/gen-pptx
       - /.agents/skills/baoyu-design/agents/gen-video
     schedule:
-      interval: weekly
+      interval: monthly
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
       design-tools:
         patterns: ["*"]
   - package-ecosystem: docker
+    open-pull-requests-limit: 1
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Keep Docker and mise on the same Node major; migrate them together.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
     groups:
       docker:
         patterns: ["*"]
