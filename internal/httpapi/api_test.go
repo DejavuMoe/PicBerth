@@ -884,6 +884,8 @@ func atoi(s string) int {
 
 func TestUploadRateLimitHTTP(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
+	now := time.Now()
+	h.svc.Now = func() time.Time { return now }
 	// the upload rate limit is a fixed 60 per minute and no longer a setting
 	resp, body := h.web("PATCH", "/api/v1/settings", map[string]any{"uploadsPerMinute": 2})
 	wantProblem(t, resp, body, 400, "validation")
@@ -896,6 +898,11 @@ func TestUploadRateLimitHTTP(t *testing.T) {
 	if atoi(resp.Header.Get("Retry-After")) < 1 {
 		t.Fatalf("Retry-After %q", resp.Header.Get("Retry-After"))
 	}
+	now = now.Add(time.Second)
+	resp, body = h.uploadWeb(makePNG(t, 260))
+	wantStatus(t, resp, body, 201)
+	resp, body = h.uploadWeb(makePNG(t, 261))
+	wantProblem(t, resp, body, 429, "rate-limited")
 }
 
 func TestSettingsEndpoints(t *testing.T) {

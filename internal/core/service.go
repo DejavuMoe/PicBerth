@@ -112,6 +112,7 @@ func New(db *meta.DB, dir *datadir.Dir, cfg Config, log *slog.Logger) (*Service,
 		thumbQ:         make(chan string, 256),
 		startedAt:      time.Now(),
 	}
+	s.uploadLimit.SetNow(s.now)
 	s.jobCtx, s.jobCancel = context.WithCancel(context.Background())
 	if err := s.loadSettings(context.Background()); err != nil {
 		return nil, err

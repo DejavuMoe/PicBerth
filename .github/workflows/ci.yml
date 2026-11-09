@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    # Validate a commit before a direct fast-forward to protected main.
+    # Validate a commit before a direct fast-forward to protected master.
     branches: ['**']
   pull_request:
   workflow_call:
@@ -46,6 +46,7 @@ jobs:
           code=false
           while IFS= read -r -d '' path; do
             case "$path" in
+              .agents/skills/baoyu-design/agents/gen-pptx/*|.agents/skills/baoyu-design/agents/gen-video/*) code=true ;;
               docs/*|designs/*|.agents/*) ;;
               */*) code=true ;;
               *.md|LICENSE|LICENSE.*) ;;
@@ -67,9 +68,20 @@ jobs:
       - run: mise run test
       - name: Go vulnerability check
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-      - name: Production dependency audit
+      - name: Frontend dependency audit (including build tools)
         working-directory: web
-        run: pnpm audit --prod --audit-level high
+        run: pnpm audit --audit-level moderate
+      - name: Check design export tools
+        run: |
+          for tool in gen-pptx gen-video; do
+            (
+              cd ".agents/skills/baoyu-design/agents/$tool"
+              npm ci --ignore-scripts
+              npm audit --audit-level moderate
+              npm run build
+              npm test
+            )
+          done
 
   cross-compile:
     needs: test

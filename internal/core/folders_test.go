@@ -203,6 +203,8 @@ func TestFolderListShape(t *testing.T) {
 
 func TestUploadToFolderAndPerFolderDedupe(t *testing.T) {
 	e := newEnv(t)
+	now := time.Now()
+	e.svc.Now = func() time.Time { return now }
 	ctx := context.Background()
 	data := makePNG(t, 10, 10, 920)
 
@@ -210,6 +212,7 @@ func TestUploadToFolderAndPerFolderDedupe(t *testing.T) {
 	if root.FolderID != nil || root.Duplicate {
 		t.Fatalf("root upload: %+v", root)
 	}
+	now = now.Add(time.Millisecond) // Keep the root copy strictly older for dedupe ordering.
 	f := e.folder(e.admin, "f", nil)
 
 	// the same bytes in another folder are a new image
