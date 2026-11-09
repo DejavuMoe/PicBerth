@@ -1,10 +1,11 @@
 # Current UI capabilities and states
 
-Evidence-based inventory of PicBerth as of 2026-10-22. Sources: `internal/httpapi/api.go` (routes),
-`internal/httpapi/handlers_images.go`, `web/src/lib/{api,types,upload.svelte}.ts`, `docs/api.md`.
-The production SPA implements the from-scratch redesign approved as `ead4953` (2026-11-08). Every image is public: the
-console has no 公开 / 私有 controls and uploads send `visibility=public`; the API still carries the field. The earlier 「暗房」 design was
-**rejected** by the user on 2026-10-21 and no longer exists in the code; it has no authority.
+Evidence-based inventory of PicBerth as of 2026-11-09. Sources: `internal/httpapi/api.go` (routes),
+`internal/httpapi/handlers_*.go`, `web/src/lib/{api,types,upload.svelte,library.svelte,folders}.ts`, `docs/api.md`.
+The production SPA implements the folders revision approved as `c3bb4d0` (2026-11-09, `docs/ui/folders-revision.md`)
+on top of the from-scratch redesign approved as `ead4953`. Every image is public; there is no visibility concept in
+the API or the console. Tags do not exist. The earlier 「暗房」 design was **rejected** by the user on 2026-10-21 and
+no longer exists in the code; it has no authority.
 
 ## Users and primary jobs
 
@@ -12,80 +13,83 @@ console has no 公开 / 私有 controls and uploads send `visibility=public`; th
 - Upload images (web: drop / paste / pick; external tools: PicGo, PicList, ShareX, curl via API tokens) and copy
   their links in URL / Markdown / HTML / BBCode form.
 - Find an existing image again and copy its link.
-- Manage images: rename, tag, move to trash, restore, purge; act on many images at once.
-- Administer: API tokens, upload/retention/session settings, health checks and snapshots, audit log.
+- Organise images in folders (at most 3 levels); rename, move, trash, restore, purge; act on many images at once.
+- Administer: API tokens, upload / retention settings, health checks and snapshots, operation log.
 
 ## Surfaces
 
 | Surface ID | Route | Purpose | Primary actions | Evidence |
 |---|---|---|---|---|
 | setup | `/setup` | create first admin | enter setup code, username, password | `POST /api/v1/setup`, `screens/Setup.svelte` |
-| login | `/login` | sign in | username + password | `POST /api/v1/session`, `screens/Login.svelte` |
+| login | `/login?next=` | sign in | username + password, then return to `next` | `POST /api/v1/session`, `screens/Login.svelte` |
 | not-found | any unknown path | tell the user the page does not exist | go back to the library | `screens/NotFound.svelte` |
-| library | `/`, `/library` | browse/search active images, inline upload tray | upload, search, filter, sort, select, batch, open detail | `screens/Library.svelte`, `components/library/` |
-| image-detail | docked column / drawer / sheet over library/trash | one image | copy link (4 formats, last-used format remembered), rename, edit tags, download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
-| trash | `/trash` | trashed images | restore, purge (confirm), batch | `screens/Library.svelte` (trash mode) |
-| tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke (inline second press) | `screens/Tokens.svelte`, `components/admin/TokenCreate.svelte`, `TokenReveal.svelte` |
+| library | `/library`, `/library/<folder path>` (`/` is replaced with `/library`) | browse the current folder, search / filter it with its subfolders, inline upload tray | upload, search, filter, sort, select, batch, move, open detail | `screens/Library.svelte`, `components/library/` |
+| folder tree | tree pane ≥ 1100 px, popover below | folders of the library | open, create, rename, move, delete (empty only), drop images onto a node | `components/library/FolderPanel.svelte`, `FolderMenu.svelte` |
+| image-detail | docked column / drawer / sheet over library/trash | one image | copy link (4 formats, last-used format remembered), rename, move (文件夹 row), download, trash / restore / purge, prev/next | `components/library/DetailPanel.svelte` |
+| trash | `/trash` | trashed images across folders, with a 文件夹 column | restore, purge (confirm), batch | `screens/Library.svelte` (trash mode) |
+| tokens | `/tokens` | API tokens | create (name, scopes, expiry), reveal once + integration snippets, revoke (inline second press), open API 文档 | `screens/Tokens.svelte`, `components/admin/TokenCreate.svelte`, `TokenReveal.svelte` |
 | settings | `/settings` | business settings | edit, save / discard, leave guard | `screens/Settings.svelte` |
-| status | `/status` | health | quick / full check, snapshot, view warnings, figures, audit log | `screens/Status.svelte` |
+| status | `/status` | health and operation log | quick / full check, snapshot, warnings, figures, operation log filter and 加载更多 | `screens/Status.svelte` |
+| api-docs | `/docs/api` (no session needed) | API reference | read, copy examples, open OpenAPI | `screens/DocsApi.svelte`, `GET /api/v1/openapi.json` |
 
 ## Domain objects and terminology
 
 | Object | User-visible fields | Allowed actions (web session) | Rules | Evidence |
 |---|---|---|---|---|
-| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, broken, duplicate, source (网页 / 令牌名 / 命令行), tags, createdAt, trashedAt, links{url, markdown, html, bbcode} | upload (always public), rename, edit tags, trash, restore, purge, download raw | link bytes never change; purged IDs never reused; the API `visibility` field is not used by the console; `hasGps` is returned by the API but not shown in the console | `lib/types.ts` Image, `handlers_images.go` |
-| Upload item | file name, progress, status queued/uploading/processing/done/error, error text, retryable | cancel, retry (retryable only), remove, copy link | concurrency 3; client pre-check of size/format; 429 auto-retry | `lib/upload.svelte.ts` |
-| Token (令牌) | name, prefix, scopes 上传/只读/管理, createdAt, lastUsedAt, expiresAt, revokedAt | create, revoke | secret shown once; tokens cannot manage tokens/settings | `lib/types.ts` Token, `api.md` |
-| Settings (设置) | maxUploadBytes, maxPixels, allowedFormats, dedupe, trashRetentionDays, uploadsPerMinute, sessionIdleMinutes, sessionAbsoluteHours; read-only publicUrl, imageUrl, hardMaxUploadBytes | edit writable fields | — | `lib/types.ts` Settings |
+| Image (图片) | filename, id, url, mime/ext, size, width×height, frames (animated), sha256, broken, duplicate, source (网页 / 令牌名 / 命令行), folder, createdAt, trashedAt, links{url, markdown, html, bbcode} | upload, rename, move, trash, restore, purge, download raw | link bytes never change, also when moved; purged IDs never reused; dedupe is per folder; `hasGps` is returned by the API but not shown | `lib/types.ts` Image, `handlers_images.go` |
+| Folder (文件夹) | name, parent, depth, imageCount (direct, active) | create, rename, move, delete when empty | depth ≤ 3 counting the moved subtree; names 1–64 characters, no `/` or `\`, unique among siblings case-insensitively; opaque ids, the address uses names | `lib/folders.ts`, `handlers_folders.go` |
+| Upload item | file name, folder, progress, status queued/uploading/processing/done/error, error text, retryable | cancel, retry (retryable only), remove, copy link | concurrency 3; client pre-check of size/format; 429 auto-retry | `lib/upload.svelte.ts` |
+| Token (令牌) | name, prefix, scopes 上传/管理, createdAt, lastUsedAt, expiresAt, revokedAt | create, revoke | secret shown once; tokens cannot manage tokens/settings | `lib/types.ts` Token, `api.md` |
+| Settings (设置) | maxUploadBytes, allowedFormats, dedupe, trashRetentionDays, auditRetentionDays; read-only publicUrl, imageUrl, hardMaxUploadBytes | edit writable fields | upload rate (60/min), session lifetimes (7 days idle, 30 days absolute) and max pixels (50 MP) are fixed | `lib/types.ts` Settings |
 | Status (状态) | images {active, trashed, bytes, broken}, database, disk, lastSnapshot, lastCheck, warnings, versions | run check (quick/full), create snapshot | — | `lib/types.ts` Status |
-| Audit entry | at, actor, action, target, detail, ip | read, paginate | — | `GET /api/v1/audit` |
+| Audit entry (操作记录) | at, actor, action, target, detail, ip | read, filter by category, page by 10 | read-only; pruned after `auditRetentionDays` | `GET /api/v1/audit` |
 
 ## Library query capabilities (what "find / filter" can do today)
 
-`GET /api/v1/images` supports, all combined with AND: `state` (active | trashed), `q` (filename or tag
-substring, ID or SHA-256 prefix), `format` (any-of jpeg | png | gif | webp | avif; repeatable and/or
-comma-separated), `tag` (repeatable, image must have all), `source` (repeatable any-of: `web`, `cli`,
-`token:<id>`), `visibility` (public | private), `since` / `until` (RFC 3339, upload time,
-`since` inclusive, `until` exclusive), `sort` (new | old | large | small | name), cursor pagination
-(`limit`, `cursor`). No size range.
+`GET /api/v1/images` supports, all combined with AND: `state` (active | trashed), `folder` (`root` or a folder
+id) with `recursive` (include descendants), `q` (filename substring, ID or SHA-256 prefix), `format` (any-of
+jpeg | png | gif | webp | avif; repeatable and/or comma-separated), `source` (repeatable any-of: `web`, `cli`,
+`token:<id>`), `since` / `until` (RFC 3339, upload time, `since` inclusive, `until` exclusive), `sort` (new | old |
+large | small | name), cursor pagination (`limit`, `cursor`). No size range. The console browses a folder without
+`recursive` and adds `recursive=true` when a search or filter is active.
 
 `GET /api/v1/images/facets?state=active|trashed` returns counts for the whole visible set of that state
-(ignoring other filters): total, bytes, per format, per visibility, per source (web, each token with
-its name, cli) and per tag. Use it for filter counts and tag/source pickers.
+(ignoring other filters): total, bytes, per format and per source (web, each token with its name, cli). Use it
+for filter counts and the source picker.
 
-Images carry `tags` (up to 20, 1–32 characters each; no comma, no leading `#`). `PATCH /api/v1/images/{id}`
-accepts any non-empty subset of `visibility`, `filename` (rename; link and id never change) and `tags` (replaces
-the full set). Upload accepts repeated `tag` parts. Batch (`POST /api/v1/images/batch`, ≤ 500 ids):
-`trash | restore | purge | visibility` — no batch tagging or renaming.
+`PATCH /api/v1/images/{id}` accepts any non-empty subset of `filename` (rename; link and id never change) and
+`folderId`. Batch (`POST /api/v1/images/batch`, ≤ 500 ids): `trash | restore | purge | move` — no batch renaming.
 
 ## Not supported by the backend (would need new API work)
 
-Albums / folders, notes/descriptions, replacing an image's bytes, view / traffic statistics, size-range
-filter, batch tag / rename, tag rename or merge across images (tags are only edited per image), multiple users.
+Albums across folders, notes/descriptions, replacing an image's bytes, view / traffic statistics, size-range
+filter, batch rename, multiple users.
 
 ## State matrix
 
 | Flow | Ready | Loading | Empty | Error | Disabled | Permission | Progress / cancel / retry |
 |---|---|---|---|---|---|---|---|
-| library list | list with cursor | first page + load more | none at all; filtered-empty with clear filters | load failed + retry | — | 401 → login | infinite scroll |
-| upload | done with link | — | — | precheck rejection, 413/415/422/429/5xx messages | — | 401 → login | % progress, processing, cancel, retry (retryable), auto-retry on short 429 |
-| batch actions | toast with 撤销 for trash/restore | — | — | partial failure counts | — | — | — |
+| library list | list with cursor | first page + load more | 还没有图片; 这里没有图片 in a folder; filtered-empty with 清除筛选 | load failed + retry; 文件夹不存在 | — | 401 → login | infinite scroll |
+| folder tree | tree | 加载中 | 还没有文件夹 | 文件夹加载失败 + 重试 | 新建子文件夹 at depth 3 (最多 3 层); 删除 while 不为空; move targets past depth 3 | — | inline create / rename (Enter / Esc); delete and move with 撤销 |
+| upload | done with link | — | — | precheck rejection, 404 folder, 413/415/422/429/5xx messages | — | 401 → login | % progress, processing, cancel, retry (retryable), auto-retry on short 429 |
+| batch actions | toast with 撤销 for trash/restore/move | — | — | partial failure counts | — | — | — |
 | purge | confirm dialog | — | — | — | — | — | — |
 | tokens | rows | — | 还没有令牌 | load failed | — | — | — |
 | settings | form | — | — | validation per field, save error | save while unchanged | — | unsaved bar, leave guard |
 | status | figures | — | — | load failed | buttons while running | — | check elapsed time |
+| operation log | rows, 加载更多 | 加载中 | empty filter result | load failed | — | — | paging by 10 |
 
 ## Interaction and accessibility behavior
 
 - Keyboard: `U` opens file picker, `/` focuses search, arrows move between images, Space selects, Enter opens,
-  Esc clears selection / closes detail, ←/→ in detail.
-- Pointer: window-wide drag & drop and paste; Ctrl/⌘-click toggle, Shift-click range; touch long-press select,
-  swipe in detail. Phones: 选择 in the header ⋯ menu starts selection mode; batch actions float above the tab bar;
-  theme and 退出 live in an 账户 section at the end of 设置; the upload button is the last header control.
-- Table row actions show on hover or focus and always on touch. Default library view is the table on every
+  Esc clears selection / closes detail, ←/→ in detail; Enter saves and Esc cancels inline folder names.
+- Pointer: window-wide drag & drop and paste upload into the current folder; images (the whole selection when the
+  dragged image is selected) can be dropped on a tree node or a breadcrumb ancestor; Ctrl/⌘-click toggle,
+  Shift-click range; touch long-press select, swipe in detail. Folders are not draggable. Phones: 选择 in the
+  header 显示 menu starts selection mode; batch actions float above the tab bar; the upload button is the last
+  header control.
+- Table row actions show on hover or focus and always on touch. Default library view is the list on every
   width; the choice is remembered (`picberth.view`).
-- Tag editor: up to 20 tags, 32 characters each (server limit); a leading `#` is stripped. The add field is a
-  combobox listing existing tags with counts.
 - Status figures are one card; the settings unsaved bar floats at the bottom (above the tab bar on phones).
 - Live region announces upload completions/errors; icon buttons have labels.
 - Overlays (modal, drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced-motion`.
@@ -95,22 +99,23 @@ filter, batch tag / rename, tag rename or merge across images (tags are only edi
 
 - SPA embedded in a Go binary; strict CSP (`script-src 'self'`, images from self/blob/data/image origin).
 - Svelte 5 + Vite, no UI libraries. Target Chrome/Edge 111+, Firefox 114+, Safari 16.4+.
-- Breakpoints: full sidebar from 1100 px, icon rail 721–1099 px, full-bleed panel with a bottom tab bar at
-  ≤ 720 px. Library phone rows at ≤ 720 px; image detail docked column ≥ 1280 px (380 px), right drawer
-  721–1279 px, bottom sheet on phones. The header controls adapt to the width of the panel content, not the
-  viewport.
-- The server serves the SPA only for its known routes: an unknown URL requested directly gets a plain 404; unknown
-  in-app paths show the not-found screen.
+- Breakpoints: full sidebar and folder tree pane from 1100 px, icon rail and tree popover 721–1099 px, full-bleed
+  panel with a bottom tab bar at ≤ 720 px. Image detail docked column ≥ 1440 px, right drawer 721–1439 px, bottom
+  sheet on phones. The header controls adapt to the width of the panel content, not the viewport.
+- The server serves the SPA for its known routes and any `/library/...` path: an unknown URL requested directly
+  gets a plain 404; unknown in-app paths show the not-found screen.
 
 ## Content authority currently evidenced
 
-- Domain terminology in production code: 图片, 上传, 回收站, 令牌, 设置, 状态, 链接, 复制,
-  移到回收站, 恢复, 永久删除, 撤销, 动图, 损坏, 上传 / 只读 / 管理.
+- Domain terminology in production code: 图片, 文件夹, 上传, 回收站, 令牌, 设置, 状态, 操作记录, 链接, 复制,
+  移动, 移到回收站, 恢复, 永久删除, 撤销, 动图, 损坏, 上传 / 管理.
 - State/error strings in `lib/api.ts` (`errorMessage`) and `lib/upload.svelte.ts` must stay compatible.
 - Rejected metaphor copy (底片, 帧, 冲洗, 显影, 暗房已就绪, 图片的泊位 …) has no authority.
 - Explicitly approved marketing copy: none.
 
 ## Known unknowns
 
-- Which management capabilities the user expects beyond the current API (albums, notes, batch tagging and
-  renaming, tag merge, size-range filter, statistics …).
+- Which management capabilities the user expects beyond the current API (notes, batch renaming, size-range
+  filter, statistics …).
+- The approved prototype's API reference identified folders by path; the API identifies them by opaque id, and the
+  production reference documents ids.
