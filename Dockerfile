@@ -9,7 +9,7 @@ ADD --checksum=sha256:18dbb118de1dbef0e4516c17bf847d6ee206fc4deffb2bb488ec8e1d28
 FROM pnpm-${TARGETARCH} AS pnpm
 
 # ---- web: build the Svelte SPA (Vite writes to /src/internal/webui/dist) ----
-FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS web
+FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS web
 COPY --from=pnpm /pnpm.tar.gz /tmp/pnpm.tar.gz
 RUN mkdir /opt/pnpm && tar -xzf /tmp/pnpm.tar.gz -C /opt/pnpm && ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm && rm /tmp/pnpm.tar.gz
 WORKDIR /src/web

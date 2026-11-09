@@ -2,7 +2,7 @@
 # Floors come from security advisories (design baseline §9.6): Go >= 1.26.10 / 1.27.3.
 [tools]
 go = "1.27.3"
-node = "24.21.0"
+node = "24.22.2"
 pnpm = "12.10.1"
 
 [env]
