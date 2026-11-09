@@ -1,0 +1,60 @@
+name: Native container build
+description: Build on the host CPU with standalone BuildKit and retain attestations.
+inputs:
+  arch:
+    required: true
+    description: Native Linux CPU architecture
+  version:
+    default: v0.0.1-dev
+    description: Release version
+  push:
+    default: 'false'
+    description: Publish the per-run architecture image
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/buildkit-cache
+        key: buildkit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Dockerfile', 'mise.lock') }}-${{ github.sha }}
+        restore-keys: |
+          buildkit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Dockerfile', 'mise.lock') }}-
+          buildkit-${{ runner.os }}-${{ runner.arch }}-
+    - name: Build and check native image
+      shell: bash
+      env:
+        ARCH: ${{ inputs.arch }}
+        VERSION: ${{ inputs.version }}
+        PUSH: ${{ inputs.push }}
+      run: |
+        case "$ARCH:$(uname -m)" in
+          amd64:x86_64|arm64:aarch64) ;;
+          *) echo 'Runner CPU does not match target' >&2; exit 1 ;;
+        esac
+        mkdir -p "$RUNNER_TEMP/buildkit-cache" "$HOME/.docker"
+        args=()
+        if [[ -f "$RUNNER_TEMP/buildkit-cache/index.json" ]]; then
+          args+=(--import-cache type=local,src=/cache)
+        fi
+        image="ghcr.io/dejavumoe/picberth:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$ARCH"
+        if [[ "$PUSH" == true ]]; then
+          output="type=image,name=$image,push=true"
+        else
+          output="type=oci,dest=/output/image.tar"
+        fi
+        docker run --rm --privileged \
+          -v "$GITHUB_WORKSPACE:/src:ro" \
+          -v "$HOME/.docker:/root/.docker:ro" \
+          -v "$RUNNER_TEMP/buildkit-cache:/cache" \
+          -v "$RUNNER_TEMP:/output" \
+          --entrypoint buildctl-daemonless.sh moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e build \
+          --frontend dockerfile.v0 --local context=/src --local dockerfile=/src \
+          --opt "platform=linux/$ARCH" \
+          --opt "build-arg:VERSION=${VERSION#v}" --opt "build-arg:COMMIT=$GITHUB_SHA" \
+          --opt attest:provenance=mode=max --opt attest:sbom= \
+          "${args[@]}" --export-cache type=local,dest=/output/buildkit-cache-new,mode=max \
+          --output "$output"
+        sudo rm -f "$RUNNER_TEMP/image.tar"
+        sudo rm -rf "$RUNNER_TEMP/buildkit-cache"
+        sudo mv "$RUNNER_TEMP/buildkit-cache-new" "$RUNNER_TEMP/buildkit-cache"
+        sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/buildkit-cache"
