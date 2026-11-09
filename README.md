@@ -68,7 +68,7 @@ curl -H "Authorization: Bearer pb_…" -F file=@shot.png https://pics.example.co
 - **PicGo / PicList**（web-uploader 插件）：API 地址 `https://pics.example.com/api/v1/images`，POST 参数名 `file`，JSON 路径 `url`，自定义请求头 `{"Authorization":"Bearer pb_…"}`。
 - **ShareX**：在令牌对话框中下载 `.sxcu` 文件后双击导入。
 
-令牌分为三种权限：「上传」只能上传并查看自己上传的图片，「只读」可查看全部图片，「管理」还可以修改可见性和删除图片。任何令牌都不能管理令牌或修改设置。
+令牌分为两种权限：「上传」只能上传（可指定已有文件夹）并查看自己上传的图片；「管理」可查看全部图片，管理文件夹，移动、删除图片。任何令牌都不能管理令牌或修改设置。接口说明见控制台「令牌 → API 文档」（`/docs/api`），机器可读描述位于 `/api/v1/openapi.json`。
 
 ## 备份与恢复
 
@@ -91,6 +91,24 @@ mise install            # Go、Node、pnpm 的锁定版本
 mise run web:install
 mise run dev            # Go 服务，数据目录为 .devdata
 mise run web:dev        # 另开一个终端：Vite 开发服务器 http://127.0.0.1:5173
-mise run test           # go vet + go test + svelte-check
+mise run test           # go vet + go test + svelte-check + E2E TypeScript 检查
+mise run web:e2e:install # 安装 Playwright Chromium 及系统依赖
+mise run web:e2e        # Playwright E2E 测试（依赖 build，使用临时独立数据库/目录）
 mise run build          # 生成 dist/picberth（内嵌前端）
 ```
+
+`test`、`dev` 和 `build` 会先构建需要嵌入的前端资源。干净检出后若直接执行 `go test ./...`、
+`go vet ./...` 或 `go run ./cmd/picberth`，请先运行 `mise run web:build`。
+
+Windows 开发环境下，将浏览器安装和测试放在 WSL 中运行，例如：
+
+```powershell
+linux-task.ps1 -Mode build -Project <项目路径> -Command 'export PATH="$HOME/.local/bin:$PATH"; mise run web:e2e:install && mise run web:e2e'
+```
+
+测试使用临时数据目录和本地端口 5210（可用 `PICBERTH_PORT` 覆盖），
+不会复用已有服务。Linux 下退出时等待服务关闭，再清理测试数据；失败截图和 trace 位于系统临时目录
+`picberth-e2e-artifacts`（可用 `E2E_OUTPUT_DIR` 覆盖）。
+
+图片从备份恢复后，运行 `picberth check --full`（或状态页的完整检查）验证内容并清除损坏标记；
+快速检查只检查结构和文件位置，不会清除已有损坏标记。
