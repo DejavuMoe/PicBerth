@@ -77,6 +77,10 @@ Steps are used for their Radix purpose:
   x-height; a leading icon in a button shortens that side's padding by 2 px.
 - Text in neighbouring columns shares one baseline. Mixed sizes in a row align on the baseline, not the box.
 - Right-align numbers in tables; keep units in the field, not after it.
+- One gutter (20 px, 16 px on phones) carries every title, section heading, row, image edge and the checkbox
+  column inside the panel. The glyph or the text sits on it, not the box: a filled button ends on the gutter
+  with its box, a ghost or icon button with its label or glyph (pulled out by its inner padding). The brand
+  mark, the navigation icons, the root of the folder tree and the centre of the avatar share one column.
 
 ## 6. Radius
 
@@ -97,7 +101,8 @@ Steps are used for their Radix purpose:
 - Every border, divider and outline-style edge is 0.5 px (`--bw`). The only exception is the 2 px keyboard
   focus ring, which must stay visible.
 - Surfaces are separated by step changes and 0.5 px lines, not shadows. A shadow is allowed only on layers
-  that float over content (menus, popovers, dialogs, sheets, toasts, the phone bulk bar) and is a single soft
+  that float over content (menus, popovers, dialogs, sheets, toasts, the phone bulk bar, the command palette,
+  the uploads panel, the drop label) and is a single soft
   `blackA` shadow.
 - Never a coloured stripe on one edge of a card, row or alert. Selection and the open item are shown with a
   fill (`--sel`), not an edge marker.
@@ -106,7 +111,8 @@ Steps are used for their Radix purpose:
 
 - Default to no transition. Hover, focus and selection changes are instant.
 - Motion is kept only where it explains a change of place: dialogs, drawers and sheets entering and leaving,
-  the detail column opening, toasts arriving, a switch knob moving. These use `--dur` 250 ms and
+  the detail column opening, toasts arriving, a switch knob moving, the command palette, the uploads panel and
+  the drop overlay appearing, the detail preview growing into the viewer. These use `--dur` 250 ms and
   `--ease` `ease-out`.
 - Loading indicators (skeleton pulse, indeterminate progress) are the only looping animations.
 - `prefers-reduced-motion: reduce` removes all of it.
