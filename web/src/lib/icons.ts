@@ -133,6 +133,24 @@ export const ICONS = {
     { t: 'path', d: 'M12 10v4' },
     { t: 'path', d: 'M10 12h4' },
   ],
+  up: [{ t: 'path', d: 'M4 10l4-4 4 4' }],
+  scan: [
+    { t: 'path', d: 'M2.5 5.5v-2a1 1 0 0 1 1-1h2' },
+    { t: 'path', d: 'M10.5 2.5h2a1 1 0 0 1 1 1v2' },
+    { t: 'path', d: 'M13.5 10.5v2a1 1 0 0 1-1 1h-2' },
+    { t: 'path', d: 'M5.5 13.5h-2a1 1 0 0 1-1-1v-2' },
+    { t: 'path', d: 'M5 8h6' },
+  ],
+  book: [
+    { t: 'path', d: 'M3 3.5A1.5 1.5 0 0 1 4.5 2H13v9.5H4.5A1.5 1.5 0 0 0 3 13V3.5Z' },
+    { t: 'path', d: 'M3 13a1.5 1.5 0 0 0 1.5 1.5H13' },
+  ],
+  moon: [{ t: 'path', d: 'M13 9.5A5.5 5.5 0 0 1 6.5 3 5.5 5.5 0 1 0 13 9.5Z' }],
+  monitor: [
+    { t: 'rect', x: 2, y: 3, w: 12, h: 8, rx: 1.5 },
+    { t: 'path', d: 'M6 13.5h4' },
+    { t: 'path', d: 'M8 11v2.5' },
+  ],
   external: [
     { t: 'path', d: 'M9 3h4v4' },
     { t: 'path', d: 'M13 3 7.5 8.5' },

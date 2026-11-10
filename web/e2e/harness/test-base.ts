@@ -26,6 +26,11 @@ export function samplePng(): Buffer {
   ]);
 }
 
+/** The grid is the default view; tests that need table rows ask for the list. */
+export async function useListView(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('picberth.view', 'list'));
+}
+
 export async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('用户名').fill('testadmin');
@@ -44,23 +49,23 @@ export async function checkPageHealth(page: Page) {
   ), { message: 'Page should not overflow horizontally' }).toBe(true);
 }
 
-/** A row of the image table or a tile of the grid (not the upload tray). */
+/** A tile of the grid or a row of the list (not the upload panel). */
 export function libraryItem(page: Page, filename: string) {
-  return page.locator('table.table tbody tr, .grid .tile').filter({ hasText: filename });
+  return page.locator('table.table tbody tr, .jgrid .jt').filter({ hasText: filename });
 }
 
-/** A row of the upload tray. */
+/** A row of the upload panel. */
 export function uploadRow(page: Page, filename: string) {
-  return page.locator('.uploads .up-row').filter({ hasText: filename });
+  return page.locator('.dock .up-row').filter({ hasText: filename });
 }
 
-/** Waits until every named upload has finished (its row offers 查看), then closes the tray. */
+/** Waits until every named upload has finished (its row offers 查看), then closes the panel. */
 export async function finishUploads(page: Page, filenames: string[]) {
   for (const name of filenames) {
     await expect(uploadRow(page, name).getByRole('button', { name: '查看', exact: true })).toBeVisible();
   }
-  await page.locator('.uploads').getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(page.locator('.uploads')).toHaveCount(0);
+  await page.locator('.dock').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.locator('.dock')).toHaveCount(0);
 }
 
 export async function storedImages(page: Page, filename: string, state: ImageState = 'active') {

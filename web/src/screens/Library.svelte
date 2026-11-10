@@ -5,16 +5,18 @@
   import ActiveFilters from '../components/library/ActiveFilters.svelte';
   import BulkActions from '../components/library/BulkActions.svelte';
   import DetailPanel from '../components/library/DetailPanel.svelte';
-  import FolderPanel from '../components/library/FolderPanel.svelte';
+  import FolderChips from '../components/library/FolderChips.svelte';
   import ImageList from '../components/library/ImageList.svelte';
   import LibraryHead from '../components/library/LibraryHead.svelte';
   import PurgeConfirm from '../components/library/PurgeConfirm.svelte';
-  import UploadTray from '../components/library/UploadTray.svelte';
+  import Viewer from '../components/library/Viewer.svelte';
   import { refreshFacets } from '../lib/facets.svelte';
   import { Library } from '../lib/library.svelte';
-  import { phone, wide, wideNav } from '../lib/media.svelte';
+  import { phone, wide } from '../lib/media.svelte';
   import { isTypingTarget } from '../lib/modal';
+  import { openRequest } from '../lib/open.svelte';
   import { bottomBar } from '../lib/toast.svelte';
+  import { tree } from '../lib/tree.svelte';
   import { onUploaded, setUploadTarget } from '../lib/upload.svelte';
 
   let { mode }: { mode: 'library' | 'trash' } = $props();
@@ -33,14 +35,20 @@
   });
 
   onMount(() => {
-    void lib.loadFolders();
+    void tree.ensure();
     void refreshFacets();
+    // Images dropped on the sidebar tree move through this screen's list.
+    tree.mover = (ids, to) => void lib.moveImages(ids, to);
     if (trash) lib.loadRetention();
-    return onUploaded((img) => {
+    const off = onUploaded((img) => {
       void refreshFacets();
       void lib.refreshFolders();
       lib.addUploaded(img);
     });
+    return () => {
+      off();
+      tree.mover = null;
+    };
   });
   onDestroy(() => {
     lib.destroy();
@@ -60,6 +68,17 @@
     }
   });
 
+  // 查看 on an upload and results of the palette open an image's detail, possibly after a folder change.
+  $effect(() => {
+    const id = openRequest.id;
+    if (!id || lib.mode !== 'library') return;
+    untrack(() => {
+      openRequest.id = null;
+      if (lib.phase === 'ready' && lib.items.some((i) => i.id === id)) lib.open(id);
+      else lib.pendingOpen = id;
+    });
+  });
+
   // The phone selection bar sits where toasts appear.
   $effect(() => {
     bottomBar.active = phone.matches && lib.selecting;
@@ -71,7 +90,6 @@
   // Wide screens dock the detail beside the list; narrower ones use a drawer, phones a sheet.
   const variant = $derived(wide.matches && !phone.matches ? 'docked' : phone.matches ? 'sheet' : 'drawer');
   const openImg = $derived(lib.active);
-  const pane = $derived(lib.mode === 'library' && wideNav.matches);
 
   async function focusSearch() {
     if (phone.matches) {
@@ -111,7 +129,7 @@
     if (!lib.active || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
     // Arrows move through the images when the detail is docked, or is the only overlay open.
     const overlays = document.querySelectorAll('[data-overlay]').length;
-    if (overlays !== (variant === 'docked' ? 0 : 1)) return;
+    if (overlays !== (variant === 'docked' ? 0 : 1) + (lib.viewing ? 1 : 0)) return;
     e.preventDefault();
     if (e.key === 'ArrowLeft') {
       const p = lib.prev;
@@ -123,12 +141,6 @@
 </script>
 
 <svelte:window {onkeydown} />
-
-{#if pane}
-  <aside class="tree-pane">
-    <FolderPanel {lib} currentId={lib.folderId} counts={lib.counts} />
-  </aside>
-{/if}
 
 {#if lib.missing}
   <div class="panel-main">
@@ -147,8 +159,8 @@
     <LibraryHead {lib} bind:searchEl bind:searching />
     <ActiveFilters {lib} omitQuery={phone.matches && searching} />
     <div class="scroll" bind:this={scroller} onscroll={maybeLoadMore}>
-      {#if !trash}
-        <UploadTray {lib} />
+      {#if lib.view === 'grid' && lib.phase === 'ready'}
+        <FolderChips {lib} />
       {/if}
       <ImageList {lib} />
       {#if lib.phase === 'ready'}
@@ -178,6 +190,10 @@
       <DetailPanel {lib} image={openImg} variant="drawer" onclose={close} />
     {/snippet}
   </Drawer>
+{/if}
+
+{#if openImg && lib.viewing}
+  <Viewer {lib} image={openImg} />
 {/if}
 
 {#if phone.matches && lib.sel.size > 0}
