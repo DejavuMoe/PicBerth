@@ -1,4 +1,4 @@
-// 图片 and 回收站: list, filters, selection, uploads, detail.
+// 图片 and 回收站: grid and list, filters, selection, folder tree, detail, viewer.
 
 function Thumb({ img, className = 'thumb' }) {
   return <img className={className} src={img.thumb} alt="" loading="lazy" draggable="false" />;
@@ -22,7 +22,7 @@ function FilterPopover({ filters, setFilters, pool }) {
         <button {...p} type="button" className="btn btn-ghost" aria-label={n ? `筛选，已选 ${n} 项` : '筛选'}>
           <Icon name="filter" />
           <span className="hide-phone">筛选</span>
-          {n > 0 && <span className="num muted">{n}</span>}
+          {n > 0 && <span className="fp-count">{n}</span>}
         </button>
       )}
     >
@@ -80,7 +80,7 @@ function ActiveFilters({ filters, setFilters }) {
   return (
     <div className="filters">
       {chips.map((c) => (
-        <span key={c.k} className="chip" style={{ color: 'var(--text)' }}>
+        <span key={c.k} className="chip" aria-pressed="true">
           {c.label}
           <button type="button" className="x" aria-label={`移除 ${c.label}`} onClick={c.rm}>
             <Icon name="x" size="s" />
@@ -94,134 +94,72 @@ function ActiveFilters({ filters, setFilters }) {
   );
 }
 
-function DisplayMenu({ view, setView, sort, setSort, phone, onSelectMode }) {
-  return (
-    <Popover
-      label="显示"
-      trigger={(p) => (
-        <button {...p} type="button" className="btn btn-ghost btn-icon" aria-label={phone ? '更多' : '显示'} title={phone ? '更多' : '显示'}>
-          <Icon name={phone ? 'more' : view === 'grid' ? 'grid' : 'list'} />
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          {phone && (
-            <>
-              <MenuItem icon="select" onClick={() => (onSelectMode(), close())}>
-                选择
-              </MenuItem>
-              <div className="menu-sep" />
-            </>
-          )}
-          <div className="menu-group">视图</div>
-          <MenuItem checked={view === 'table'} onClick={() => (setView('table'), close())}>
-            列表
-          </MenuItem>
-          <MenuItem checked={view === 'grid'} onClick={() => (setView('grid'), close())}>
-            网格
-          </MenuItem>
-          <div className="menu-sep" />
-          <div className="menu-group">排序</div>
-          {SORTS.map((s) => (
-            <MenuItem key={s.key} checked={sort === s.key} onClick={() => (setSort(s.key), close())}>
-              {s.label}
+const VIEWS = [
+  { value: 'grid', icon: 'grid', aria: '网格' },
+  { value: 'list', icon: 'list', aria: '列表' },
+];
+function ViewControls({ view, setView, sort, setSort, phone, onSelectMode }) {
+  const sortItems = (close) =>
+    SORTS.map((s) => (
+      <MenuItem key={s.key} checked={sort === s.key} onClick={() => (setSort(s.key), close())}>
+        {s.label}
+      </MenuItem>
+    ));
+  if (phone)
+    return (
+      <Popover
+        label="更多"
+        trigger={(p) => (
+          <button {...p} type="button" className="btn btn-ghost btn-icon" aria-label="更多" title="更多">
+            <Icon name="more" />
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            <MenuItem icon="select" onClick={() => (onSelectMode(), close())}>
+              选择
             </MenuItem>
-          ))}
-        </>
-      )}
-    </Popover>
-  );
-}
-
-// ---------------------------------------------------------------- uploads
-function UploadTray({ items, folders, onCancel, onRetry, onRemove, onCopy, onCopyAll, onClear, onOpen }) {
-  if (!items.length) return null;
-  const done = items.filter((u) => u.status === 'done' || u.status === 'duplicate');
-  const busy = items.some((u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing');
+            <div className="menu-sep" />
+            <div className="menu-group">视图</div>
+            <MenuItem checked={view === 'grid'} onClick={() => (setView('grid'), close())}>
+              网格
+            </MenuItem>
+            <MenuItem checked={view === 'list'} onClick={() => (setView('list'), close())}>
+              列表
+            </MenuItem>
+            <div className="menu-sep" />
+            <div className="menu-group">排序</div>
+            {sortItems(close)}
+          </>
+        )}
+      </Popover>
+    );
   return (
-    <section className="uploads" aria-label="上传">
-      <div className="uploads-head">
-        <span className="strong">上传</span>
-        <span className="muted num">
-          {done.length} / {items.length}
-        </span>
-        <span className="grow" />
-        {done.length > 1 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onCopyAll}>
-            <Icon name="copy" size="s" />
-            复制全部链接
+    <>
+      <Popover
+        label="排序"
+        trigger={(p) => (
+          <button {...p} type="button" className="btn btn-ghost btn-icon" aria-label="排序" title="排序">
+            <Icon name="sort" />
           </button>
         )}
-        {!busy && (
-          <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label="关闭" title="关闭" onClick={onClear}>
-            <Icon name="x" />
+      >
+        {sortItems}
+      </Popover>
+      <div className="seg seg-icons" role="group" aria-label="视图">
+        {VIEWS.map((o) => (
+          <button key={o.value} type="button" aria-pressed={o.value === view} aria-label={o.aria} title={o.aria} onClick={() => setView(o.value)}>
+            <Icon name={o.icon} size="s" />
           </button>
-        )}
+        ))}
       </div>
-      {items.map((u) => (
-        <div key={u.id} className="up-row">
-          <img className="thumb" src={u.thumb} alt="" />
-          <div className="up-name">
-            <span className="ellipsis medium">{u.name}</span>
-            {(u.status === 'uploading' || u.status === 'queued') && (
-              <div className="bar" role="progressbar" aria-label={u.name} aria-valuenow={Math.round(u.progress)} aria-valuemin={0} aria-valuemax={100}>
-                <i style={{ width: `${u.progress}%` }} />
-              </div>
-            )}
-            {u.status === 'processing' && (
-              <div className="bar indeterminate" role="progressbar" aria-label={u.name}>
-                <i />
-              </div>
-            )}
-            {u.status === 'error' && <span className="s text-danger">{u.error}</span>}
-            {u.status === 'done' && (
-              <span className="s muted facts">
-                <span>{fmtBytes(u.size)}</span>
-                {u.folderId && <span className="ellipsis">{folderLabel(folders, u.folderId)}</span>}
-              </span>
-            )}
-            {u.status === 'duplicate' && <span className="s muted">已存在，使用原有链接</span>}
-          </div>
-          <div className="row" style={{ gap: 2 }}>
-            {u.status === 'queued' && <span className="s muted">等待中</span>}
-            {u.status === 'uploading' && <span className="s muted num">{Math.round(u.progress)}%</span>}
-            {u.status === 'processing' && <span className="s muted">处理中</span>}
-            {(u.status === 'queued' || u.status === 'uploading') && (
-              <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`取消 ${u.name}`} title="取消" onClick={() => onCancel(u.id)}>
-                <Icon name="x" />
-              </button>
-            )}
-            {u.status === 'error' && u.retryable && (
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRetry(u.id)}>
-                重试
-              </button>
-            )}
-            {u.status === 'error' && (
-              <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`移除 ${u.name}`} title="移除" onClick={() => onRemove(u.id)}>
-                <Icon name="x" />
-              </button>
-            )}
-            {(u.status === 'done' || u.status === 'duplicate') && (
-              <>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(u.imageId)}>
-                  查看
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onCopy(u.imageId)}>
-                  <Icon name="copy" size="s" />
-                  复制
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      ))}
-    </section>
+    </>
   );
 }
 
-// ---------------------------------------------------------------- list views
-function ImageTable({ list, mode, folders, showFolder, sel, openId, onRowClick, onToggle, onToggleAll, onCopy, onRestore, onTrash, onPurge, onMove, onDragStart, retention, selecting }) {
+// ---------------------------------------------------------------- list view
+function ImageTable({ list, mode, folders, showFolder, sel, openId, onRowClick, onOpenViewer, onToggle, onToggleAll, onCopy, onRestore, onTrash, onPurge, onMove, onDragStart, retention, selecting }) {
   const allOn = list.length > 0 && list.every((im) => sel.has(im.id));
   const someOn = list.some((im) => sel.has(im.id));
   return (
@@ -265,11 +203,13 @@ function ImageTable({ list, mode, folders, showFolder, sel, openId, onRowClick, 
               aria-selected={on}
               className={openId === im.id ? 'is-open' : ''}
               onClick={(e) => onRowClick(im, e)}
+              onDoubleClick={() => onOpenViewer(im)}
               tabIndex={0}
               data-id={im.id}
               draggable={mode === 'active'}
               onDragStart={(e) => onDragStart(im, e)}
               onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
                 if (e.key === 'Enter') onRowClick(im, e);
                 if (e.key === ' ') (e.preventDefault(), onToggle(im.id));
               }}
@@ -283,6 +223,7 @@ function ImageTable({ list, mode, folders, showFolder, sel, openId, onRowClick, 
               <td>
                 <div className="name-cell">
                   <span className="name ellipsis">{im.filename}</span>
+                  {im.frames > 1 && <span className="muted s">动图</span>}
                 </div>
                 <div className="mobile-meta num">
                   <span>{fmtBytes(im.size)}</span>
@@ -301,7 +242,7 @@ function ImageTable({ list, mode, folders, showFolder, sel, openId, onRowClick, 
               <td className="col-size r muted num">{fmtBytes(im.size)}</td>
               <td className="col-date muted num">{when}</td>
               <td className="col-act">
-                <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                <div className="row-actions" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                   {mode === 'active' ? (
                     <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`复制 ${im.filename} 的链接`} title="复制链接" onClick={() => onCopy(im)}>
                       <Icon name="copy" />
@@ -375,49 +316,121 @@ function RowMenuBody({ im, mode, folders, close, onCopy, onMove, onTrash, onPurg
   );
 }
 
-function ImageGrid({ list, mode, folders, showFolder, sel, openId, onRowClick, onToggle, onDragStart, retention, selecting }) {
+// ---------------------------------------------------------------- grid view
+function useWidth(ref) {
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setW(el.clientWidth);
+    const ro = new ResizeObserver(([e]) => setW(Math.floor(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return w;
+}
+
+/** Rows of equal height that fill the width; every image keeps its proportions. */
+function justify(list, width, target, gap) {
+  const rows = [];
+  let row = [];
+  let sum = 0;
+  for (const im of list) {
+    const r = Math.max(0.6, Math.min(2.4, im.width / im.height));
+    row.push({ im, r });
+    sum += r;
+    const h = (width - gap * (row.length - 1)) / sum;
+    if (h <= target) {
+      rows.push({ h, items: row });
+      row = [];
+      sum = 0;
+    }
+  }
+  if (row.length) rows.push({ h: Math.min(target, (width - gap * (row.length - 1)) / sum), items: row });
+  return rows;
+}
+
+function ImageGrid({ list, mode, folders, showFolder, sel, openId, onRowClick, onOpenViewer, onToggle, onCopy, onDragStart, retention, selecting }) {
+  const ref = useRef(null);
+  const width = useWidth(ref);
+  const narrow = width > 0 && width < 560;
+  const gap = narrow ? 8 : 12;
+  const rows = useMemo(() => (width ? justify(list, width, narrow ? 132 : 188, gap) : []), [list, width]);
   return (
-    <div className={'grid' + (selecting ? ' selecting' : '')} role="listbox" aria-multiselectable="true" aria-label={mode === 'trash' ? '回收站' : '图片'}>
-      {list.map((im) => {
-        const on = sel.has(im.id);
-        return (
-          <div
-            key={im.id}
-            className={'tile' + (openId === im.id ? ' is-open' : '')}
-            role="option"
-            aria-selected={on}
-            tabIndex={0}
-            data-id={im.id}
-            draggable={mode === 'active'}
-            onDragStart={(e) => onDragStart(im, e)}
-            onClick={(e) => onRowClick(im, e)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onRowClick(im, e);
-              if (e.key === ' ') (e.preventDefault(), onToggle(im.id));
-            }}
-          >
-            <Thumb img={im} className="tile-img" />
-            <Check on={on} onChange={(e) => onToggle(im.id, e)} label={`选择 ${im.filename}`} />
-            <div className="tile-meta">
-              <span className="name ellipsis grow">{im.filename}</span>
-            </div>
-            <div className="tile-sub num">
-              <span>{fmtBytes(im.size)}</span>
-              <span>{mode === 'trash' ? purgeIn(im, retention) : fmtRel(im.createdAt)}</span>
-              {showFolder && <span className="ellipsis">{folderLabel(folders, im.folderId)}</span>}
-            </div>
-          </div>
-        );
-      })}
+    <div className={'jgrid' + (selecting ? ' selecting' : '')} role="listbox" aria-multiselectable="true" aria-label={mode === 'trash' ? '回收站' : '图片'}>
+      <div ref={ref} style={{ height: 0, margin: '-8px 0' }} />
+      {rows.map((row, i) => (
+        <div className="jrow" key={i} role="presentation">
+          {row.items.map(({ im, r }) => {
+            const on = sel.has(im.id);
+            return (
+              <div
+                key={im.id}
+                className={'jt' + (openId === im.id ? ' is-open' : '')}
+                style={{ width: r * row.h }}
+                role="option"
+                aria-selected={on}
+                aria-label={im.filename}
+                tabIndex={0}
+                data-id={im.id}
+                draggable={mode === 'active'}
+                onDragStart={(e) => onDragStart(im, e)}
+                onClick={(e) => onRowClick(im, e)}
+                onDoubleClick={() => onOpenViewer(im)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === 'Enter') onRowClick(im, e);
+                  if (e.key === ' ') (e.preventDefault(), onToggle(im.id));
+                }}
+              >
+                <div className="jt-frame" style={{ height: row.h }}>
+                  <Thumb img={im} className="" />
+                  {im.frames > 1 && <span className="jt-badge">动图</span>}
+                  <Check on={on} onChange={(e) => onToggle(im.id, e)} label={`选择 ${im.filename}`} />
+                  {mode === 'active' && (
+                    <button
+                      type="button"
+                      className="jt-copy"
+                      aria-label={`复制 ${im.filename} 的链接`}
+                      title="复制链接"
+                      onClick={(e) => (e.stopPropagation(), onCopy(im))}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      <Icon name="copy" size="s" />
+                    </button>
+                  )}
+                </div>
+                <div className="jt-cap">
+                  <span className="name ellipsis">{im.filename}</span>
+                  <span className="meta num">{mode === 'trash' ? purgeIn(im, retention) : showFolder ? folderLabel(folders, im.folderId) : fmtBytes(im.size)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
-function LoadingRows() {
+
+function LoadingList({ grid }) {
+  if (grid)
+    return (
+      <div className="jgrid" aria-busy="true" aria-label="加载中">
+        {[0, 1, 2].map((r) => (
+          <div className="jrow" key={r}>
+            {[1.5, 1, 1.8, 1.3, 0.9].map((f, i) => (
+              <div key={i} className="skeleton" style={{ flex: f, height: 188, borderRadius: 8 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
   return (
     <div aria-busy="true" aria-label="加载中">
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="row" style={{ height: 48, padding: '0 20px', gap: 16, borderBottom: 'var(--bw) solid var(--hairline)' }}>
-          <div className="skeleton" style={{ width: 32, height: 32, marginLeft: 36 }} />
+        <div key={i} className="row" style={{ height: 52, padding: '0 20px', gap: 16, borderBottom: 'var(--bw) solid var(--hairline)' }}>
+          <div className="skeleton" style={{ width: 40, height: 40, marginLeft: 36, borderRadius: 6 }} />
           <div className="skeleton" style={{ width: `${30 + ((i * 17) % 30)}%`, height: 10 }} />
           <span className="grow" />
           <div className="skeleton" style={{ width: 56, height: 10 }} />
@@ -526,8 +539,11 @@ function FolderMenuBody({ folder, folders, nonEmpty, onNew, onRename, onMove, on
   );
 }
 
-/** Folder tree with inline create / rename. Used as the library side pane and, below 1100 px, inside a popover. */
-function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRename, onMove, onDelete, onDropImages, onRetry, compact, close }) {
+/**
+ * Folder tree with inline create / rename. In the sidebar (≥ 1100 px) the root row carries the create button;
+ * below that width the tree sits in a popover with its own header (`compact`).
+ */
+function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRename, onMove, onDelete, onDropImages, onRetry, compact, close, createSignal }) {
   const [open, setOpen] = useState(() => new Set(folderChain(folders, currentId).map((f) => f.id)));
   const [creating, setCreating] = useState(undefined); // undefined: not creating, null: at root, id: under that folder
   const [renaming, setRenaming] = useState(null);
@@ -543,6 +559,9 @@ function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRe
     const t = setTimeout(() => setOpen((s) => new Set(s).add(over)), 700);
     return () => clearTimeout(t);
   }, [over]);
+  useEffect(() => {
+    if (createSignal) startCreate(null);
+  }, [createSignal]);
 
   const toggle = (id) => setOpen((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set(s).add(id)));
   const cancelEdit = () => (setCreating(undefined), setRenaming(null), setErr(''));
@@ -572,7 +591,7 @@ function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRe
 
   const editor = (level) => (
     <>
-      <div className="tn tn-edit" style={{ paddingLeft: 4 + (level - 1) * 16 }}>
+      <div className="tn tn-edit" style={{ paddingLeft: 8 + (level - 1) * 16 }}>
         <span className="tn-tw" />
         <Icon name="folder" />
         <input
@@ -592,7 +611,7 @@ function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRe
         />
       </div>
       {err && (
-        <div className="field-error tn-err" role="alert" style={{ paddingLeft: 4 + (level - 1) * 16 + 44 }}>
+        <div className="field-error tn-err" role="alert" style={{ paddingLeft: 8 + (level - 1) * 16 + 44 }}>
           {err}
         </div>
       )}
@@ -606,7 +625,7 @@ function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRe
     const n = counts.get(f.id) || 0;
     return (
       <Fragment key={f.id}>
-        <div className={'tn' + (currentId === f.id ? ' is-cur' : '') + (over === f.id ? ' is-over' : '')} style={{ paddingLeft: 4 + (level - 1) * 16 }} {...dropHandlers(f.id, over, setOver, onDropImages)}>
+        <div className={'tn' + (currentId === f.id ? ' is-cur' : '') + (over === f.id ? ' is-over' : '')} style={{ paddingLeft: 8 + (level - 1) * 16 }} {...dropHandlers(f.id, over, setOver, onDropImages)}>
           <button type="button" className="tn-tw" aria-label={isOpen ? `收起 ${f.name}` : `展开 ${f.name}`} aria-expanded={kids.length ? isOpen : undefined} disabled={!kids.length} tabIndex={kids.length ? 0 : -1} onClick={() => toggle(f.id)}>
             {kids.length > 0 && <Icon name={isOpen ? 'down' : 'right'} size="s" />}
           </button>
@@ -643,51 +662,74 @@ function FolderPanel({ folders, state, currentId, counts, onOpen, onCreate, onRe
     );
   };
 
+  const addButton = (cls) => (
+    <button type="button" className={'btn btn-ghost btn-icon btn-sm ' + cls} aria-label="新建文件夹" title="新建文件夹" disabled={state !== 'ready'} onClick={() => startCreate(null)}>
+      <Icon name="folder-plus" />
+    </button>
+  );
+  const rootRow = (
+    <div className={'tn tn-root' + (currentId === null ? ' is-cur' : '') + (over === 'root' ? ' is-over' : '')} {...dropHandlers(null, over, setOver, onDropImages)}>
+      <button type="button" className="tn-main" aria-current={currentId === null ? 'page' : undefined} onClick={() => (onOpen(null), close?.())}>
+        <Icon name="image" />
+        <span className="ellipsis">{ROOT_LABEL}</span>
+        {state === 'ready' && counts.get(null) > 0 && <span className="n num">{counts.get(null)}</span>}
+      </button>
+      {!compact && addButton('tn-more')}
+    </div>
+  );
   const roots = childrenOf(folders, null);
   let body;
   if (state === 'loading')
     body = (
-      <div aria-busy="true" aria-label="加载中" className="tree-skel">
-        {[60, 40, 52, 36, 48].map((w, i) => (
-          <div key={i} className="skeleton" style={{ width: `${w}%`, height: 10, marginLeft: 8 + (i % 3 === 2 ? 16 : 0) }} />
-        ))}
-      </div>
+      <>
+        {rootRow}
+        <div aria-busy="true" aria-label="加载中" className="tree-skel">
+          {[60, 40, 52, 36, 48].map((w, i) => (
+            <div key={i} className="skeleton" style={{ width: `${w}%`, height: 10, marginLeft: 28 + (i % 3 === 2 ? 16 : 0) }} />
+          ))}
+        </div>
+      </>
     );
   else if (state === 'error')
     body = (
-      <div className="tree-note" role="alert">
-        <span>文件夹加载失败</span>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-          重试
-        </button>
-      </div>
+      <>
+        {rootRow}
+        <div className="tree-note" role="alert">
+          <span>文件夹加载失败</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
+            重试
+          </button>
+        </div>
+      </>
     );
   else
     body = (
-      <nav aria-label="文件夹">
-        <div className={'tn' + (currentId === null ? ' is-cur' : '') + (over === 'root' ? ' is-over' : '')} style={{ paddingLeft: 4 }} {...dropHandlers(null, over, setOver, onDropImages)}>
-          <span className="tn-tw" />
-          <button type="button" className="tn-main" aria-current={currentId === null ? 'page' : undefined} onClick={() => (onOpen(null), close?.())}>
-            <Icon name="image" />
-            <span className="ellipsis">{ROOT_LABEL}</span>
-            {counts.get(null) > 0 && <span className="n num">{counts.get(null)}</span>}
-          </button>
-        </div>
+      <>
+        {rootRow}
         {roots.map((f) => row(f, 1))}
         {creating === null && editor(1)}
-        {!roots.length && creating === undefined && <div className="tree-note muted">还没有文件夹</div>}
-      </nav>
+        {!roots.length && creating === undefined && (
+          <div className="tree-note">
+            <span>还没有文件夹</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => startCreate(null)}>
+              新建
+            </button>
+          </div>
+        )}
+      </>
     );
 
   return (
     <>
-      <div className="tree-head">
-        <span className="medium">文件夹</span>
-        <button type="button" className="btn btn-ghost btn-icon btn-sm" aria-label="新建文件夹" title="新建文件夹" disabled={state !== 'ready'} onClick={() => startCreate(null)}>
-          <Icon name="folder-plus" />
-        </button>
-      </div>
-      <div className="tree-body">{body}</div>
+      {compact && (
+        <div className="tree-head">
+          <span className="medium">文件夹</span>
+          {addButton('')}
+        </div>
+      )}
+      <nav className="tree-body" aria-label="文件夹">
+        {body}
+      </nav>
     </>
   );
 }
@@ -726,8 +768,29 @@ function Breadcrumb({ folders, currentId, count, onOpen, onDropImages, tool }) {
     </div>
   );
 }
+
+/** Subfolders of the current folder, shown above the images in the grid view only. Each accepts dropped images. */
+function FolderChips({ list, counts, onOpen, onDropImages }) {
+  const [over, setOver] = useState(null);
+  if (!list.length) return null;
+  return (
+    <div className="fgrid" role="list" aria-label="文件夹">
+      {list.map((f) => {
+        const n = counts.get(f.id) || 0;
+        return (
+          <button key={f.id} type="button" role="listitem" className={'fchip' + (over === f.id ? ' is-over' : '')} onClick={() => onOpen(f.id)} {...dropHandlers(f.id, over, setOver, onDropImages)}>
+            <Icon name="folder" />
+            <span className="ellipsis">{f.name}</span>
+            {n > 0 && <span className="n num">{n}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- detail
-function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, onNext, onUpdate, onMove, onTrash, onRestore, onPurge, onCopyFormat, lastFormat, retention }) {
+function Detail({ img, mode, folders, index, total, variant, viewing, onClose, onPrev, onNext, onZoom, onUpdate, onMove, onTrash, onRestore, onPurge, onCopyFormat, retention }) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(img.filename);
   const [copied, setCopied] = useState('');
@@ -771,9 +834,9 @@ function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, on
         </button>
       </div>
       <div className="detail-body">
-        <div className="preview">
-          <img src={img.thumb} alt={img.filename} />
-        </div>
+        <button type="button" className="preview" aria-label="查看大图" title="查看大图" onClick={onZoom}>
+          <img src={img.thumb} alt="" style={{ viewTransitionName: viewing ? 'none' : 'pb-zoom' }} />
+        </button>
 
         <div className="title-edit">
           {renaming ? (
@@ -792,7 +855,7 @@ function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, on
             />
           ) : (
             <h2>
-              <button type="button" className="title-btn" title="重命名" aria-label={`${img.filename}，重命名`} onClick={() => !trashed && setRenaming(true)} disabled={trashed}>
+              <button type="button" className="title-btn" title={trashed ? undefined : '重命名'} aria-label={trashed ? img.filename : `${img.filename}，重命名`} onClick={() => !trashed && setRenaming(true)} disabled={trashed}>
                 {img.filename}
               </button>
             </h2>
@@ -823,7 +886,7 @@ function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, on
               >
                 <span className="k">{f.label}</span>
                 <span className="v mono ellipsis">{img.links[f.key]}</span>
-                <Icon name={copied === f.key ? 'check' : 'copy'} size="s" />
+                <Icon key={copied === f.key ? 'on' : 'off'} name={copied === f.key ? 'check' : 'copy'} size="s" />
               </button>
             ))}
           </div>
@@ -848,11 +911,6 @@ function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, on
               </Popover>
             </dd>
           )}
-        </dl>
-
-        <div className="props-divide" />
-
-        <dl className="props">
           <dt>来源</dt>
           <dd className="ellipsis">{sourceLabel(img.source)}</dd>
           <dt>上传时间</dt>
@@ -913,8 +971,72 @@ function Detail({ img, mode, folders, index, total, variant, onClose, onPrev, on
   );
 }
 
+// ---------------------------------------------------------------- viewer
+/** The image at full window size. Click toggles between fit and actual size. */
+function Viewer({ img, mode, index, total, onClose, onPrev, onNext, onCopy }) {
+  const [actual, setActual] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => setActual(false), [img.id]);
+  useEffect(() => {
+    const prev = document.activeElement;
+    ref.current?.focus();
+    const key = (e) => {
+      if (e.key === 'Escape') (e.stopPropagation(), onClose());
+      if (e.key === 'ArrowLeft') (e.stopPropagation(), onPrev());
+      if (e.key === 'ArrowRight') (e.stopPropagation(), onNext());
+    };
+    document.addEventListener('keydown', key, true);
+    return () => {
+      document.removeEventListener('keydown', key, true);
+      prev?.focus?.();
+    };
+  });
+  return ReactDOM.createPortal(
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={img.filename} ref={ref} tabIndex={-1}>
+      <div className="viewer-bar">
+        <span className="name ellipsis">{img.filename}</span>
+        <span className="meta">
+          {img.width} × {img.height}
+        </span>
+        <span className="grow" />
+        <button type="button" className="vbtn" aria-label="上一张" title="上一张" disabled={index <= 0} onClick={onPrev}>
+          <Icon name="left" />
+        </button>
+        <button type="button" className="vbtn" aria-label="下一张" title="下一张" disabled={index >= total - 1} onClick={onNext}>
+          <Icon name="right" />
+        </button>
+        <span className="meta" style={{ margin: '0 12px 0 4px' }}>
+          {index + 1} / {total}
+        </span>
+        {mode === 'active' && (
+          <button type="button" className="vbtn" onClick={() => onCopy(img)}>
+            <Icon name="copy" />
+            <span className="label">复制链接</span>
+          </button>
+        )}
+        <button type="button" className="vbtn" aria-label={actual ? '适应窗口' : '原始大小'} title={actual ? '适应窗口' : '原始大小'} aria-pressed={actual} onClick={() => setActual((a) => !a)}>
+          <Icon name="scan" />
+        </button>
+        <button type="button" className="vbtn" aria-label="关闭" title="关闭" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      </div>
+      <div className={'viewer-stage' + (actual ? ' actual' : '')} onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <img
+          src={img.thumb}
+          alt={img.filename}
+          width={actual ? img.width : undefined}
+          style={{ viewTransitionName: 'pb-zoom' }}
+          onClick={() => setActual((a) => !a)}
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ---------------------------------------------------------------- page
-function Library({ mode, images, setImages, folders, setFolders, folderState, folderPath, onNavigate, onRetryFolders, uploads, uploadApi, settings, dataState, onRetryLoad, initialOpen }) {
+function Library({ mode, images, setImages, folders, folderState, folderId, missing, panelProps, onOpenFolder, moveImages, onUpload, settings, dataState, onRetryLoad, onRetryFolders, initialOpen, openRequest, hook, copyLink, copyMany }) {
   const toast = useToast();
   const phone = useMedia('(max-width: 720px)');
   const wide = useMedia('(min-width: 1440px)');
@@ -923,24 +1045,20 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
   const [sort, setSort] = useState('new');
   const [view, setView] = useState(() => {
     try {
-      return localStorage.getItem('picberth.view') || 'table';
+      const v = localStorage.getItem('picberth.view');
+      return v === 'list' || v === 'grid' ? v : 'grid';
     } catch (e) {
-      return 'table';
+      return 'grid';
     }
   });
   const [sel, setSel] = useState(() => new Set());
   const [anchor, setAnchor] = useState(null);
   const [selectMode, setSelectMode] = useState(false);
   const [openId, setOpenId] = useState(initialOpen ?? null);
+  const [viewing, setViewing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [purge, setPurge] = useState(null);
-  const [lastFormat, setLastFormat] = useState('url');
   const searchRef = useRef(null);
-  const fileRef = useRef(null);
-
-  const resolved = useMemo(() => (mode === 'active' && folderState === 'ready' ? resolvePath(folders, folderPath) : null), [mode, folderState, folders, folderPath]);
-  const missing = resolved === undefined;
-  const folderId = resolved ?? null;
   const prevFolder = useRef(folderId);
 
   useEffect(() => {
@@ -953,6 +1071,7 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
     setSelectMode(false);
     setFilters(EMPTY_FILTERS);
     setOpenId(initialOpen ?? null);
+    setViewing(false);
   }, [mode]);
   useEffect(() => {
     if (prevFolder.current === folderId) return;
@@ -961,8 +1080,14 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
     setSelectMode(false);
     setOpenId((id) => (images.some((im) => im.id === id && (im.folderId ?? null) === folderId) ? id : null));
   }, [folderId]);
+  const seenRequest = useRef(openRequest);
+  useEffect(() => {
+    if (!openRequest || openRequest === seenRequest.current) return;
+    seenRequest.current = openRequest;
+    setFilters(EMPTY_FILTERS);
+    setOpenId(openRequest.id);
+  }, [openRequest]);
 
-  const state = mode === 'trash' ? 'trashed' : 'active';
   const active = useMemo(() => images.filter((im) => im.state === 'active'), [images]);
   const trashedAll = useMemo(() => images.filter((im) => im.state === 'trashed'), [images]);
   const subtree = useMemo(() => (folderId === null ? null : new Set([folderId, ...descendantIds(folders, folderId)])), [folders, folderId]);
@@ -972,23 +1097,22 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
   const filtersActive = !!filters.q.trim() || filterCount(filters) > 0;
   const base = mode === 'trash' ? trashedAll : filtersActive ? scope : direct;
   const list = useMemo(() => applyFilters(base, filters, sort), [base, filters, sort]);
-  const counts = useMemo(() => {
-    const m = new Map();
-    for (const im of active) m.set(im.folderId ?? null, (m.get(im.folderId ?? null) || 0) + 1);
-    return m;
-  }, [active]);
   const showFolder = mode === 'trash' || filtersActive;
+  const subfolders = useMemo(() => (mode === 'active' && !filtersActive && folderState === 'ready' ? childrenOf(folders, folderId) : []), [mode, filtersActive, folderState, folders, folderId]);
   const openIdx = list.findIndex((im) => im.id === openId);
   const openImg = openIdx >= 0 ? list[openIdx] : null;
-  const filtered = filtersActive;
   const selecting = sel.size > 0 || selectMode;
   const selectedList = list.filter((im) => sel.has(im.id));
   const commonFolder = selectedList.length && selectedList.every((im) => (im.folderId ?? null) === (selectedList[0].folderId ?? null)) ? (selectedList[0].folderId ?? null) : undefined;
 
+  useEffect(() => {
+    if (!openImg && viewing) setViewing(false);
+  }, [!!openImg]);
+
   // keyboard
   useEffect(() => {
     const key = (e) => {
-      const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName) || document.querySelector('.scrim');
+      const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName) || document.querySelector('.scrim, .cmdk-scrim');
       if (e.key === 'Escape' && !typing) {
         if (openImg) setOpenId(null);
         else if (selecting) (setSel(new Set()), setSelectMode(false));
@@ -998,7 +1122,6 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
         e.preventDefault();
         phone ? setSearching(true) : searchRef.current?.focus();
       }
-      if ((e.key === 'u' || e.key === 'U') && mode === 'active') fileRef.current?.click();
       if (openImg && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         const n = openIdx + (e.key === 'ArrowLeft' ? -1 : 1);
         if (list[n]) setOpenId(list[n].id);
@@ -1010,22 +1133,6 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
   useEffect(() => {
     if (searching) searchRef.current?.focus();
   }, [searching]);
-
-  const fmtName = (k) => LINK_FORMATS.find((f) => f.key === k)?.label;
-  const copyImg = (im, fmt = lastFormat) => {
-    if (fmt === 'id' || fmt === 'sha256') {
-      copyText(im[fmt]);
-      toast(fmt === 'id' ? '已复制 ID' : '已复制 SHA-256');
-      return;
-    }
-    setLastFormat(fmt);
-    copyText(im.links[fmt]);
-    toast(`已复制 ${fmtName(fmt)}`);
-  };
-  const copyMany = (ims) => {
-    copyText(ims.map((im) => im.links[lastFormat]).join('\n'));
-    toast(`已复制 ${ims.length} 条 ${fmtName(lastFormat)}`);
-  };
 
   const toggle = (id, e) => {
     setSel((s) => {
@@ -1040,9 +1147,15 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
     setAnchor(id);
   };
   const toggleAll = () => setSel((s) => (list.every((im) => s.has(im.id)) ? new Set() : new Set(list.map((im) => im.id))));
+  const clearSel = () => (setSel(new Set()), setSelectMode(false));
   const onRowClick = (im, e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || selecting) return toggle(im.id, e);
     setOpenId(openId === im.id && !wide ? null : im.id);
+  };
+  const openViewer = (im) => {
+    if (selecting) return;
+    setOpenId(im.id);
+    setViewing(true);
   };
 
   const patch = (ids, fn) => setImages((xs) => xs.map((im) => (ids.includes(im.id) ? fn(im) : im)));
@@ -1053,91 +1166,36 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
       setOpenId(next ? next.id : null);
     }
   };
+  // Images moved from anywhere (menu, drag onto the sidebar tree or a breadcrumb) leave this list.
+  hook.current.leaving = (ids) => {
+    if (!filtersActive) advanceFrom(ids);
+    clearSel();
+  };
   const trash = (ids) => {
     const before = images;
     advanceFrom(ids);
     patch(ids, (im) => ({ ...im, state: 'trashed', trashedAt: NOW }));
-    setSel(new Set());
-    setSelectMode(false);
+    clearSel();
     toast(ids.length > 1 ? `已将 ${ids.length} 张图片移到回收站` : '已移到回收站', { label: '撤销', run: () => setImages(before) });
   };
   const restore = (ids) => {
     const before = images;
     advanceFrom(ids);
     patch(ids, (im) => ({ ...im, state: 'active', trashedAt: null }));
-    setSel(new Set());
-    setSelectMode(false);
+    clearSel();
     toast(ids.length > 1 ? `已恢复 ${ids.length} 张图片` : '已恢复', { label: '撤销', run: () => setImages(before) });
   };
   const doPurge = () => {
     const ids = purge;
     advanceFrom(ids);
     setImages((xs) => xs.filter((im) => !ids.includes(im.id)));
-    setSel(new Set());
-    setSelectMode(false);
+    clearSel();
     setPurge(null);
     toast(ids.length > 1 ? `已永久删除 ${ids.length} 张图片` : '已永久删除');
   };
   const update = (p, msg) => {
     patch([openImg.id], (im) => ({ ...im, ...p, links: p.filename ? makeLinks(im.id, im.ext, p.filename) : im.links }));
     if (msg) toast(msg);
-  };
-
-  // ---- folders
-  const openFolder = (id) => onNavigate(libraryHash(folders, id));
-  const moveImages = (ids, to) => {
-    const moving = images.filter((im) => ids.includes(im.id) && im.state === 'active' && (im.folderId ?? null) !== to).map((im) => im.id);
-    if (!moving.length) return;
-    const before = images;
-    if (!filtersActive) advanceFrom(moving);
-    patch(moving, (im) => ({ ...im, folderId: to }));
-    setSel(new Set());
-    setSelectMode(false);
-    const where = folderLabel(folders, to);
-    toast(moving.length > 1 ? `已将 ${moving.length} 张图片移到 ${where}` : `已移到 ${where}`, { label: '撤销', run: () => setImages(before) });
-  };
-  const inside = (id) => folderId !== null && (folderId === id || descendantIds(folders, id).has(folderId));
-  const createFolder = (parentId, name) => {
-    const e = folderNameError(folders, parentId, name);
-    if (e) return e;
-    if (folderDepth(folders, parentId) >= MAX_DEPTH) return `最多 ${MAX_DEPTH} 层`;
-    setFolders((xs) => [...xs, { id: 'f' + Math.random().toString(36).slice(2, 8), name: name.trim(), parentId }]);
-    toast('已创建文件夹');
-    return '';
-  };
-  const renameFolder = (id, name) => {
-    const f = folderById(folders, id);
-    const e = folderNameError(folders, f.parentId ?? null, name, id);
-    if (e) return e;
-    const next = folders.map((x) => (x.id === id ? { ...x, name: name.trim() } : x));
-    setFolders(next);
-    if (inside(id)) onNavigate(libraryHash(next, folderId), { replace: true });
-    toast('已重命名');
-    return '';
-  };
-  const moveFolder = (id, to) => {
-    const f = folderById(folders, id);
-    if (folderNameError(folders, to, f.name, id)) return toast('目标位置已有同名文件夹');
-    if (!fitsUnder(folders, id, to)) return toast(`最多 ${MAX_DEPTH} 层`);
-    const before = folders;
-    const next = folders.map((x) => (x.id === id ? { ...x, parentId: to } : x));
-    const here = inside(id);
-    setFolders(next);
-    if (here) onNavigate(libraryHash(next, folderId), { replace: true });
-    toast(`已将 ${f.name} 移到 ${folderLabel(folders, to)}`, {
-      label: '撤销',
-      run: () => (setFolders(before), here && onNavigate(libraryHash(before, folderId), { replace: true })),
-    });
-  };
-  const deleteFolder = (id) => {
-    const f = folderById(folders, id);
-    if (childrenOf(folders, id).length || (counts.get(id) || 0) > 0) return toast('文件夹不为空');
-    const beforeFolders = folders;
-    const beforeImages = images;
-    setFolders((xs) => xs.filter((x) => x.id !== id));
-    setImages((xs) => xs.map((im) => (im.folderId === id ? { ...im, folderId: null } : im)));
-    if (folderId === id) onNavigate(libraryHash(folders, f.parentId ?? null), { replace: true });
-    toast('已删除文件夹', { label: '撤销', run: () => (setFolders(beforeFolders), setImages(beforeImages)) });
   };
   const onDragStart = (im, e) => {
     const ids = sel.has(im.id) ? [...sel] : [im.id];
@@ -1152,42 +1210,22 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
       setTimeout(() => g.remove(), 0);
     }
   };
-  const panelProps = {
-    folders,
-    state: folderState,
-    currentId: folderId,
-    counts,
-    onOpen: openFolder,
-    onCreate: createFolder,
-    onRename: renameFolder,
-    onMove: moveFolder,
-    onDelete: deleteFolder,
-    onDropImages: moveImages,
-    onRetry: onRetryFolders,
-  };
-  const pane = mode === 'active' && wideNav && (
-    <aside className="tree-pane">
-      <FolderPanel {...panelProps} />
-    </aside>
-  );
+
   if (missing)
     return (
-      <>
-        {pane}
-        <div className="panel-main">
-          <div className="head">
-            <div className="head-title">
-              <h1>{ROOT_LABEL}</h1>
-            </div>
-          </div>
-          <div className="state">
-            <span className="t">文件夹不存在</span>
-            <button type="button" className="btn btn-secondary" onClick={() => openFolder(null)}>
-              返回图片
-            </button>
+      <div className="panel-main">
+        <div className="head">
+          <div className="head-title">
+            <h1>{ROOT_LABEL}</h1>
           </div>
         </div>
-      </>
+        <div className="state">
+          <span className="t">文件夹不存在</span>
+          <button type="button" className="btn btn-secondary" onClick={() => onOpenFolder(null)}>
+            返回图片
+          </button>
+        </div>
+      </div>
     );
 
   const ids = [...sel];
@@ -1208,14 +1246,17 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
         </Popover>
       </span>
     ) : null;
-  const countText = filtered ? `${list.length} / ${scope.length}` : base.length;
+  const countText = filtersActive ? `${list.length} / ${scope.length}` : base.length;
+  const bulk = (compact) => (
+    <BulkActions mode={mode} ids={ids} selected={selectedList} folders={folders} currentFolder={commonFolder} onCopy={copyMany} onMove={moveImages} onTrash={trash} onRestore={restore} onPurge={setPurge} compact={compact} />
+  );
 
   // header
   let head;
   if (phone && searching) {
     head = (
       <div className="head">
-        <div className="field-wrap grow">
+        <div className="field-wrap grow search" style={{ width: 'auto' }}>
           <Icon name="search" />
           <input ref={searchRef} className="input" type="search" placeholder="搜索" aria-label="搜索" value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))} />
         </div>
@@ -1226,13 +1267,13 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
     );
   } else if (selecting) {
     head = (
-      <div className="head" style={{ paddingLeft: phone ? 8 : 12 }}>
+      <div className="head is-selecting">
         <div className="bulk">
           <Check on={list.length && list.every((im) => sel.has(im.id)) ? true : sel.size ? 'mixed' : false} onChange={toggleAll} label="全选" />
           <span className="n">已选 {sel.size} 张</span>
-          {!phone && sel.size > 0 && <BulkActions mode={mode} ids={ids} selected={selectedList} folders={folders} currentFolder={commonFolder} onCopy={copyMany} onMove={moveImages} onTrash={trash} onRestore={restore} onPurge={setPurge} />}
+          {!phone && sel.size > 0 && bulk(false)}
           <span className="grow" />
-          <button type="button" className="btn btn-ghost" onClick={() => (setSel(new Set()), setSelectMode(false))}>
+          <button type="button" className="btn btn-ghost" onClick={clearSel}>
             {phone ? '完成' : '取消选择'}
           </button>
         </div>
@@ -1247,7 +1288,7 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
             {dataState === 'ready' && <span className="count">{countText}</span>}
           </div>
         ) : (
-          <Breadcrumb folders={folders} currentId={folderId} count={dataState === 'ready' && folderState === 'ready' ? countText : null} onOpen={openFolder} onDropImages={moveImages} tool={folderTool} />
+          <Breadcrumb folders={folders} currentId={folderId} count={dataState === 'ready' && folderState === 'ready' ? countText : null} onOpen={onOpenFolder} onDropImages={moveImages} tool={folderTool} />
         )}
         {phone ? (
           <button type="button" className="btn btn-ghost btn-icon" aria-label="搜索" title="搜索" onClick={() => setSearching(true)}>
@@ -1261,22 +1302,28 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
           </div>
         )}
         <FilterPopover filters={filters} setFilters={setFilters} pool={scope} />
-        <DisplayMenu view={view} setView={setView} sort={sort} setSort={setSort} phone={phone} onSelectMode={() => setSelectMode(true)} />
+        <ViewControls view={view} setView={setView} sort={sort} setSort={setSort} phone={phone} onSelectMode={() => setSelectMode(true)} />
         {mode === 'active' && (
-          <button type="button" className={'btn btn-primary' + (phone ? ' btn-icon' : '')} style={phone ? { color: 'var(--accent-ink)' } : null} aria-label="上传" title="上传 (U)" onClick={() => fileRef.current?.click()}>
+          <button type="button" className={'btn btn-primary' + (phone ? ' btn-icon' : '')} style={phone ? { color: 'var(--accent-ink)' } : undefined} aria-label="上传" title="上传 (U)" onClick={onUpload}>
             <Icon name="upload" />
             {!phone && '上传'}
           </button>
         )}
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => (uploadApi.add([...e.target.files], folderId), (e.target.value = ''))} />
       </div>
     );
   }
 
   const loading = dataState === 'loading' || (mode === 'active' && folderState === 'loading');
   const failed = dataState === 'error' || (mode === 'active' && folderState === 'error');
+  const listEl = () => {
+    const p = { list, mode, folders, showFolder, sel, openId, onRowClick, onOpenViewer: openViewer, onToggle: toggle, onCopy: copyLink, onDragStart, retention: settings.trashRetentionDays, selecting };
+    if (view === 'grid') return <ImageGrid {...p} />;
+    return (
+      <ImageTable {...p} onToggleAll={toggleAll} onRestore={restore} onTrash={trash} onPurge={setPurge} onMove={moveImages} />
+    );
+  };
   let content;
-  if (loading) content = <LoadingRows />;
+  if (loading) content = <LoadingList grid={view === 'grid'} />;
   else if (failed)
     content = (
       <div className="state" role="alert">
@@ -1293,7 +1340,7 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
         <span className="t">回收站是空的</span>
       </div>
     );
-  else if (!list.length && filtered)
+  else if (!list.length && filtersActive)
     content = (
       <div className="state">
         <span className="t">没有匹配的图片</span>
@@ -1302,52 +1349,32 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
         </button>
       </div>
     );
+  else if (!list.length && subfolders.length && view === 'grid') content = null;
   else if (!list.length)
     content = (
-      <div className="state">
-        <span className="t">{active.length ? '这里没有图片' : '还没有图片'}</span>
-        <span className="d">拖入、粘贴或选择文件上传</span>
-        <button type="button" className="btn btn-secondary" onClick={() => fileRef.current?.click()}>
-          选择文件
-        </button>
+      <div className="empty-drop">
+        <DashFrame />
+        <div className="state">
+          <span className="t">{active.length ? '这里没有图片' : '还没有图片'}</span>
+          <span className="d">拖入、粘贴或选择文件上传</span>
+          <button type="button" className="btn btn-secondary" onClick={onUpload}>
+            选择文件
+          </button>
+        </div>
       </div>
     );
-  else {
-    const p = { list, mode, folders, showFolder, sel, openId, onRowClick, onToggle: toggle, onDragStart, retention: settings.trashRetentionDays, selecting };
-    content =
-      view === 'grid' ? (
-        <ImageGrid {...p} />
-      ) : (
-        <ImageTable {...p} onToggleAll={toggleAll} onCopy={copyImg} onRestore={restore} onTrash={trash} onPurge={setPurge} onMove={moveImages} />
-      );
-  }
+  else content = listEl();
 
   const variant = wide && !phone ? 'docked' : phone ? 'sheet' : 'drawer';
+  const step = (d) => list[openIdx + d] && setOpenId(list[openIdx + d].id);
 
   return (
     <>
-      {pane}
       <div className="panel-main">
         {head}
         <ActiveFilters filters={phone && searching ? { ...filters, q: '' } : filters} setFilters={setFilters} />
         <div className="scroll">
-          {mode === 'active' && (
-            <UploadTray
-              items={uploads}
-              folders={folders}
-              onCancel={uploadApi.cancel}
-              onRetry={uploadApi.retry}
-              onRemove={uploadApi.remove}
-              onClear={uploadApi.clear}
-              onOpen={(id) => {
-                const im = images.find((x) => x.id === id);
-                if (im && (im.folderId ?? null) !== folderId) openFolder(im.folderId ?? null);
-                setOpenId(id);
-              }}
-              onCopy={(id) => copyImg(images.find((im) => im.id === id))}
-              onCopyAll={() => copyMany(uploads.filter((u) => u.imageId).map((u) => images.find((im) => im.id === u.imageId)).filter(Boolean))}
-            />
-          )}
+          {!loading && !failed && view === 'grid' && <FolderChips list={subfolders} counts={panelProps.counts} onOpen={onOpenFolder} onDropImages={moveImages} />}
           {content}
           {dataState === 'ready' && !loading && !failed && list.length > 12 && <div className="loadmore">已显示全部</div>}
         </div>
@@ -1360,22 +1387,26 @@ function Library({ mode, images, setImages, folders, setFolders, folderState, fo
           index={openIdx}
           total={list.length}
           variant={variant}
+          viewing={viewing}
           retention={settings.trashRetentionDays}
           onClose={() => setOpenId(null)}
-          onPrev={() => list[openIdx - 1] && setOpenId(list[openIdx - 1].id)}
-          onNext={() => list[openIdx + 1] && setOpenId(list[openIdx + 1].id)}
+          onPrev={() => step(-1)}
+          onNext={() => step(1)}
+          onZoom={() => vt(() => setViewing(true))}
           onUpdate={update}
           onMove={moveImages}
           onTrash={trash}
           onRestore={restore}
           onPurge={setPurge}
-          onCopyFormat={copyImg}
-          lastFormat={lastFormat}
+          onCopyFormat={copyLink}
         />
+      )}
+      {openImg && viewing && (
+        <Viewer img={openImg} mode={mode} index={openIdx} total={list.length} onClose={() => vt(() => setViewing(false))} onPrev={() => step(-1)} onNext={() => step(1)} onCopy={copyLink} />
       )}
       {phone && sel.size > 0 && (
         <div className="float-bar" role="toolbar" aria-label="批量操作">
-          <BulkActions mode={mode} ids={ids} selected={selectedList} folders={folders} currentFolder={commonFolder} onCopy={copyMany} onMove={moveImages} onTrash={trash} onRestore={restore} onPurge={setPurge} compact />
+          {bulk(true)}
         </div>
       )}
       {purge && (
@@ -1445,4 +1476,4 @@ function BulkActions({ mode, ids, selected, folders, currentFolder, onCopy, onMo
   );
 }
 
-Object.assign(window, { Library });
+Object.assign(window, { Library, FolderPanel, Thumb });

@@ -12,7 +12,7 @@
   apply();
   mq.addEventListener('change', apply);
 
-  document.querySelectorAll('.code').forEach(function (box) {
+  document.querySelectorAll('.codeblock').forEach(function (box) {
     var pre = box.querySelector('pre');
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -29,4 +29,23 @@
     });
     box.appendChild(btn);
   });
+
+  // The table of contents marks the section being read.
+  var scroller = document.querySelector('.scroll');
+  var secs = [].slice.call(document.querySelectorAll('.doc-sec[id]'));
+  function mark() {
+    var top = scroller.getBoundingClientRect().top + 24;
+    var cur = secs[0];
+    secs.forEach(function (sec) {
+      if (sec.getBoundingClientRect().top <= top) cur = sec;
+    });
+    document.querySelectorAll('.doc-toc a').forEach(function (a) {
+      if (a.getAttribute('href') === '#' + cur.id) a.setAttribute('aria-current', 'true');
+      else a.removeAttribute('aria-current');
+    });
+  }
+  if (scroller && secs.length) {
+    scroller.addEventListener('scroll', mark, { passive: true });
+    mark();
+  }
 })();

@@ -36,6 +36,17 @@ const PATHS = {
   edit: <><path d="M10.5 3 13 5.5 6 12.5H3.5V10Z" /></>,
   folder: <><path d="M2.5 4.5a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1Z" /></>,
   'folder-plus': <><path d="M8.5 12.5h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h2.9l1.2 1.5h4.9a1 1 0 0 1 1 1V8M12 10v4M10 12h4" /></>,
+  command: <><path d="M5.5 5.5h5v5h-5zM5.5 5.5V4a1.5 1.5 0 1 0-1.5 1.5h1.5ZM10.5 5.5H12A1.5 1.5 0 1 0 10.5 4v1.5ZM10.5 10.5V12a1.5 1.5 0 1 0 1.5-1.5h-1.5ZM5.5 10.5H4A1.5 1.5 0 1 0 5.5 12v-1.5Z" /></>,
+  expand: <><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></>,
+  up: <><path d="M4 10l4-4 4 4" /></>,
+  enter: <><path d="M13 3.5v4a2 2 0 0 1-2 2H3.5M6 7 3.5 9.5 6 12" /></>,
+  shield: <><path d="M8 2 3 4v3.5c0 3 2 5.3 5 6.5 3-1.2 5-3.5 5-6.5V4Z" /><path d="m6 8 1.5 1.5L10 6.5" /></>,
+  scan: <><path d="M2.5 5.5v-2a1 1 0 0 1 1-1h2M10.5 2.5h2a1 1 0 0 1 1 1v2M13.5 10.5v2a1 1 0 0 1-1 1h-2M5.5 13.5h-2a1 1 0 0 1-1-1v-2M5 8h6" /></>,
+  archive: <><rect x="2.5" y="3" width="11" height="3.5" rx="1" /><path d="M3.5 6.5V12a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6.5M6.5 9.5h3" /></>,
+  user: <><circle cx="8" cy="5.75" r="2.75" /><path d="M3 13.5c.6-2.3 2.5-3.5 5-3.5s4.4 1.2 5 3.5" /></>,
+  moon: <><path d="M13 9.5A5.5 5.5 0 0 1 6.5 3 5.5 5.5 0 1 0 13 9.5Z" /></>,
+  monitor: <><rect x="2" y="3" width="12" height="8" rx="1.5" /><path d="M6 13.5h4M8 11v2.5" /></>,
+  book: <><path d="M3 3.5A1.5 1.5 0 0 1 4.5 2H13v9.5H4.5A1.5 1.5 0 0 0 3 13V3.5ZM3 13a1.5 1.5 0 0 0 1.5 1.5H13" /></>,
   external: <><path d="M9 3h4v4M13 3 7.5 8.5M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5" /></>,
 };
 function Icon({ name, size }) {
@@ -335,8 +346,11 @@ function useTheme() {
       return q || 'system';
     }
   });
+  const first = useRef(true);
   useEffect(() => {
-    applyTheme(pref);
+    if (first.current) applyTheme(pref);
+    else applyTheme(pref);
+    first.current = false;
     try {
       localStorage.setItem('picberth.theme', pref);
     } catch (e) {}
@@ -347,15 +361,34 @@ function useTheme() {
   }, [pref]);
   return [pref, setPref];
 }
+/** Run a state change inside a view transition where the browser has one and motion is allowed. */
+function vt(fn) {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!document.startViewTransition || still) return fn();
+  document.startViewTransition(() => ReactDOM.flushSync(fn));
+}
+
+/** A dashed frame that follows its box (stroke stays 1:1 at any size). */
+function DashFrame({ radius = 16 }) {
+  return (
+    <svg className="frame" aria-hidden="true">
+      <rect x="0" y="0" width="100%" height="100%" rx={radius} />
+    </svg>
+  );
+}
+
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = IS_MAC ? '⌘' : 'Ctrl';
+
 const THEMES = [
-  { value: 'system', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
+  { value: 'system', label: '跟随系统', icon: 'monitor' },
+  { value: 'light', label: '浅色', icon: 'sun' },
+  { value: 'dark', label: '深色', icon: 'moon' },
 ];
 
 if (new URLSearchParams(location.search).has('clean')) document.documentElement.classList.add('clean');
 
 Object.assign(window, {
   Icon, useMedia, Popover, MenuItem, Select, Check, Seg, Switch, Dialog, ToastHost, useToast, copyText, useTheme, THEMES,
-  useFloating, useDismiss,
+  useFloating, useDismiss, vt, DashFrame, MOD, IS_MAC,
 });
