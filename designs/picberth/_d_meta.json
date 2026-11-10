@@ -7,9 +7,9 @@
       "versions": [
         {
           "path": "index.html",
-          "createdAt": "2026-11-09T01:13:43.000Z",
+          "createdAt": "2026-11-10T00:00:00.000Z",
           "status": "approved",
-          "subtitle": "文件夹（最多 3 层）替代标签；路由整理；操作记录保留与筛选；令牌页 API 文档入口",
+          "subtitle": "第 7 版：侧栏并入文件夹树，网格视图在图片上方显示子文件夹，按比例排布的网格，大图查看，命令面板，浮动上传面板，状态页重排；颜色、字号、圆角、动效遵循 DESIGN.md",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -21,9 +21,9 @@
       "versions": [
         {
           "path": "auth.html",
-          "createdAt": "2026-11-09T01:13:43.000Z",
+          "createdAt": "2026-11-10T00:00:00.000Z",
           "status": "approved",
-          "subtitle": "登录后回到来源页面",
+          "subtitle": "第 7 版：初始化代码分三组显示",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -35,9 +35,9 @@
       "versions": [
         {
           "path": "api-docs.html",
-          "createdAt": "2026-11-09T01:13:43.000Z",
+          "createdAt": "2026-11-10T00:00:00.000Z",
           "status": "approved",
-          "subtitle": "令牌使用的 API 参考页：认证、上传、图片、文件夹、错误、频率限制、客户端示例",
+          "subtitle": "第 7 版：使用与控制台相同的外壳，目录作为侧栏导航",
           "viewport": {
             "width": 1440,
             "height": 900
@@ -47,5 +47,5 @@
     }
   },
   "createdAt": "2026-10-21T12:27:29.586Z",
-  "updatedAt": "2026-11-09T01:29:51Z"
+  "updatedAt": "2026-11-10T00:00:00Z"
 }

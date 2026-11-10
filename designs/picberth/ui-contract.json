@@ -111,7 +111,20 @@
           "audit-kind-filter",
           "audit-load-more",
           "settings-audit-retention",
-          "tokens-api-docs-link"
+          "tokens-api-docs-link",
+          "sidebar-folder-tree",
+          "library-grid-proportional",
+          "library-grid-default",
+          "image-viewer",
+          "image-viewer-actual-size",
+          "command-palette",
+          "command-palette-results",
+          "command-palette-empty",
+          "upload-dock-progress",
+          "upload-dock-folded",
+          "folder-chips-grid",
+          "status-disk-breakdown",
+          "not-found-light"
         ],
         "stableIds": [
           "library",
@@ -205,7 +218,8 @@
           "login-offline",
           "login-busy",
           "light-dark",
-          "mobile-390"
+          "mobile-390",
+          "setup-code-groups"
         ],
         "stableIds": [
           "setup",
@@ -243,7 +257,10 @@
           "api-docs-tablet-toc-row",
           "api-docs-phone",
           "code-copy",
-          "light-dark"
+          "light-dark",
+          "api-docs-console-shell",
+          "api-docs-toc-current",
+          "api-docs-toc-tabs-narrow"
         ],
         "stableIds": [
           "api-docs"
