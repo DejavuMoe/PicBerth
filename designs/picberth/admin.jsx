@@ -87,6 +87,7 @@ const CLIENTS = [
 function TokenReveal({ token, onDone }) {
   const toast = useToast();
   const [client, setClient] = useState('picgo');
+  const [copied, setCopied] = useState(false);
   const secret = `${token.prefix}_${fakeId(token.id * 7)}${fakeId(token.id * 13).slice(0, 12)}`;
   const endpoint = 'https://pics.example.com/api/v1/images';
   const snippets = {
@@ -101,7 +102,7 @@ function TokenReveal({ token, onDone }) {
       dismissible={false}
       onClose={onDone}
       footer={
-        <button type="button" className="btn btn-primary" data-autofocus onClick={onDone}>
+        <button type="button" className="btn btn-secondary" onClick={onDone}>
           完成
         </button>
       }
@@ -112,8 +113,8 @@ function TokenReveal({ token, onDone }) {
       </div>
       <div className="secret">
         <span className="mono">{secret}</span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => (copyText(secret), toast('已复制令牌'))}>
-          <Icon name="copy" size="s" />
+        <button type="button" className="btn btn-primary btn-sm" data-autofocus onClick={() => (copyText(secret), setCopied(true), toast('已复制令牌'))}>
+          <Icon key={String(copied)} name={copied ? 'check' : 'copy'} size="s" />
           复制
         </button>
       </div>
@@ -138,12 +139,16 @@ function TokenReveal({ token, onDone }) {
   );
 }
 
-function Tokens({ dataState, onRetryLoad }) {
+function Tokens({ dataState, onRetryLoad, createSignal }) {
   const toast = useToast();
   const [tokens, setTokens] = useState(TOKENS);
   const [creating, setCreating] = useState(false);
   const [revealed, setRevealed] = useState(null);
   const [arming, setArming] = useState(null);
+  const seenSignal = useRef(createSignal);
+  useEffect(() => {
+    if (createSignal !== seenSignal.current) (seenSignal.current = createSignal), setCreating(true);
+  }, [createSignal]);
   useEffect(() => {
     if (arming == null) return;
     const t = setTimeout(() => setArming(null), 4000);
@@ -159,20 +164,21 @@ function Tokens({ dataState, onRetryLoad }) {
   const live = list.filter((t) => !t.revokedAt);
   const dead = list.filter((t) => t.revokedAt);
   const expiry = (t) => (t.revokedAt ? '已吊销' : t.expiresAt ? (t.expiresAt < NOW ? '已过期' : fmtDate(t.expiresAt).slice(0, 10)) : '永不过期');
-  const scopes = (t) => t.scopes.map((s) => SCOPES.find((x) => x.key === s).label).join('、');
+  const scopeNames = (t) => t.scopes.map((s) => SCOPES.find((x) => x.key === s).label);
+  const used = (t) => (t.lastUsedAt ? fmtRel(t.lastUsedAt) : '从未使用');
   const row = (t) => (
-    <div key={t.id} className={'list-row tok-row' + (t.revokedAt ? ' revoked' : '')}>
+    <div key={t.id} className={'list-row tok-row' + (t.revokedAt ? ' revoked' : '')} role="row">
       <div className="tok-name">
         <span className="n ellipsis">{t.name}</span>
         <span className="mono">{t.prefix}</span>
         <span className="tok-sub">
-          <span>{scopes(t)}</span>
-          <span>{t.lastUsedAt ? fmtRel(t.lastUsedAt) : '从未使用'}</span>
+          <span>{scopeNames(t).join('、')}</span>
+          <span>{used(t)}</span>
           <span>{expiry(t)}</span>
         </span>
       </div>
-      <span className="c-scope">{scopes(t)}</span>
-      <span className="c-used muted num">{t.lastUsedAt ? fmtRel(t.lastUsedAt) : '从未使用'}</span>
+      <span className="c-scope">{scopeNames(t).join('、')}</span>
+      <span className="c-used muted num">{used(t)}</span>
       <span className="c-exp muted num">{expiry(t)}</span>
       {t.revokedAt ? (
         <span />
@@ -202,9 +208,9 @@ function Tokens({ dataState, onRetryLoad }) {
         </button>
       </Head>
       <div className="scroll">
-        <div className="page" style={{ maxWidth: 960 }}>
+        <div className="page page-wide">
           {dataState === 'loading' ? (
-            <div className="list" aria-busy="true">
+            <div className="rows" aria-busy="true">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="list-row tok-row">
                   <div className="skeleton" style={{ height: 10, width: '60%' }} />
@@ -212,19 +218,19 @@ function Tokens({ dataState, onRetryLoad }) {
               ))}
             </div>
           ) : dataState === 'error' ? (
-            <div className="state" role="alert" style={{ padding: '64px 0' }}>
+            <div className="state" role="alert">
               <span className="t">令牌加载失败</span>
               <button type="button" className="btn btn-secondary" onClick={onRetryLoad}>
                 重试
               </button>
             </div>
           ) : !list.length ? (
-            <div className="state" style={{ padding: '64px 0' }}>
+            <div className="state">
               <span className="t">还没有令牌</span>
               <span className="d">PicGo、ShareX 等工具通过令牌上传图片</span>
             </div>
           ) : (
-            <div className="list" role="table" aria-label="令牌">
+            <div className="rows" role="table" aria-label="令牌">
               <div className="list-row list-head tok-row" role="row">
                 <span>名称</span>
                 <span className="c-scope">权限</span>
@@ -256,7 +262,7 @@ function Tokens({ dataState, onRetryLoad }) {
 }
 
 // ---------------------------------------------------------------- settings
-function NumField({ id, value, onChange, unit, min, max, err }) {
+function NumField({ id, value, onChange, unit, err }) {
   return (
     <>
       <div className="field-wrap has-suffix w-num">
@@ -303,6 +309,14 @@ function Settings({ settings, setSettings, guard }) {
       <div className="ctl">{ctl}</div>
     </div>
   );
+  const url = (v) => (
+    <button type="button" className="copy-inline" title="复制" aria-label={`复制 ${v}`} onClick={() => (copyText(v), toast('已复制'))}>
+      <span className="mono ellipsis" style={{ fontSize: 'var(--fs-m)' }}>
+        {v}
+      </span>
+      <Icon name="copy" size="s" />
+    </button>
+  );
   return (
     <div className="panel-main">
       <Head title="设置" />
@@ -310,7 +324,7 @@ function Settings({ settings, setSettings, guard }) {
         <div className="page">
           <section className="section">
             <h2>上传</h2>
-            <div className="form-rows">
+            <div className="rows">
               {row('单文件上限', 's-max', <NumField id="s-max" value={form.maxUploadMB} onChange={set('maxUploadMB')} unit="MB" err={errs.maxUploadMB} />)}
               {row(
                 '格式',
@@ -337,21 +351,17 @@ function Settings({ settings, setSettings, guard }) {
           </section>
           <section className="section">
             <h2>回收站</h2>
-            <div className="form-rows">
-              {row('保留时间', 's-trash', <NumField id="s-trash" value={form.trashRetentionDays} onChange={set('trashRetentionDays')} unit="天" err={errs.trashRetentionDays} />)}
-            </div>
+            <div className="rows">{row('保留时间', 's-trash', <NumField id="s-trash" value={form.trashRetentionDays} onChange={set('trashRetentionDays')} unit="天" err={errs.trashRetentionDays} />)}</div>
           </section>
           <section className="section">
             <h2>操作记录</h2>
-            <div className="form-rows">
-              {row('保留时间', 's-audit', <NumField id="s-audit" value={form.auditRetentionDays} onChange={set('auditRetentionDays')} unit="天" err={errs.auditRetentionDays} />)}
-            </div>
+            <div className="rows">{row('保留时间', 's-audit', <NumField id="s-audit" value={form.auditRetentionDays} onChange={set('auditRetentionDays')} unit="天" err={errs.auditRetentionDays} />)}</div>
           </section>
           <section className="section">
             <h2>地址</h2>
-            <div className="form-rows">
-              {row('公开地址', null, <span className="mono ellipsis" style={{ fontSize: 'var(--fs-m)' }}>{form.publicUrl}</span>)}
-              {row('图片地址', null, <span className="mono ellipsis" style={{ fontSize: 'var(--fs-m)' }}>{form.imageUrl}</span>)}
+            <div className="rows">
+              {row('公开地址', null, url(form.publicUrl))}
+              {row('图片地址', null, url(form.imageUrl))}
             </div>
           </section>
         </div>
@@ -376,8 +386,8 @@ function Status({ dataState, onRetryLoad, settings }) {
   const toast = useToast();
   const [running, setRunning] = useState(null);
   const [results, setResults] = useState({
-    quick: { tone: 'success', text: `正常`, at: STATUS.lastQuick.at },
-    full: { tone: 'success', text: `正常`, at: STATUS.lastFull.at },
+    quick: { tone: 'success', text: '正常', at: STATUS.lastQuick.at },
+    full: { tone: 'success', text: '正常', at: STATUS.lastFull.at },
     snapshot: { tone: 'warning', text: '', at: STATUS.lastSnapshot },
   });
   const [warnings, setWarnings] = useState(STATUS.warnings);
@@ -400,7 +410,6 @@ function Status({ dataState, onRetryLoad, settings }) {
     }, 1400);
   };
   const s = STATUS;
-  const used = 1 - s.disk.free / s.disk.total;
   if (dataState === 'loading' || dataState === 'error')
     return (
       <div className="panel-main">
@@ -414,17 +423,33 @@ function Status({ dataState, onRetryLoad, settings }) {
               </button>
             </div>
           ) : (
-            <div className="page" aria-busy="true">
-              <div className="skeleton" style={{ height: 76, borderRadius: 8 }} />
+            <div className="page page-wide" aria-busy="true">
+              <div className="skeleton" style={{ height: 64 }} />
+              <div className="skeleton" style={{ height: 8 }} />
             </div>
           )}
         </div>
       </div>
     );
+  const used = s.disk.total - s.disk.free;
+  const other = Math.max(0, used - s.images.bytes - s.dbBytes);
+  const parts = [
+    { k: 'images', label: '图片', v: s.images.bytes },
+    { k: 'db', label: '数据库', v: s.dbBytes },
+    { k: 'other', label: '其他', v: other },
+    { k: 'free', label: '可用', v: s.disk.free },
+  ];
+  const figures = [
+    ['图片', s.images.active.toLocaleString('zh-CN')],
+    ['占用空间', fmtBytes(s.images.bytes)],
+    ['回收站', s.images.trashed],
+    ['损坏', s.images.broken],
+    ['数据库', fmtBytes(s.dbBytes)],
+  ];
   const maint = [
-    { k: 'quick', name: '快速检查', btn: '检查' },
-    { k: 'full', name: '完整检查', btn: '检查' },
-    { k: 'snapshot', name: '快照', btn: '创建' },
+    { k: 'quick', name: '快速检查', btn: '检查', busy: '检查中…' },
+    { k: 'full', name: '完整检查', btn: '检查', busy: '检查中…' },
+    { k: 'snapshot', name: '快照', btn: '创建', busy: '创建中…' },
   ];
   return (
     <div className="panel-main">
@@ -435,50 +460,56 @@ function Status({ dataState, onRetryLoad, settings }) {
         </button>
       </Head>
       <div className="scroll">
-        <div className="page" style={{ maxWidth: 960 }}>
+        <div className="page page-wide">
           {warnings.length > 0 && (
-            <section className="section" aria-label="警告">
-              <div>
-                {warnings.map((w) => (
-                  <div key={w.code} className="warn-row" role="alert">
-                    <span className="dot dot-warning" />
-                    <span className="t">{w.title}</span>
-                    <span className="d">{w.help}</span>
-                  </div>
-                ))}
-              </div>
+            <section aria-label="警告">
+              {warnings.map((w) => (
+                <div key={w.code} className="warn-row" role="alert">
+                  <span className="dot dot-warning" />
+                  <span className="t">{w.title}</span>
+                  <span className="d">{w.help}</span>
+                </div>
+              ))}
             </section>
           )}
 
           <div className="figures">
-            <div className="figure">
-              <span className="v">{s.images.active.toLocaleString('zh-CN')}</span>
-              <span className="k">图片</span>
-            </div>
-            <div className="figure">
-              <span className="v">{fmtBytes(s.images.bytes)}</span>
-              <span className="k">占用空间</span>
-            </div>
-            <div className="figure">
-              <span className="v">{s.images.trashed}</span>
-              <span className="k">回收站</span>
-            </div>
-            <div className="figure">
-              <span className="v">{fmtBytes(s.dbBytes)}</span>
-              <span className="k">数据库</span>
-            </div>
-            <div className="figure">
-              <span className="v">{fmtBytes(s.disk.free)}</span>
-              <span className="k">磁盘剩余</span>
-              <div className="meter" role="progressbar" aria-label="磁盘已用" aria-valuenow={Math.round(used * 100)} aria-valuemin={0} aria-valuemax={100}>
-                <i style={{ width: `${used * 100}%` }} />
+            {figures.map(([k, v]) => (
+              <div key={k} className="figure">
+                <span className="v">{v}</span>
+                <span className="k">{k}</span>
               </div>
-            </div>
+            ))}
           </div>
 
           <section className="section">
+            <div className="disk-head">
+              <h2>磁盘</h2>
+              <span className="muted num">
+                已用 {fmtBytes(used)} / {fmtBytes(s.disk.total)}
+              </span>
+            </div>
+            <div className="stack-bar" role="img" aria-label={parts.map((p) => `${p.label} ${fmtBytes(p.v)}`).join('，')}>
+              {parts.map((p) => (
+                <i key={p.k} className={'sw-' + p.k} style={p.k === 'free' ? undefined : { width: `${(p.v / s.disk.total) * 100}%` }} />
+              ))}
+            </div>
+            <dl className="legend">
+              {parts.map((p) => (
+                <div key={p.k}>
+                  <dt>
+                    <i className={'sw-' + p.k} />
+                    {p.label}
+                  </dt>
+                  <dd>{fmtBytes(p.v)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section className="section">
             <h2>维护</h2>
-            <div className="list">
+            <div className="rows">
               {maint.map((m) => {
                 const r = results[m.k];
                 return (
@@ -490,7 +521,7 @@ function Status({ dataState, onRetryLoad, settings }) {
                       <span className="num">{fmtDate(r.at)}</span>
                     </span>
                     <button type="button" className="btn btn-secondary btn-sm" disabled={running != null} onClick={() => run(m.k)}>
-                      {running === m.k ? (m.k === 'snapshot' ? '创建中…' : '检查中…') : m.btn}
+                      {running === m.k ? m.busy : m.btn}
                     </button>
                   </div>
                 );
@@ -504,16 +535,10 @@ function Status({ dataState, onRetryLoad, settings }) {
                 <h2>操作记录</h2>
                 <span className="s muted">保留 {settings.auditRetentionDays} 天</span>
               </div>
-              <Select
-                label="操作类型"
-                value={kind}
-                options={AUDIT_KINDS}
-                width={128}
-                onChange={(v) => (setKind(v), setShown(AUDIT_PAGE))}
-              />
+              <Select label="操作类型" value={kind} options={AUDIT_KINDS} width={128} onChange={(v) => (setKind(v), setShown(AUDIT_PAGE))} />
             </div>
             {audit.length ? (
-              <div className="list" role="table" aria-label="操作记录">
+              <div className="rows" role="table" aria-label="操作记录">
                 <div className="list-row list-head audit-row" role="row">
                   <span>时间</span>
                   <span>操作者</span>

@@ -86,6 +86,37 @@ function Setup({ scenario }) {
     setError('');
     setTimeout(() => (location.href = consoleUrl()), 900);
   };
+  const codeField = (
+    <div className="field">
+      <label htmlFor="s-code">初始化代码</label>
+      <div className="code-field" data-invalid={tried && !!errs.code}>
+        <input
+          id="s-code"
+          autoFocus
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          maxLength={12}
+          aria-invalid={tried && !!errs.code}
+          value={v.code}
+          onChange={(e) => setV((x) => ({ ...x, code: e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12) }))}
+        />
+        {[0, 1, 2].map((g) => (
+          <div key={g} className="code-group" aria-hidden="true">
+            {[0, 1, 2, 3].map((c) => {
+              const i = g * 4 + c;
+              return (
+                <span key={c} className={'code-cell' + (v.code[i] ? ' is-filled' : '') + (i === Math.min(v.code.length, 11) ? ' is-next' : '')}>
+                  {v.code[i] || ''}
+                </span>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {tried && errs.code ? <span className="field-error">{errs.code}</span> : <span className="s muted">在服务器启动日志中</span>}
+    </div>
+  );
   const field = (k, id, label, props, hint) => (
     <div className="field">
       <label htmlFor={id}>{label}</label>
@@ -96,7 +127,7 @@ function Setup({ scenario }) {
   return (
     <AuthShell title="初始化">
       <form className="auth-form" onSubmit={submit} noValidate>
-        {field('code', 's-code', '初始化代码', { autoFocus: true, autoComplete: 'off', spellCheck: false, maxLength: 12 }, '在服务器启动日志中')}
+        {codeField}
         {field('user', 's-user', '用户名', { autoComplete: 'username' })}
         {field('pass', 's-pass', '密码', { type: 'password', autoComplete: 'new-password' })}
         {field('confirm', 's-confirm', '确认密码', { type: 'password', autoComplete: 'new-password' })}
@@ -134,6 +165,7 @@ function AuthApp() {
     <ToastHost>
       {screen === 'login' ? <Login key={key} scenario={scenario} /> : <Setup key={key} scenario={scenario} />}
       <Popover
+        align="start"
         trigger={(p) => (
           <button {...p} type="button" className="proto">
             原型
