@@ -5,7 +5,8 @@ test('protects settings drafts, discards on confirmation, and persists saves', a
   // Desktop and tablet use the side navigation; phones use the five-tab bar.
   const navigation = testInfo.project.name === 'mobile' ? 'nav.tabbar' : 'nav.side';
   const settingsLink = page.locator(`${navigation} a[href="/settings"]`);
-  const libraryLink = page.locator(`${navigation} a[href="/library"]`);
+  // From 1100 px the library entry is the root row of the sidebar folder tree; narrower layouts keep a link.
+  const libraryLink = page.locator(`${navigation} a[href="/library"], ${navigation} .tn-root .tn-main`).first();
   async function goToSettings() {
     await settingsLink.click();
     await expect(page).toHaveURL(/\/settings$/);
