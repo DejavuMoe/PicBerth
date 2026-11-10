@@ -1,6 +1,41 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import CodeBlock from '../components/CodeBlock.svelte';
   import Icon from '../components/Icon.svelte';
+
+  const SECTIONS = [
+    { id: 'auth', label: '认证' },
+    { id: 'upload', label: '上传' },
+    { id: 'images', label: '图片' },
+    { id: 'folders', label: '文件夹' },
+    { id: 'errors', label: '错误' },
+    { id: 'limits', label: '频率限制' },
+    { id: 'clients', label: '客户端' },
+  ];
+
+  let scroller = $state<HTMLElement | null>(null);
+  let current = $state(SECTIONS[0]!.id);
+
+  // The contents mark the section being read.
+  function mark() {
+    if (!scroller) return;
+    const top = scroller.getBoundingClientRect().top + 24;
+    let cur = SECTIONS[0]!.id;
+    for (const sec of SECTIONS) {
+      const el = document.getElementById(sec.id);
+      if (el && el.getBoundingClientRect().top <= top) cur = sec.id;
+    }
+    current = cur;
+  }
+
+  function jump(e: MouseEvent, id: string) {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView();
+    history.replaceState(null, '', `#${id}`);
+    current = id;
+  }
+
+  onMount(mark);
 
   const AUTH_CURL = String.raw`curl -H "Authorization: Bearer pb_…" \
   "https://pics.example.com/api/v1/images?limit=2"`;
@@ -105,32 +140,45 @@ JSON 路径: url
   <title>API 文档 - PicBerth</title>
 </svelte:head>
 
-<header class="doc-top">
-  <span class="brand">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <span class="brand-word">PicBerth</span>
-  </span>
-  <a class="btn btn-secondary" href="/api/v1/openapi.json">
-    OpenAPI
-    <Icon name="external" size="s" />
-  </a>
-  <a class="btn btn-ghost" href="/tokens">令牌</a>
-</header>
+{#snippet toc()}
+  {#each SECTIONS as sec (sec.id)}
+    <a
+      class="nav-item"
+      href={`#${sec.id}`}
+      aria-current={current === sec.id ? 'true' : undefined}
+      onclick={(e) => jump(e, sec.id)}>{sec.label}</a
+    >
+  {/each}
+{/snippet}
 
-<div class="doc-layout">
-  <nav class="doc-toc" aria-label="目录">
-    <a href="#auth">认证</a>
-    <a href="#upload">上传</a>
-    <a href="#images">图片</a>
-    <a href="#folders">文件夹</a>
-    <a href="#errors">错误</a>
-    <a href="#limits">频率限制</a>
-    <a href="#clients">客户端</a>
+<div class="shell doc-shell">
+  <nav class="side" aria-label="目录">
+    <div class="brand-row">
+      <a class="brand" href="/library">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-word">PicBerth</span>
+      </a>
+    </div>
+    <div class="side-nav doc-toc">{@render toc()}</div>
   </nav>
 
-  <main class="doc-main">
-    <section class="doc-sec" aria-labelledby="top">
-      <h1 id="top">API 文档</h1>
+  <main class="main">
+    <div class="panel">
+      <div class="panel-main">
+        <div class="head">
+          <div class="head-title">
+            <h1>API 文档</h1>
+          </div>
+          <a class="btn btn-ghost" href="/tokens">令牌</a>
+          <a class="btn btn-secondary" href="/api/v1/openapi.json">
+            OpenAPI
+            <Icon name="external" size="s" />
+          </a>
+        </div>
+        <nav class="doc-tabs doc-toc" aria-label="目录">{@render toc()}</nav>
+        <div class="scroll" bind:this={scroller} onscroll={mark}>
+          <div class="doc-page">
+    <section class="doc-sec" aria-label="地址">
       <dl class="dl">
         <dt>地址</dt>
         <dd class="mono">https://pics.example.com/api/v1</dd>
@@ -174,7 +222,7 @@ JSON 路径: url
           </thead>
           <tbody>
             <tr><td><code>file</code></td><td>文件</td><td>必填，图片文件</td></tr>
-            <tr><td><code>folder</code></td><td>文本</td><td>文件夹 ID，见 <a href="#folders">文件夹</a>；省略时放在根目录；文件夹不存在时返回 <code>404</code></td></tr>
+            <tr><td><code>folder</code></td><td>文本</td><td>文件夹 ID，见 <a href="#folders" onclick={(e) => jump(e, 'folders')}>文件夹</a>；省略时放在根目录；文件夹不存在时返回 <code>404</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -321,5 +369,9 @@ JSON 路径: url
       <h3>ShareX</h3>
       <CodeBlock text={SHAREX} />
     </section>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 </div>

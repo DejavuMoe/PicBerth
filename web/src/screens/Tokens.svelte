@@ -4,6 +4,7 @@
   import TokenCreate from '../components/admin/TokenCreate.svelte';
   import TokenReveal from '../components/admin/TokenReveal.svelte';
   import { api, errorMessage } from '../lib/api';
+  import { palette } from '../lib/palette.svelte';
   import { formatAbsolute, formatDate, formatRelative } from '../lib/format';
   import { toast } from '../lib/toast.svelte';
   import type { Scope, Token } from '../lib/types';
@@ -34,6 +35,13 @@
     }
   }
   onMount(() => void load());
+
+  // 新建令牌 in the command palette lands here.
+  $effect(() => {
+    if (!palette.newToken) return;
+    palette.newToken = false;
+    creating = true;
+  });
 
   async function revoke(t: Token) {
     clearTimeout(disarm);

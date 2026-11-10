@@ -232,9 +232,18 @@
   });
 
   // ---- display ---------------------------------------------------------------------------------
-  const usedShare = $derived(
-    status && status.disk.totalBytes > 0 ? Math.round(((status.disk.totalBytes - status.disk.freeBytes) / status.disk.totalBytes) * 100) : 0,
-  );
+  const used = $derived(status ? Math.max(0, status.disk.totalBytes - status.disk.freeBytes) : 0);
+  /** 图片 / 数据库 / 其他 / 可用: 其他 is what is used beyond the first two, never below 0. */
+  const parts = $derived.by(() => {
+    if (!status) return [];
+    const other = Math.max(0, used - status.images.bytes - status.database.bytes);
+    return [
+      { k: 'images', label: '图片', v: status.images.bytes },
+      { k: 'db', label: '数据库', v: status.database.bytes },
+      { k: 'other', label: '其他', v: other },
+      { k: 'free', label: '可用', v: status.disk.freeBytes },
+    ];
+  });
   const uptime = $derived.by(() => {
     if (!status) return '';
     const days = Math.floor(status.uptimeSeconds / 86400);
@@ -260,7 +269,7 @@
   </div>
   <div class="scroll">
     {#if phase === 'loading' || phase === 'error' || !status}
-      <div class="page" style="max-width: 960px;">
+      <div class="page page-wide">
         {#if phase === 'error'}
           <div class="state" role="alert">
             <span class="t">状态加载失败</span>
@@ -268,22 +277,20 @@
             <button type="button" class="btn btn-secondary" onclick={() => void loadStatus()}>重试</button>
           </div>
         {:else}
-          <div class="skeleton" style="height: 76px; border-radius: 8px;" aria-busy="true"></div>
+          <div class="skeleton" style="height: 64px;" aria-busy="true"></div>
         {/if}
       </div>
     {:else}
-      <div class="page" style="max-width: 960px;">
+      <div class="page page-wide">
         {#if warnings.length > 0}
-          <section class="section" aria-label="警告">
-            <div>
-              {#each warnings as w (w.code)}
-                <div class="warn-row" role="alert">
-                  <span class="dot dot-warning"></span>
-                  <span class="t">{HEADLINE[w.code] ?? w.message}</span>
-                  {#if REMEDY[w.code]}<span class="d">{REMEDY[w.code]}</span>{/if}
-                </div>
-              {/each}
-            </div>
+          <section aria-label="警告">
+            {#each warnings as w (w.code)}
+              <div class="warn-row" role="alert">
+                <span class="dot dot-warning"></span>
+                <span class="t">{HEADLINE[w.code] ?? w.message}</span>
+                {#if REMEDY[w.code]}<span class="d">{REMEDY[w.code]}</span>{/if}
+              </div>
+            {/each}
           </section>
         {/if}
 
@@ -301,17 +308,34 @@
             <span class="k">回收站</span>
           </div>
           <div class="figure">
+            <span class="v">{formatInt(status.images.broken)}</span>
+            <span class="k">损坏</span>
+          </div>
+          <div class="figure">
             <span class="v">{formatBytes(status.database.bytes)}</span>
             <span class="k">数据库</span>
           </div>
-          <div class="figure">
-            <span class="v">{formatBytes(status.disk.freeBytes)}</span>
-            <span class="k">磁盘剩余</span>
-            <div class="meter" role="progressbar" aria-label="磁盘已用" aria-valuenow={usedShare} aria-valuemin={0} aria-valuemax={100}>
-              <i style="width: {usedShare}%;"></i>
-            </div>
-          </div>
         </div>
+
+        <section class="section">
+          <div class="disk-head">
+            <h2>磁盘</h2>
+            <span class="muted num">已用 {formatBytes(used)} / {formatBytes(status.disk.totalBytes)}</span>
+          </div>
+          <div class="stack-bar" role="img" aria-label={parts.map((p) => `${p.label} ${formatBytes(p.v)}`).join('，')}>
+            {#each parts as p (p.k)}
+              <i class="sw-{p.k}" style:width={p.k === 'free' || status.disk.totalBytes <= 0 ? undefined : `${(p.v / status.disk.totalBytes) * 100}%`}></i>
+            {/each}
+          </div>
+          <dl class="legend">
+            {#each parts as p (p.k)}
+              <div>
+                <dt><i class="sw-{p.k}"></i>{p.label}</dt>
+                <dd>{formatBytes(p.v)}</dd>
+              </div>
+            {/each}
+          </dl>
+        </section>
 
         <section class="section">
           <h2>维护</h2>

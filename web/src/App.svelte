@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import DropOverlay from './components/DropOverlay.svelte';
+  import Palette from './components/Palette.svelte';
   import Shell from './components/Shell.svelte';
   import Toasts from './components/Toasts.svelte';
   import { errorMessage } from './lib/api';
   import { refreshFacets } from './lib/facets.svelte';
   import { watchHealth } from './lib/health.svelte';
   import { isTypingTarget, modalOpen } from './lib/modal';
+  import { palette } from './lib/palette.svelte';
   import { openPicker, registerPicker } from './lib/picker';
   import { isKnownPath, isLibraryPath, navigate, router, safeNext } from './lib/router.svelte';
   import { loadSession, session } from './lib/session.svelte';
@@ -97,6 +99,14 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (view === 'app' && !e.defaultPrevented && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+      // The palette opens over the page, but not over a dialog or the viewer; it closes itself.
+      if (palette.open || !document.querySelector('.scrim, .viewer')) {
+        e.preventDefault();
+        palette.open = !palette.open;
+      }
+      return;
+    }
     if (view !== 'app' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTypingTarget(e.target) || modalOpen()) return;
     if (router.path !== '/' && !isLibraryPath(router.path)) return;
@@ -129,8 +139,9 @@
     {:else}
       <NotFound />
     {/if}
-    <DropOverlay />
   </Shell>
+  <DropOverlay />
+  {#if palette.open}<Palette />{/if}
   <input bind:this={picker} type="file" multiple hidden accept={acceptAttr()} onchange={onpicked} />
 {:else if view === 'docs'}
   <DocsApi />

@@ -1,16 +1,16 @@
 import type { Page } from '@playwright/test';
 import {
   checkPageHealth, createFolderApi, expect, finishUploads, libraryItem, login, samplePng, storedFolders,
-  storedImages, test, uniqueName, uploadRow,
+  storedImages, test, uniqueName, uploadRow, useListView,
 } from './harness/test-base.js';
 
 function tree(page: Page) {
-  return page.locator('.tree-pane, .popover');
+  return page.locator('.side .tree-body, .popover');
 }
 
 async function openTree(page: Page, mobile: boolean) {
   if (!mobile) {
-    await expect(page.locator('.tree-pane')).toBeVisible();
+    await expect(page.locator('.side .tree-body')).toBeVisible();
     return;
   }
   if (await page.locator('.popover .tree-head').isVisible().catch(() => false)) return;
@@ -162,6 +162,7 @@ test('moves folders only where the depth allows and keeps the address in step', 
 test('moves one image through the row menu and undoes it', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   test.skip(mobile, 'the row menu is hidden on phones');
+  await useListView(page);
   await login(page);
   const target = await createFolderApi(page, uniqueName('moves', testInfo));
   const name = uniqueName('move', testInfo) + '.png';
@@ -191,12 +192,12 @@ test('drags an image onto a folder node', async ({ page }, testInfo) => {
   await page.locator('input[type="file"]').setInputFiles({ name, mimeType: 'image/png', buffer: samplePng() });
   await finishUploads(page, [name]);
   await expect(libraryItem(page, name)).toBeVisible();
-  await expect(page.locator('.tree-pane .tn-main').filter({ hasText: target.name })).toBeVisible();
+  await expect(page.locator('.side .tn-main').filter({ hasText: target.name })).toBeVisible();
 
   // A single drag carries the image id to the tree node through the product's own drag payload.
   await page.evaluate(({ filename, folder }) => {
-    const row = [...document.querySelectorAll("table.table tbody tr")].find((tr) => tr.textContent?.includes(filename));
-    const node = [...document.querySelectorAll(".tree-pane .tn-main")].find((b) => b.textContent?.includes(folder));
+    const row = [...document.querySelectorAll("table.table tbody tr, .jgrid .jt")].find((tr) => tr.textContent?.includes(filename));
+    const node = [...document.querySelectorAll(".side .tn-main")].find((b) => b.textContent?.includes(folder));
     if (!row || !node) throw new Error("drag source or target missing");
     const dt = new DataTransfer();
     row.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: dt }));
@@ -216,6 +217,7 @@ test('drags an image onto a folder node', async ({ page }, testInfo) => {
 
 test('uploads into the current folder and finds it from the root with the folder column', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
+  await useListView(page);
   await login(page);
   const folder = await createFolderApi(page, uniqueName('up', testInfo));
   await page.goto(`/library/${folder.name}`);

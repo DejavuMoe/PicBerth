@@ -14,7 +14,7 @@
   }
 </script>
 
-<div class="code">
+<div class="codeblock">
   <pre>{text}</pre>
   <button type="button" class="btn btn-ghost btn-sm copy" onclick={() => void copy()}>{copied ? '已复制' : '复制'}</button>
 </div>

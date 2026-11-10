@@ -4,6 +4,7 @@
   import Modal from '../components/Modal.svelte';
   import Switch from '../components/Switch.svelte';
   import { api, errorMessage } from '../lib/api';
+  import { copyText } from '../lib/clipboard';
   import { FORMAT_NAMES } from '../lib/format';
   import { refreshHealth } from '../lib/health.svelte';
   import { phone } from '../lib/media.svelte';
@@ -24,6 +25,11 @@
     audit: string;
   }
   type NumberKey = 'maxMB' | 'retention' | 'audit';
+
+  async function copyAddress(value: string) {
+    const r = await copyText(value);
+    toast(r === 'copied' ? '已复制' : '当前连接不安全，无法写入剪贴板');
+  }
 
   const trimNum = (n: number) => String(Math.round(n * 1e6) / 1e6);
   function toForm(s: Settings): Form {
@@ -173,6 +179,17 @@
   {#if errors[key]}<span class="field-error">{errors[key]}</span>{/if}
 {/snippet}
 
+{#snippet address(value: string)}
+  {#if value}
+    <button type="button" class="copy-inline" title="复制" aria-label={`复制 ${value}`} onclick={() => void copyAddress(value)}>
+      <span class="mono ellipsis" style="font-size: var(--fs-m);">{value}</span>
+      <Icon name="copy" size="s" />
+    </button>
+  {:else}
+    <span class="mono" style="font-size: var(--fs-m);">—</span>
+  {/if}
+{/snippet}
+
 <div class="panel-main">
   <div class="head">
     <div class="head-title">
@@ -257,13 +274,13 @@
             <div class="form-row">
               <span class="k">公开地址</span>
               <div class="ctl">
-                <span class="mono ellipsis" style="font-size: var(--fs-m);">{baseline.publicUrl || '—'}</span>
+                {@render address(baseline.publicUrl)}
               </div>
             </div>
             <div class="form-row">
               <span class="k">图片地址</span>
               <div class="ctl">
-                <span class="mono ellipsis" style="font-size: var(--fs-m);">{baseline.imageUrl || '—'}</span>
+                {@render address(baseline.imageUrl)}
               </div>
             </div>
           </div>

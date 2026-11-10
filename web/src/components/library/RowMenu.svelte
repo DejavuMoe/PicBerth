@@ -44,7 +44,6 @@
       <MenuItem icon="left" onclick={() => (view = 'main')}>移动到</MenuItem>
       <div class="menu-sep"></div>
       <FolderTargets
-        {lib}
         currentId={image.folderId ?? null}
         onpick={(id) => void lib.moveImages([image.id], id)}
         {close}

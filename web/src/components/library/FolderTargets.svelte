@@ -1,11 +1,10 @@
 <script lang="ts">
   import { ROOT_LABEL } from '../../lib/folders';
-  import type { Library } from '../../lib/library.svelte';
+  import { tree } from '../../lib/tree.svelte';
   import type { Folder } from '../../lib/types';
   import MenuItem from '../MenuItem.svelte';
 
   interface Props {
-    lib: Library;
     /** Omitted or null ticks the root; null means the root. */
     currentId?: string | null;
     /** Folders that may not be picked (the folder itself and its subtree). */
@@ -15,7 +14,7 @@
     onpick: (id: string | null) => void;
     close: () => void;
   }
-  let { lib, currentId, exclude, blocked, onpick, close }: Props = $props();
+  let { currentId, exclude, blocked, onpick, close }: Props = $props();
 
   interface Row {
     folder: Folder;
@@ -24,7 +23,7 @@
   const rows = $derived.by(() => {
     const out: Row[] = [];
     const walk = (parent: string | null, level: number) => {
-      for (const f of lib.kids(parent)) {
+      for (const f of tree.kids(parent)) {
         if (exclude?.has(f.id)) continue;
         out.push({ folder: f, level });
         walk(f.id, level + 1);
