@@ -4,7 +4,7 @@
 
 <div class="panel-main">
   <div class="nf">
-    <span class="code">页面不存在</span>
+    <span class="nf-title">页面不存在</span>
     <span class="muted mono">{location.pathname + location.search}</span>
     <a class="btn btn-secondary" href="/library">返回图片</a>
   </div>

@@ -4,6 +4,7 @@
   import { daysLeft, formatName, sourceLabel, thumbSrc } from '../../lib/image';
   import { copyLink, copyValue, downloadImage, type Library } from '../../lib/library.svelte';
   import type { Image, LinkFormat } from '../../lib/types';
+  import { withTransition } from '../../lib/transition';
   import { LINK_FORMATS } from '../../lib/upload.svelte';
   import Icon from '../Icon.svelte';
   import Menu from '../Menu.svelte';
@@ -135,13 +136,19 @@
   </div>
 
   <div class="detail-body">
-    <div class="preview">
+    <button
+      type="button"
+      class="preview"
+      aria-label="查看大图"
+      title="查看大图"
+      onclick={() => withTransition(() => (lib.viewing = true))}
+    >
       {#if image.broken}
         <Icon name="image" />
       {:else}
-        <img src={thumbSrc(image)} alt={image.filename} />
+        <img src={thumbSrc(image)} alt="" style:view-transition-name={lib.viewing ? 'none' : 'pb-zoom'} />
       {/if}
-    </div>
+    </button>
 
     <div class="title-edit">
       {#if renaming}
@@ -191,7 +198,7 @@
           >
             <span class="k">{f.label}</span>
             <span class="v mono ellipsis">{image.links[f.value]}</span>
-            <Icon name={copied === f.value ? 'check' : 'copy'} size="s" />
+            {#key copied === f.value}<Icon name={copied === f.value ? 'check' : 'copy'} size="s" />{/key}
           </button>
         {/each}
       </div>
@@ -202,7 +209,7 @@
       {#if trash}
         <dd class="ellipsis">{lib.label(image.folderId)}</dd>
       {:else}
-        <dd>
+        <dd class="has-menu">
           <Menu align="left" label="文件夹">
             {#snippet trigger(open, toggle)}
               <button
@@ -219,7 +226,6 @@
             {/snippet}
             {#snippet children(close)}
               <FolderTargets
-                {lib}
                 currentId={image.folderId ?? null}
                 onpick={(id) => void lib.moveImages([image.id], id)}
                 {close}
@@ -228,11 +234,6 @@
           </Menu>
         </dd>
       {/if}
-    </dl>
-
-    <div class="props-divide"></div>
-
-    <dl class="props">
       <dt>来源</dt>
       <dd class="ellipsis">{sourceLabel(image.source)}</dd>
       <dt>上传时间</dt>

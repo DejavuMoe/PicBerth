@@ -2,28 +2,15 @@
 // the current folder comes from the path.
 
 import { SvelteSet } from 'svelte/reactivity';
-import { api, ApiError, errorMessage, isAbort, rawUrl } from './api';
+import { api, errorMessage, isAbort, rawUrl } from './api';
 import { copyText } from './clipboard';
 import { facetsFor, refreshFacets } from './facets.svelte';
 import { startOfDay } from './format';
-import {
-  MAX_DEPTH,
-  ROOT_LABEL,
-  childrenOf,
-  folderById,
-  folderChain,
-  folderDepth,
-  folderLabel,
-  folderNameError,
-  folderNames,
-  fitsUnder,
-  isInside,
-  resolvePath,
-  subtreeCount,
-} from './folders';
+import { folderById, resolvePath, subtreeCount } from './folders';
 import { refreshHealth } from './health.svelte';
-import { libraryPath, librarySegments, navigate, router, updateQuery } from './router.svelte';
+import { librarySegments, router, updateQuery } from './router.svelte';
 import { toast } from './toast.svelte';
+import { tree } from './tree.svelte';
 import type {
   BatchAction,
   Folder,
@@ -91,26 +78,17 @@ function dateRange(key: DateKey, now = Date.now()): { since?: string; until?: st
   return { until: new Date(now - 30 * DAY).toISOString() };
 }
 
-/** Map a folder request failure onto the inline message the tree shows. */
-function folderError(e: unknown): string {
-  if (e instanceof ApiError) {
-    if (e.code === 'folder-exists') return '已有同名文件夹';
-    if (e.code === 'folder-depth') return `最多 ${MAX_DEPTH} 层`;
-    if (e.code === 'folder-not-empty') return '文件夹不为空';
-  }
-  return errorMessage(e);
-}
-
 /** The drag payload images use when dropped on a folder node or a breadcrumb. */
 export const IMAGE_DRAG_TYPE = 'application/x-picberth-images';
 
 const VIEW_KEY = 'picberth.view';
-export type ViewMode = 'table' | 'grid';
+export type ViewMode = 'grid' | 'list';
+/** Grid unless the list was chosen; the old value `table` counts as unset. */
 function loadView(): ViewMode {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'table';
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
   } catch {
-    return 'table';
+    return 'grid';
   }
 }
 
@@ -167,22 +145,20 @@ export class Library {
   errorKind = $state<'images' | 'folders'>('images');
   retention = $state<number | null>(null);
 
-  folders = $state<Folder[]>([]);
-  foldersPhase = $state<'loading' | 'ready' | 'error'>('loading');
-  foldersError = $state('');
-
   view = $state<ViewMode>(loadView());
   sel = new SvelteSet<string>();
   selectMode = $state(false);
-  activeId = $state<string | null>(null);
+  #activeId = $state<string | null>(null);
   /** An image to open once the list for its folder has loaded (e.g. 查看 on an upload elsewhere). */
   pendingOpen = $state<string | null>(null);
   purgeIds = $state<string[] | null>(null);
+  /** The viewer (the image at window size) is open on the active image. */
+  viewing = $state(false);
 
   /** Decoded folder names from the path (empty at the root). */
   pathNames = $derived(librarySegments(router.path));
   /** The folder id for the path: null at the root, undefined when no such folder exists. */
-  resolved = $derived(this.mode === 'library' && this.foldersPhase === 'ready' ? resolvePath(this.folders, this.pathNames) : null);
+  resolved = $derived(this.mode === 'library' && tree.phase === 'ready' ? resolvePath(tree.folders, this.pathNames) : null);
   missing = $derived(this.mode === 'library' && this.resolved === undefined);
   folderId = $derived(this.resolved ?? null);
 
@@ -198,6 +174,16 @@ export class Library {
   #anchor: string | null = null;
   #suppress = false;
   alive = true;
+
+  /** The image whose detail is open. Without one there is no viewer either. */
+  get activeId(): string | null {
+    return this.#activeId;
+  }
+
+  set activeId(id: string | null) {
+    this.#activeId = id;
+    if (id === null) this.viewing = false;
+  }
 
   constructor(mode: 'library' | 'trash') {
     this.mode = mode;
@@ -218,50 +204,44 @@ export class Library {
     this.#ctrl?.abort();
   }
 
-  // ---- folders -----------------------------------------------------------------------------------
+  // ---- folders (shared with the sidebar: see lib/tree.svelte.ts) -----------------------------------
 
-  async loadFolders(quiet = false) {
-    if (!quiet) this.foldersPhase = 'loading';
-    try {
-      const page = await api.listFolders();
-      this.folders = page.items;
-      this.foldersPhase = 'ready';
-      this.foldersError = '';
-    } catch (e) {
-      this.foldersError = errorMessage(e);
-      if (!quiet || this.foldersPhase !== 'ready') this.foldersPhase = 'error';
-    }
+  get folders(): Folder[] {
+    return tree.folders;
+  }
+
+  get foldersPhase(): 'loading' | 'ready' | 'error' {
+    return tree.phase;
+  }
+
+  get foldersError(): string {
+    return tree.error;
+  }
+
+  loadFolders(): Promise<void> {
+    return tree.load();
   }
 
   refreshFolders(): Promise<void> {
-    return this.loadFolders(true);
+    return tree.refresh();
   }
 
-  /** Direct image counts for the tree, including the root's own count. */
+  /** Direct image counts per folder, including the root's own count. */
   get counts(): Map<string | null, number> {
-    const m = new Map<string | null, number>();
-    for (const f of this.folders) m.set(f.id, f.imageCount);
-    m.set(null, this.rootCount);
-    return m;
-  }
-
-  get rootCount(): number {
-    const total = facetsFor('active')?.total;
-    if (total === undefined) return 0;
-    return Math.max(0, total - this.folders.reduce((n, f) => n + f.imageCount, 0));
+    return tree.counts;
   }
 
   get currentCount(): number {
     if (this.mode === 'trash') return facetsFor('trashed')?.total ?? this.items.length;
-    if (this.folderId === null) return this.rootCount;
-    return folderById(this.folders, this.folderId)?.imageCount ?? 0;
+    if (this.folderId === null) return tree.rootCount;
+    return folderById(tree.folders, this.folderId)?.imageCount ?? 0;
   }
 
   /** The unfiltered size of what the current folder covers (for `n / total`). */
   get scopeTotal(): number {
     if (this.mode === 'trash') return facetsFor('trashed')?.total ?? 0;
     if (this.folderId === null) return facetsFor('active')?.total ?? 0;
-    return subtreeCount(this.folders, this.folderId);
+    return subtreeCount(tree.folders, this.folderId);
   }
 
   get countText(): string {
@@ -273,133 +253,25 @@ export class Library {
   }
 
   label(id: string | null): string {
-    return folderLabel(this.folders, id);
-  }
-
-  names(id: string | null): string[] {
-    return folderNames(this.folders, id);
-  }
-
-  chain(id: string | null): Folder[] {
-    return folderChain(this.folders, id);
+    return tree.label(id);
   }
 
   kids(id: string | null): Folder[] {
-    return childrenOf(this.folders, id);
+    return tree.kids(id);
+  }
+
+  chain(id: string | null): Folder[] {
+    return tree.chain(id);
   }
 
   openFolder(id: string | null) {
-    // Filters and sort live in the query and stay with the folder being opened.
-    void navigate(libraryPath(folderNames(this.folders, id)) + router.search);
+    tree.openFolder(id);
   }
 
-  get canCreateInCurrent(): boolean {
-    return folderDepth(this.folders, this.folderId) < MAX_DEPTH;
-  }
-
-  async createFolder(parentId: string | null, name: string): Promise<string> {
-    const e = folderNameError(this.folders, parentId, name);
-    if (e) return e;
-    if (folderDepth(this.folders, parentId) >= MAX_DEPTH) return `最多 ${MAX_DEPTH} 层`;
-    try {
-      await api.createFolder({ name: name.trim(), parentId });
-      await this.loadFolders(true);
-      toast('已创建文件夹');
-      return '';
-    } catch (err) {
-      return folderError(err);
-    }
-  }
-
-  async renameFolder(id: string, name: string): Promise<string> {
-    const f = folderById(this.folders, id);
-    if (!f) return '文件夹不存在';
-    const e = folderNameError(this.folders, f.parentId ?? null, name, id);
-    if (e) return e;
-    const here = isInside(this.folders, id, this.folderId);
-    const currentId = this.folderId;
-    const search = router.search;
-    try {
-      await api.patchFolder(id, { name: name.trim() });
-      await this.loadFolders(true);
-      if (here) void navigate(libraryPath(folderNames(this.folders, currentId)) + search, { replace: true });
-      toast('已重命名');
-      return '';
-    } catch (err) {
-      return folderError(err);
-    }
-  }
-
-  async moveFolder(id: string, to: string | null) {
-    const f = folderById(this.folders, id);
-    if (!f) return;
-    if (f.parentId === to) return;
-    if (folderNameError(this.folders, to, f.name, id)) return toast('目标位置已有同名文件夹');
-    if (!fitsUnder(this.folders, id, to)) return toast(`最多 ${MAX_DEPTH} 层`);
-    const before = f.parentId ?? null;
-    const here = isInside(this.folders, id, this.folderId);
-    const currentId = this.folderId;
-    const search = router.search;
-    const where = folderLabel(this.folders, to);
-    try {
-      await api.patchFolder(id, { parentId: to });
-      await this.loadFolders(true);
-      if (here) void navigate(libraryPath(folderNames(this.folders, currentId)) + search, { replace: true });
-      toast(`已将 ${f.name} 移到 ${where}`, {
-        action: {
-          label: '撤销',
-          run: () => {
-            void (async () => {
-              try {
-                await api.patchFolder(id, { parentId: before });
-                await this.loadFolders(true);
-                if (here) void navigate(libraryPath(folderNames(this.folders, currentId)) + router.search, { replace: true });
-              } catch (e) {
-                toast(folderError(e));
-              }
-            })();
-          },
-        },
-      });
-    } catch (e) {
-      toast(folderError(e));
-    }
-  }
-
-  async deleteFolder(id: string) {
-    const f = folderById(this.folders, id);
-    if (!f) return;
-    const nonEmpty = childrenOf(this.folders, id).length > 0 || (this.counts.get(id) ?? 0) > 0;
-    if (nonEmpty) return toast('文件夹不为空');
-    const parentId = f.parentId ?? null;
-    const name = f.name;
-    const leaving = this.folderId === id;
-    const search = router.search;
-    try {
-      await api.deleteFolder(id);
-      await this.loadFolders(true);
-      if (leaving) void navigate(libraryPath(folderNames(this.folders, parentId)) + search, { replace: true });
-      toast('已删除文件夹', {
-        action: {
-          label: '撤销',
-          run: () => {
-            void (async () => {
-              try {
-                await api.createFolder({ name, parentId });
-                await this.loadFolders(true);
-                if (leaving) {
-                  void navigate(libraryPath([...folderNames(this.folders, parentId), name]) + router.search, { replace: true });
-                }
-              } catch (e) {
-                toast(folderError(e));
-              }
-            })();
-          },
-        },
-      });
-    } catch (e) {
-      toast(folderError(e));
-    }
+  /** The direct subfolders shown above the images (grid view): not while searching, filtering or in the trash. */
+  get subfolders(): Folder[] {
+    if (this.mode !== 'library' || this.filtered || tree.phase !== 'ready') return [];
+    return tree.kids(this.folderId);
   }
 
   // ---- query -------------------------------------------------------------------------------------
@@ -605,6 +477,13 @@ export class Library {
 
   close() {
     this.activeId = null;
+  }
+
+  /** Double-click: the detail and the viewer open together. */
+  openViewer(id: string) {
+    if (this.selecting) return;
+    this.activeId = id;
+    this.viewing = true;
   }
 
   get prev(): Image | null {

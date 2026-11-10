@@ -11,34 +11,19 @@
   let busy = $state(false);
   let formError = $state('');
 
-  // Setup codes are 12 Crockford base32 characters (no I, L, O, U), shown as XXXX-XXXX-XXXX.
-  const INVALID = /[^0-9A-HJKMNP-TV-Z]/g;
+  // Setup codes are 12 Crockford base32 characters (no I, L, O, U). One real input holds them; twelve cells in
+  // three groups of four show them.
   const CODE_LEN = 12;
+  const INVALID = /[^0-9A-HJKMNP-TV-Z]/g;
+  const clean = (raw: string) => raw.toUpperCase().replace(INVALID, '').slice(0, CODE_LEN);
 
-  function formatCode(raw: string): string {
-    const chars = raw.toUpperCase().replace(INVALID, '').slice(0, CODE_LEN);
-    return chars.match(/.{1,4}/g)?.join('-') ?? '';
-  }
-
-  // Upper-case, drop invalid characters and keep the dashes in place while typing or pasting,
-  // without letting the caret jump to the end.
   function oncodeinput(e: Event & { currentTarget: HTMLInputElement }) {
     const el = e.currentTarget;
-    const caret = el.selectionStart ?? el.value.length;
-    const before = el.value.slice(0, caret).toUpperCase().replace(INVALID, '').length;
-    const next = formatCode(el.value);
-    code = next;
-    if (el.value !== next) el.value = next;
-    let pos = 0;
-    let seen = 0;
-    while (pos < next.length && seen < Math.min(before, CODE_LEN)) {
-      if (next[pos] !== '-') seen++;
-      pos++;
-    }
-    el.setSelectionRange(pos, pos);
+    code = clean(el.value);
+    if (el.value !== code) el.value = code;
   }
 
-  const codeComplete = $derived(code.replace(/-/g, '').length === CODE_LEN);
+  const codeComplete = $derived(code.length === CODE_LEN);
 
   const errors = $derived({
     code: !code.trim()
@@ -59,7 +44,7 @@
     if (!valid || busy) return;
     busy = true;
     try {
-      await api.setup(code.trim().toUpperCase(), username.trim(), password);
+      await api.setup(code.toUpperCase(), username.trim(), password);
       await refreshSession();
     } catch (err) {
       if (err instanceof ApiError && err.code === 'setup-done') {
@@ -86,20 +71,28 @@
     <form class="auth-form" onsubmit={submit} novalidate>
       <div class="field">
         <label for="setup-code">初始化代码</label>
-        <!-- svelte-ignore a11y_autofocus -->
-        <input
-          id="setup-code"
-          class="input mono"
-          value={code}
-          oninput={oncodeinput}
-          autocomplete="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          maxlength={14}
-          placeholder="XXXX-XXXX-XXXX"
-          aria-invalid={submitted && errors.code ? 'true' : undefined}
-          autofocus
-        />
+        <div class="code-field" data-invalid={submitted && errors.code ? 'true' : undefined}>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            id="setup-code"
+            value={code}
+            oninput={oncodeinput}
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            maxlength={CODE_LEN}
+            aria-invalid={submitted && errors.code ? 'true' : undefined}
+            autofocus
+          />
+          {#each [0, 1, 2] as g (g)}
+            <div class="code-group" aria-hidden="true">
+              {#each [0, 1, 2, 3] as c (c)}
+                {@const i = g * 4 + c}
+                <span class="code-cell" class:is-next={i === Math.min(code.length, CODE_LEN - 1)}>{code[i] ?? ''}</span>
+              {/each}
+            </div>
+          {/each}
+        </div>
         {#if submitted && errors.code}
           <span class="field-error">{errors.code}</span>
         {:else}

@@ -53,7 +53,7 @@
     {/snippet}
     {#snippet children(close)}
       <div class="menu-group">移动到</div>
-      <FolderTargets {lib} currentId={commonFolder} onpick={(id) => void lib.moveImages(ids, id)} {close} />
+      <FolderTargets currentId={commonFolder} onpick={(id) => void lib.moveImages(ids, id)} {close} />
     {/snippet}
   </Menu>
   {#if compact}<span class="grow"></span>{/if}

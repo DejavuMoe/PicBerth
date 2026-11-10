@@ -81,6 +81,7 @@
         data-id={im.id}
         draggable={!trash}
         onclick={(e) => lib.clickItem(im.id, e)}
+        ondblclick={() => lib.openViewer(im.id)}
         onkeydown={(e) => rowKey(e, im.id)}
         ondragstart={(e) => lib.dragImages(im, e)}
         use:longpress={() => {
@@ -120,7 +121,7 @@
         <td class="col-act">
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="row-actions" onclick={(e) => e.stopPropagation()}>
+          <div class="row-actions" onclick={(e) => e.stopPropagation()} ondblclick={(e) => e.stopPropagation()}>
             {#if trash}
               <button
                 type="button"

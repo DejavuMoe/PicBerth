@@ -8,9 +8,9 @@
   import Menu from '../Menu.svelte';
   import Breadcrumb from './Breadcrumb.svelte';
   import BulkActions from './BulkActions.svelte';
-  import DisplayMenu from './DisplayMenu.svelte';
   import FilterPopover from './FilterPopover.svelte';
   import FolderPanel from './FolderPanel.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   interface Props {
     lib: Library;
@@ -89,7 +89,7 @@
       </button>
     {/snippet}
     {#snippet children(close)}
-      <FolderPanel {lib} currentId={lib.folderId} counts={lib.counts} compact {close} />
+      <FolderPanel compact {close} />
     {/snippet}
   </Menu>
 {/snippet}
@@ -114,7 +114,7 @@
     <button type="button" class="btn btn-ghost" onclick={cancelSearch}>取消</button>
   </div>
 {:else if lib.selecting}
-  <div class="head" style:padding-left={phone.matches ? '8px' : '12px'}>
+  <div class="head is-selecting">
     <div class="bulk">
       <Check on={allOn ? true : someOn ? 'mixed' : false} onchange={toggleAll} label="全选" />
       <span class="n">已选 {lib.sel.size} 张</span>
@@ -166,7 +166,7 @@
       </div>
     {/if}
     <FilterPopover {lib} />
-    <DisplayMenu {lib} />
+    <ViewControls {lib} />
     {#if !trash}
       <button
         type="button"
