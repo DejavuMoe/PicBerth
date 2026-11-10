@@ -1,6 +1,6 @@
 # Revision 7 — one sidebar, one list, viewer, command palette
 
-Status: **approved** on 2026-11-10 by the owner, including the grid as the default view. `docs/ui/capabilities.md` still describes
+Status: **approved** on 2026-11-10 by the owner, including the grid as the default view; **implemented** in `web/` the same day. `docs/ui/capabilities.md` still describes
 production as it is; this file describes what the prototype in `designs/picberth/` proposes. The previous
 approved prototype is commit `c3bb4d0`.
 
