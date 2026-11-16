@@ -17,11 +17,11 @@
     "svelte": "5.57.3"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/node": "24.19.2",
     "svelte-check": "4.7.8",
     "typescript": "6.0.3",
-    "vite": "8.3.5"
+    "vite": "8.3.6"
   }
 }
