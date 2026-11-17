@@ -261,3 +261,60 @@ func TestBackupRotationKeepsNewestFive(t *testing.T) {
 		t.Fatalf("backups = %d, other files = %d", backups, files)
 	}
 }
+
+func TestThumbnailIndexMigrationPreservesPendingImages(t *testing.T) {
+	ctx := context.Background()
+	ms, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(t.TempDir(), "picberth.db")
+	old, err := openWith(ctx, dbPath, ms[:3])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer old.Close()
+	uid, _, err := old.CreateFirstUser(ctx, "admin", "fixture", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const healthy, broken, settled = "aaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccc"
+	for _, id := range []string{healthy, broken, settled} {
+		if _, err := old.InsertImage(ctx, sampleImage(id, uid, id, 1, 10), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := int64(2)
+	if _, err := old.SetBroken(ctx, broken, &at); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.SetThumb(ctx, settled, "png"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if db.PreMigrationBackup == "" {
+		t.Fatal("migration did not retain the schema 3 database")
+	}
+	ids, err := db.PendingThumbs(ctx, "", 200)
+	if err != nil || len(ids) != 1 || ids[0] != healthy {
+		t.Fatalf("pending after migration: %v, %v", ids, err)
+	}
+	im, err := db.GetImage(ctx, settled)
+	if err != nil || im.Thumb != "png" {
+		t.Fatalf("settled thumbnail changed: %+v, %v", im, err)
+	}
+	if _, err := db.SetBroken(ctx, broken, nil); err != nil {
+		t.Fatal(err)
+	}
+	ids, err = db.PendingThumbs(ctx, healthy, 200)
+	if err != nil || len(ids) != 1 || ids[0] != broken {
+		t.Fatalf("repaired image not reselected after cursor: %v, %v", ids, err)
+	}
+}
