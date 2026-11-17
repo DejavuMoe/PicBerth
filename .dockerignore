@@ -1,4 +1,7 @@
 .git
+.github
+.agents
+designs
 dist
 .devdata
 .qa
