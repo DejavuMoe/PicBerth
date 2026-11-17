@@ -14,6 +14,7 @@ runs:
   using: composite
   steps:
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: inputs.push != 'true'
       with:
         path: ${{ runner.temp }}/buildkit-cache
         key: buildkit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Dockerfile', 'mise.lock') }}-${{ github.sha }}
@@ -33,7 +34,7 @@ runs:
         esac
         mkdir -p "$RUNNER_TEMP/buildkit-cache" "$HOME/.docker"
         args=()
-        if [[ -f "$RUNNER_TEMP/buildkit-cache/index.json" ]]; then
+        if [[ "$PUSH" != true && -f "$RUNNER_TEMP/buildkit-cache/index.json" ]]; then
           args+=(--import-cache type=local,src=/cache)
         fi
         image="ghcr.io/dejavumoe/picberth:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$ARCH"

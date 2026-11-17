@@ -1,8 +1,8 @@
 # Toolchain for PicBerth. `mise install` sets up everything needed to build and test.
-# Floors come from security advisories (design baseline §9.6): Go >= 1.26.10 / 1.27.3.
+# Floors include GO-2026-6859: Go >= 1.26.11 / 1.27.4.
 [tools]
-go = "1.27.3"
-node = "24.22.2"
+go = "1.27.4"
+node = "24.22.3"
 pnpm = "12.10.1"
 
 [env]

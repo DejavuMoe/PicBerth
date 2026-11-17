@@ -12,6 +12,7 @@ gh workflow run release.yml --ref master -f version=v0.0.1
 
 演练执行完整 CI，构建四个平台的压缩包及双架构容器。压缩包保留为 Actions artifacts；不会创建标签、发布 Release、推送镜像或上传构建证明。
 检查四个 `binary-*` artifact 内的程序、MIT 许可证和校验和，核对程序的版本、提交 SHA，以及双架构镜像构建结果。
+演练和正式发布都要求目标提交已包含在远程 `master` 中；非默认分支上的新提交不能直接进入发布流水线。
 
 ## 正式发布
 
@@ -32,7 +33,8 @@ CI 的 `ci-ok` 继续作为默认分支门禁。普通分支通过 PR 验证，`
 
 CI Go 测试与镜像分别在 `ubuntu-24.04`（AMD64）和 `ubuntu-24.04-arm`（ARM64）运行。
 Release 附件使用与目标 CPU 相同的 Linux runner；Windows AMD64 和 macOS ARM64 仍是操作系统交叉编译，不代表在 Windows/macOS 上执行过测试。
-镜像使用独立 BuildKit，不使用 Buildx 或 QEMU。按架构缓存中间层，每次保存只保留本次构建可达的缓存。
+镜像使用独立 BuildKit，不使用 Buildx 或 QEMU。普通 CI 和演练按架构缓存中间层，每次保存只保留本次构建可达的缓存；正式镜像不导入这些缓存。
+发布附件不恢复 mise、pnpm、Go 模块和编译缓存，执行 `go mod verify` 并通过 `go build -a` 重新编译；普通 CI 保留缓存并验证 Go 模块。
 两个架构先推送带 run ID、attempt 和架构的暂存标签，附件与镜像全部成功后才合并正式标签，保留 SBOM/provenance。
 演练输出 OCI 归档到 runner 临时目录，不推送仓库。原生 runner 的实际排队时间和冷/热缓存耗时需通过 Actions 演练测量。
 
