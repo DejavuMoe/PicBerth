@@ -201,14 +201,14 @@ func (db *DB) ExpiredTrash(ctx context.Context, cutoff int64, limit int) ([]stri
 	return db.queryIDs(ctx, `SELECT id FROM images WHERE state = 'trashed' AND trashed_at <= ? ORDER BY trashed_at, id LIMIT ?`, cutoff, limit)
 }
 
-// PendingThumbs returns active images that have not had a thumbnail attempt yet.
-func (db *DB) PendingThumbs(ctx context.Context, limit int) ([]string, error) {
-	return db.queryIDs(ctx, `SELECT id FROM images WHERE state = 'active' AND thumb = '' ORDER BY created_at, id LIMIT ?`, limit)
+// PendingThumbs pages through healthy active images that have not had a thumbnail attempt yet.
+func (db *DB) PendingThumbs(ctx context.Context, after string, limit int) ([]string, error) {
+	return db.queryIDs(ctx, `SELECT id FROM images WHERE state = 'active' AND broken_at IS NULL AND thumb = '' AND id > ? ORDER BY id LIMIT ?`, after, limit)
 }
 
-// ImageIDsAfter pages through the ids of active and trashed images in id order.
+// ImageIDsAfter pages through image ids, including tombstones whose files may need cleanup.
 func (db *DB) ImageIDsAfter(ctx context.Context, after string, limit int) ([]string, error) {
-	return db.queryIDs(ctx, `SELECT id FROM images WHERE state IN ('active', 'trashed') AND id > ? ORDER BY id LIMIT ?`, after, limit)
+	return db.queryIDs(ctx, `SELECT id FROM images WHERE id > ? ORDER BY id LIMIT ?`, after, limit)
 }
 
 func (db *DB) queryIDs(ctx context.Context, q string, args ...any) ([]string, error) {

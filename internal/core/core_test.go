@@ -37,8 +37,11 @@ func assertInvariants(t *testing.T, e *env) {
 		}
 		for _, id := range batch {
 			im, _ := e.db.GetImage(ctx, id)
-			live[im.ObjectKey] = im
 			after = id
+			if im.State == meta.StatePurged {
+				continue
+			}
+			live[im.ObjectKey] = im
 			area := areaFor(im.State)
 			f, err := e.svc.blobs.Open(area, im.ObjectKey)
 			if err != nil {
@@ -604,6 +607,12 @@ func TestSetupLoginSessions(t *testing.T) {
 	wantCode(t, err, CodeValidation)
 	_, err = svc.Setup(ctx, "1.1.1.1", code, "admin", "short")
 	wantCode(t, err, CodeValidation)
+	for i := 0; i < 25; i++ {
+		_, err := svc.Setup(ctx, "2.2.2.2", "AAAA-AAAA-AAAA", "admin", "correct horse battery")
+		if err == nil {
+			t.Fatal("invalid setup code accepted")
+		}
+	}
 	sess, err := svc.Setup(ctx, "1.1.1.1", strings.ToLower(code), "admin", "correct horse battery")
 	if err != nil || sess.ID == "" {
 		t.Fatalf("setup: %v", err)

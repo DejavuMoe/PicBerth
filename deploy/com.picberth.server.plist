@@ -5,6 +5,8 @@
     install -m 0644 com.picberth.server.plist /Library/LaunchDaemons/
     launchctl bootstrap system /Library/LaunchDaemons/com.picberth.server.plist
   The _picberth service user and /usr/local/var/picberth must exist beforehand.
+  Create the log before bootstrap; it contains the one-time administrator setup code:
+    install -o _picberth -g wheel -m 0600 /dev/null /usr/local/var/log/picberth.log
 -->
 <plist version="1.0">
 <dict>

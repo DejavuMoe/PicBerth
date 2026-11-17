@@ -93,11 +93,11 @@ func RegisterFlags(fs *flag.FlagSet) *Flags {
 	return f
 }
 
-// Env abstracts os.Getenv / os.ReadFile so tests need no real environment.
+// Env abstracts os.LookupEnv / os.ReadFile so tests need no real environment.
 type Env struct {
-	Getenv   func(string) string
-	ReadFile func(string) ([]byte, error)
-	GOOS     string
+	LookupEnv func(string) (string, bool)
+	ReadFile  func(string) ([]byte, error)
+	GOOS      string
 }
 
 // Resolve computes the final Config after fs.Parse has run.
@@ -118,14 +118,14 @@ func (f *Flags) Resolve(env Env) (*Config, error) {
 
 // lookup builds the key → value resolver (flags > environment > config file) and returns the config file path.
 func lookup(flags map[string]string, env Env) (val func(string) string, cfgPath string, err error) {
-	get := func(key string) string {
+	get := func(key string) (string, bool) {
 		if v, ok := flags[key]; ok {
-			return v
+			return v, true
 		}
-		return env.Getenv(key)
+		return env.LookupEnv(key)
 	}
 	fileVals := map[string]string{}
-	cfgPath = get(KeyConfig)
+	cfgPath, _ = get(KeyConfig)
 	if cfgPath != "" {
 		if env.ReadFile == nil {
 			return nil, "", errors.New("config: no file reader available")
@@ -139,7 +139,7 @@ func lookup(flags map[string]string, env Env) (val func(string) string, cfgPath 
 		}
 	}
 	return func(key string) string {
-		if v := get(key); v != "" {
+		if v, ok := get(key); ok {
 			return v
 		}
 		return fileVals[key]
@@ -176,7 +176,7 @@ func Resolve(flags map[string]string, env Env) (*Config, error) {
 	dd := val(KeyDataDir)
 	if dd == "" {
 		var err error
-		if dd, err = DefaultDataDir(env.GOOS, env.Getenv); err != nil {
+		if dd, err = DefaultDataDir(env.GOOS, func(key string) string { v, _ := env.LookupEnv(key); return v }); err != nil {
 			return nil, err
 		}
 	}
