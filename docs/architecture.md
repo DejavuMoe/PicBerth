@@ -118,7 +118,9 @@ The database is the source of truth for *where a file must be*: `active` → `ob
 
 Check (quick): for each active/trashed record, stat the expected path; if missing but present in the other area,
 move it (`pending-move`, repaired); if missing in both → set `broken_at`; size mismatch → `broken_at`;
-remove files left in `trash/` for purged records; delete `tmp/` files older than the maximum upload duration.
+also page through purged records and remove leftovers in `objects/`, `trash/` and `cache/thumbs/`;
+delete `tmp/` files older than the maximum upload duration. File walks consume directory entries in batches
+and process each file immediately; only the issue report grows with the number of problems.
 Check (full): quick + re-hash each file (`hash-mismatch` → broken) + walk `objects/` and `trash/` for files
 with no active/trashed record → move to `quarantine/` (`orphan-file`). Only a successful full check of an image
 clears its `broken_at` flag: restoring a file or passing a quick check alone does not prove its bytes are intact.
@@ -126,7 +128,8 @@ clears its `broken_at` flag: restoring a file or passing a quick check alone doe
 Background jobs (in-process tickers): quick check 30 s after start and every 24 h; purge expired trash hourly;
 delete expired sessions hourly; prune the audit log hourly in batches of 1000 by `auditRetentionDays`
 (2 min after start, no audit row, log only); thumbnail worker (concurrency 1) fed by upload events and a
-startup backfill.
+startup backfill. Thumbnail backfill pages by image ID, skips known broken records, and continues beyond
+unreadable records so a failed page cannot block later images.
 
 ## 5. Snapshot / restore (§12.2–12.3)
 

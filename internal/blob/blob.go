@@ -5,6 +5,7 @@ package blob
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -229,25 +230,46 @@ type File struct {
 
 // Walk visits every non-directory below an area.
 func (s *Store) Walk(a Area, fn func(File) error) error {
-	return fs.WalkDir(s.root.FS(), string(a), func(p string, d fs.DirEntry, err error) error {
+	var walk func(string) error
+	walk = func(dir string) error {
+		d, err := s.root.Open(dir)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				return nil
 			}
 			return err
 		}
-		if d.IsDir() {
-			return nil
+		defer d.Close()
+		for {
+			entries, err := d.ReadDir(128)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return err
+			}
+			for _, entry := range entries {
+				p := path.Join(dir, entry.Name())
+				if entry.IsDir() {
+					if err := walk(p); err != nil {
+						return err
+					}
+					continue
+				}
+				f := File{Rel: p, Regular: entry.Type().IsRegular()}
+				if info, err := entry.Info(); err == nil {
+					f.Size, f.ModTime = info.Size(), info.ModTime()
+				}
+				if key := strings.TrimPrefix(p, string(a)+"/"); ValidKey(key) {
+					f.Key = key
+				}
+				if err := fn(f); err != nil {
+					return err
+				}
+			}
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 		}
-		f := File{Rel: p, Regular: d.Type().IsRegular()}
-		if info, err := d.Info(); err == nil {
-			f.Size, f.ModTime = info.Size(), info.ModTime()
-		}
-		if key := strings.TrimPrefix(p, string(a)+"/"); ValidKey(key) {
-			f.Key = key
-		}
-		return fn(f)
-	})
+	}
+	return walk(string(a))
 }
 
 // TempFile describes a leftover in tmp/.

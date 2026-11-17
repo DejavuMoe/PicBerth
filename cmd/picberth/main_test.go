@@ -24,7 +24,7 @@ func runCLI(t *testing.T, stdin string, args ...string) result {
 	t.Helper()
 	var out, errb bytes.Buffer
 	st := streams{stdin: strings.NewReader(stdin), stdout: &out, stderr: &errb,
-		env: config.Env{Getenv: func(string) string { return "" }, ReadFile: os.ReadFile}}
+		env: config.Env{LookupEnv: func(string) (string, bool) { return "", false }, ReadFile: os.ReadFile}}
 	code := run(context.Background(), args, st)
 	return result{code, out.String(), errb.String()}
 }
@@ -106,7 +106,7 @@ func TestServeLifecycleLockHealthcheckAndSetupCode(t *testing.T) {
 	data := filepath.Join(t.TempDir(), "data")
 	var logBuf syncBuf
 	cfg, err := config.Resolve(map[string]string{config.KeyDataDir: data, config.KeyListen: "127.0.0.1:0", config.KeyPublicURL: "http://127.0.0.1:1"},
-		config.Env{Getenv: func(string) string { return "" }})
+		config.Env{LookupEnv: func(string) (string, bool) { return "", false }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,6 +188,18 @@ func TestHealthcheckMapsWildcard(t *testing.T) {
 	}
 	if r := runCLI(t, "", "healthcheck", "--listen", "nonsense"); r.code != 1 {
 		t.Fatalf("bad listen: %+v", r)
+	}
+}
+
+func TestMissingDevWebDirectoryReleasesDataLock(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "data")
+	r := runCLI(t, "", "serve", "--data-dir", data, "--dev-web-dir", filepath.Join(root, "missing"))
+	if r.code != 1 || !strings.Contains(r.err, "opening development web directory") {
+		t.Fatalf("missing development directory: %+v", r)
+	}
+	if r := runCLI(t, "", "check", "--data-dir", data); r.code != 0 {
+		t.Fatalf("data lock survived failed startup: %+v", r)
 	}
 }
 
