@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to rehearse without publishing (for example v0.0.1)
+        description: Version to rehearse without publishing (for example v0.0.2)
         required: true
-        default: v0.0.1
+        default: v0.0.2
         type: string
 
 permissions:
@@ -137,6 +137,15 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ inputs.version || github.ref_name }}
           push: ${{ github.event_name == 'push' }}
+      - name: Retain rehearsal image for verification
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image.tar
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
 
   manifest:
     if: github.event_name == 'push'

@@ -32,16 +32,16 @@ runs:
       if: inputs.release != 'true'
       with:
         path: ${{ steps.paths.outputs.gomod }}
-        key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}
+        key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
         restore-keys: gomod-${{ runner.os }}-${{ runner.arch }}-
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       if: inputs.release != 'true'
       with:
         path: ${{ steps.paths.outputs.gobuild }}
-        key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-${{ hashFiles('**/*.go', 'web/**', '!web/node_modules/**') }}
+        key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-${{ hashFiles('**/*.go', 'web/**', '!web/node_modules/**') }}
         restore-keys: |
-          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-
-          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.sum') }}-
+          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.job }}-${{ inputs.go-cache-suffix }}-
+          gobuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}-
     - shell: bash
       run: mise run web:install
     - shell: bash
