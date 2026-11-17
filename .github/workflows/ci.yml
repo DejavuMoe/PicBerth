@@ -72,6 +72,9 @@ jobs:
       - name: Validate workflow syntax
         if: runner.arch == 'X64'
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
+      - name: Check OCI attestation validation
+        if: runner.arch == 'X64'
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - run: mise run test
       - name: Go vulnerability check
         if: runner.arch == 'X64'

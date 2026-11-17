@@ -44,7 +44,7 @@ runs:
         if [[ "$PUSH" == true ]]; then
           output="type=image,name=$image,push=true"
         else
-          output="type=oci,dest=/output/image.tar"
+          output="type=oci,name=$image,dest=/output/image.tar"
         fi
         docker run --rm --privileged \
           -v "$GITHUB_WORKSPACE:/src:ro" \
@@ -59,6 +59,7 @@ runs:
           "${args[@]}" \
           --output "$output"
         if [[ "$PUSH" != true ]]; then
+          python3 .github/scripts/check_oci_attestations.py "$RUNNER_TEMP/image.tar" "$ARCH"
           sudo rm -rf "$RUNNER_TEMP/buildkit-cache"
           sudo mv "$RUNNER_TEMP/buildkit-cache-new" "$RUNNER_TEMP/buildkit-cache"
           sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/buildkit-cache"
