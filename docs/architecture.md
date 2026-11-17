@@ -72,7 +72,7 @@ images(id TEXT PK, owner_id INTEGER NOT NULL REFERENCES users, token_id INTEGER 
        created_at INTEGER NOT NULL, trashed_at INTEGER NULL, purged_at INTEGER NULL, broken_at INTEGER NULL)
   indexes: (state, created_at DESC, id DESC), (state, size, id), (folder_id, state, created_at DESC, id DESC),
            (owner_id, folder_id, sha256) WHERE state='active', (token_id, state, created_at DESC),
-           (trashed_at) WHERE state='trashed', (created_at) WHERE thumb='' AND state='active'
+           (trashed_at) WHERE state='trashed', (state, id) WHERE thumb='' AND state='active' AND broken_at IS NULL
 folders(id TEXT PK, owner_id INTEGER NOT NULL REFERENCES users, parent_id TEXT NULL REFERENCES folders,
         name TEXT NOT NULL, name_key TEXT NOT NULL, depth INTEGER NOT NULL CHECK(depth BETWEEN 1 AND 3),
         created_at INTEGER NOT NULL)
@@ -89,7 +89,8 @@ Schema history: 1 initial; 2 tags; 3 folders and removal of tags, visibility and
 (also drops the write-only session columns `expires_at`/`ip`/`user_agent`, rebuilds `images` with
 `folder_id`, adds the audit `at` index, prunes removed settings, strips `read` from tokens and revokes
 tokens left without a scope — with an audit row naming the migration reason, and rotates `backups/` to the
-newest five files).
+newest five files). Schema 4 replaces the pending-thumbnail index with a state/ID-ordered partial index
+covering healthy pending records, matching the backfill cursor without indexing settled or broken images.
 
 Connections (ADR-004): writer pool `SetMaxOpenConns(1)`, reader pool `SetMaxOpenConns(max(4, GOMAXPROCS))`,
 readers open with `query_only=1`. Every connection gets — through the DSN `_pragma` parameters, never a one-off
