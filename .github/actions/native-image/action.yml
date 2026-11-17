@@ -5,7 +5,7 @@ inputs:
     required: true
     description: Native Linux CPU architecture
   version:
-    default: v0.0.1-dev
+    default: v0.0.2-dev
     description: Release version
   push:
     default: 'false'
@@ -34,8 +34,11 @@ runs:
         esac
         mkdir -p "$RUNNER_TEMP/buildkit-cache" "$HOME/.docker"
         args=()
-        if [[ "$PUSH" != true && -f "$RUNNER_TEMP/buildkit-cache/index.json" ]]; then
-          args+=(--import-cache type=local,src=/cache)
+        if [[ "$PUSH" != true ]]; then
+          args+=(--export-cache type=local,dest=/output/buildkit-cache-new,mode=max)
+          if [[ -f "$RUNNER_TEMP/buildkit-cache/index.json" ]]; then
+            args+=(--import-cache type=local,src=/cache)
+          fi
         fi
         image="ghcr.io/dejavumoe/picberth:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$ARCH"
         if [[ "$PUSH" == true ]]; then
@@ -53,9 +56,10 @@ runs:
           --opt "platform=linux/$ARCH" \
           --opt "build-arg:VERSION=$VERSION" --opt "build-arg:COMMIT=$GITHUB_SHA" \
           --opt attest:provenance=mode=max --opt attest:sbom= \
-          "${args[@]}" --export-cache type=local,dest=/output/buildkit-cache-new,mode=max \
+          "${args[@]}" \
           --output "$output"
-        sudo rm -f "$RUNNER_TEMP/image.tar"
-        sudo rm -rf "$RUNNER_TEMP/buildkit-cache"
-        sudo mv "$RUNNER_TEMP/buildkit-cache-new" "$RUNNER_TEMP/buildkit-cache"
-        sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/buildkit-cache"
+        if [[ "$PUSH" != true ]]; then
+          sudo rm -rf "$RUNNER_TEMP/buildkit-cache"
+          sudo mv "$RUNNER_TEMP/buildkit-cache-new" "$RUNNER_TEMP/buildkit-cache"
+          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/buildkit-cache"
+        fi
