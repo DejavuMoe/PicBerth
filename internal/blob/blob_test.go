@@ -2,9 +2,11 @@ package blob
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,34 @@ import (
 	"picberth/internal/datadir"
 	"picberth/internal/ids"
 )
+
+func TestWalkCanRemoveFilesAcrossBatches(t *testing.T) {
+	s, d := newStore(t)
+	for i := 0; i < 300; i++ {
+		if err := os.WriteFile(d.Abs(fmt.Sprintf("objects/stray-%03d", i)), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	visited := 0
+	if err := s.Walk(Objects, func(f File) error {
+		visited++
+		_, err := s.QuarantineRaw(f.Rel, time.Unix(1, 0))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	left, err := os.ReadDir(filepath.Join(d.Path(), "objects"))
+	if err != nil || visited != 300 || len(left) != 0 {
+		t.Fatalf("walk skipped entries while moving files: visited=%d, left=%d, err=%v", visited, len(left), err)
+	}
+	want := errors.New("stop walk")
+	if err := os.WriteFile(d.Abs("objects/stop"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Walk(Objects, func(File) error { return want }); !errors.Is(err, want) {
+		t.Fatalf("callback error lost: %v", err)
+	}
+}
 
 func newStore(t *testing.T) (*Store, *datadir.Dir) {
 	t.Helper()

@@ -146,8 +146,8 @@ func (s *Service) checkImage(ctx context.Context, id string, full bool, rep *Che
 		return err
 	}
 	if im.State == meta.StatePurged {
-		unlock.Unlock()
-		return nil
+		defer unlock.Unlock()
+		return s.checkPurged(ctx, im, rep)
 	}
 	rep.Checked++
 	bad, err := s.checkStructure(ctx, im, rep)
@@ -166,6 +166,34 @@ func (s *Service) checkImage(ctx context.Context, id string, full bool, rep *Che
 		if _, err := s.db.SetBroken(ctx, id, nil); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (s *Service) checkPurged(ctx context.Context, im *meta.Image, rep *CheckReport) error {
+	for _, area := range []blob.Area{blob.Objects, blob.Trash} {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		_, err := s.blobs.Stat(area, im.ObjectKey)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err == nil {
+			err = s.blobs.Remove(area, im.ObjectKey)
+		}
+		rep.add(IssueOrphanFile, im.ID, string(area)+"/"+im.ObjectKey, err == nil)
+	}
+	for _, ext := range blob.ThumbExts {
+		f, err := s.blobs.OpenThumb(im.ID, ext)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err == nil {
+			f.Close()
+			err = s.blobs.RemoveThumbs(im.ID)
+		}
+		rep.add(IssueOrphanFile, im.ID, "cache/thumbs/"+im.ID[:2]+"/"+im.ID+"."+ext, err == nil)
 	}
 	return nil
 }
@@ -254,21 +282,14 @@ func (s *Service) checkFiles(ctx context.Context, full bool, rep *CheckReport) e
 		areas = append(areas, blob.Objects)
 	}
 	for _, area := range areas {
-		var files []blob.File
 		err := s.blobs.Walk(area, func(f blob.File) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			files = append(files, f)
-			return nil
+			return s.checkFile(ctx, area, f, full, rep)
 		})
 		if err != nil {
 			return err
-		}
-		for _, f := range files {
-			if err := s.checkFile(ctx, area, f, full, rep); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

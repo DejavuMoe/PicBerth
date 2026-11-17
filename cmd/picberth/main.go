@@ -32,7 +32,7 @@ type streams struct {
 
 func main() {
 	st := streams{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr,
-		env: config.Env{Getenv: os.Getenv, ReadFile: os.ReadFile}}
+		env: config.Env{LookupEnv: os.LookupEnv, ReadFile: os.ReadFile}}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], st)
 	stop()

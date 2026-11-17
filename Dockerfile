@@ -9,7 +9,7 @@ ADD --checksum=sha256:18dbb118de1dbef0e4516c17bf847d6ee206fc4deffb2bb488ec8e1d28
 FROM pnpm-${BUILDARCH} AS pnpm
 
 # ---- web: build the Svelte SPA (Vite writes to /src/internal/webui/dist) ----
-FROM --platform=$BUILDPLATFORM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS web
+FROM --platform=$BUILDPLATFORM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS web
 COPY --from=pnpm /pnpm.tar.gz /tmp/pnpm.tar.gz
 RUN mkdir /opt/pnpm && tar -xzf /tmp/pnpm.tar.gz -C /opt/pnpm && ln -s /opt/pnpm/pnpm /usr/local/bin/pnpm && rm /tmp/pnpm.tar.gz
 WORKDIR /src/web
@@ -20,7 +20,7 @@ COPY web/ ./
 RUN pnpm build
 
 # ---- build: static Go binary with the SPA embedded ----
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -34,7 +34,7 @@ ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=${VERSION} -X picberth/internal/buildinfo.Commit=${COMMIT}" -o /out/picberth ./cmd/picberth && mkdir -p /out/root && mkdir -m 0700 /out/root/data
 
 # ---- final: minimal, non-root runtime ----
-FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 # The container listens on all interfaces *inside its network namespace*. Never publish
 # the port on all host interfaces: deploy/compose.yaml binds it to 127.0.0.1 only.
 COPY --from=build /out/picberth /picberth
