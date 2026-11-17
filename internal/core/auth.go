@@ -60,9 +60,6 @@ func (s *Service) EnsureSetupCode(ctx context.Context) (string, error) {
 
 // Setup creates the first administrator, authorized by the one-time setup code, and logs them in.
 func (s *Service) Setup(ctx context.Context, ip, code, username, pw string) (NewSession, error) {
-	if ok, wait := s.setupLimit.Allow("global"); !ok {
-		return NewSession{}, rateLimited(wait)
-	}
 	if ok, wait := s.loginIPLimit.Allow(ip); !ok {
 		return NewSession{}, rateLimited(wait)
 	}
@@ -82,6 +79,9 @@ func (s *Service) Setup(ctx context.Context, ip, code, username, pw string) (New
 	}
 	got := ids.NormalizeSetupCode(code)
 	if subtle.ConstantTimeCompare([]byte(got), []byte(ids.NormalizeSetupCode(want))) != 1 {
+		if ok, wait := s.setupLimit.Allow("global"); !ok {
+			return NewSession{}, rateLimited(wait)
+		}
 		s.auditActor(ctx, "anonymous", ip, "setup.failure", "", "invalid setup code")
 		return NewSession{}, forbidden("The setup code is not valid.")
 	}

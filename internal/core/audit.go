@@ -18,9 +18,8 @@ func (s *Service) audit(ctx context.Context, p Principal, action, target, detail
 
 func (s *Service) auditActor(ctx context.Context, actor, ip, action, target, detail string) {
 	// Detached from request cancellation: an audit row must survive a client disconnect.
-	if ctx.Err() != nil {
-		ctx = context.WithoutCancel(ctx)
-	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	err := s.db.AddAudit(ctx, meta.AuditEntry{At: s.nowMs(), Actor: actor, Action: action, Target: target, Detail: detail, IP: ip})
 	if err != nil {
 		s.log.Error("audit write failed", "action", action, "err", err)

@@ -32,7 +32,7 @@ func (s *Service) runThumbWorker() {
 		case <-s.jobCtx.Done():
 			return
 		case id := <-s.thumbQ:
-			s.thumbOne(id)
+			s.thumbOne(s.jobCtx, id)
 		case <-tick.C:
 			if s.thumbDirty.Swap(false) {
 				s.backfillThumbs()
@@ -42,67 +42,47 @@ func (s *Service) runThumbWorker() {
 }
 
 func (s *Service) backfillThumbs() {
-	for {
-		pending, err := s.db.PendingThumbs(s.jobCtx, 200)
-		if err != nil || len(pending) == 0 {
-			if err != nil && s.jobCtx.Err() == nil {
-				s.log.Warn("thumbnail backfill failed", "err", err)
-			}
-			return
-		}
-		progressed := false
-		for _, id := range pending {
-			if s.jobCtx.Err() != nil {
-				return
-			}
-			if s.thumbOne(id) {
-				progressed = true
-			}
-		}
-		if !progressed { // everything pending is unreadable right now; the check job deals with it
-			return
-		}
-	}
+	s.ProcessThumbnails(s.jobCtx)
 }
 
 // ProcessThumbnails synchronously generates every pending thumbnail (tests and offline use).
 func (s *Service) ProcessThumbnails(ctx context.Context) {
+	after := ""
 	for {
-		pending, err := s.db.PendingThumbs(ctx, 200)
+		pending, err := s.db.PendingThumbs(ctx, after, 200)
 		if err != nil || len(pending) == 0 {
-			return
-		}
-		progressed := false
-		for _, id := range pending {
-			if s.thumbOne(id) {
-				progressed = true
+			if err != nil && ctx.Err() == nil {
+				s.log.Warn("thumbnail backfill failed", "err", err)
 			}
-		}
-		if !progressed {
 			return
 		}
+		for _, id := range pending {
+			if ctx.Err() != nil {
+				return
+			}
+			s.thumbOne(ctx, id)
+		}
+		after = pending[len(pending)-1]
 	}
 }
 
-// thumbOne generates one thumbnail and records the outcome. It returns true when the image's thumb state
-// was settled (so loops make progress).
-func (s *Service) thumbOne(id string) bool {
-	ctx := s.jobCtx
+// thumbOne generates one thumbnail and records the outcome.
+func (s *Service) thumbOne(ctx context.Context, id string) {
 	im, err := s.db.GetImage(ctx, id)
 	if err != nil || im.State != meta.StateActive || im.Thumb != "" || im.BrokenAt != nil {
-		return err == nil && (im.State != meta.StateActive || im.Thumb != "")
+		return
 	}
 	f, err := s.openObject(im)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			s.log.Warn("thumbnail: cannot open image", "id", id, "err", err)
 		}
-		return false
+		return
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return false
+		return
 	}
 
 	outcome, data := "none", []byte(nil)
@@ -119,18 +99,17 @@ func (s *Service) thumbOne(id string) bool {
 	if outcome != "none" {
 		if err := s.blobs.WriteThumb(id, outcome, data); err != nil {
 			s.log.Warn("thumbnail: write failed", "id", id, "err", err)
-			return false
+			return
 		}
 	}
 	ok, err := s.db.SetThumb(ctx, id, outcome)
 	if err != nil {
 		s.log.Warn("thumbnail: recording outcome failed", "id", id, "err", err)
-		return false
+		return
 	}
 	if !ok && outcome != "none" { // purged while we worked
 		s.blobs.RemoveThumbs(id)
 	}
-	return true
 }
 
 // safeThumbnail shields the process from decoder panics on hostile input.

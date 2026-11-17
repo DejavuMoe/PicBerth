@@ -10,8 +10,12 @@ import (
 
 func envOf(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
 
+func lookupOf(m map[string]string) func(string) (string, bool) {
+	return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
+}
+
 func TestDefaults(t *testing.T) {
-	c, err := Resolve(nil, Env{Getenv: envOf(map[string]string{"HOME": "/home/u"}), GOOS: "linux"})
+	c, err := Resolve(nil, Env{LookupEnv: lookupOf(map[string]string{"HOME": "/home/u"}), GOOS: "linux"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +34,7 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestWildcardListenDerivesLoopbackURL(t *testing.T) {
-	c, err := Resolve(map[string]string{KeyListen: "0.0.0.0:8080", KeyDataDir: "x"}, Env{Getenv: envOf(nil)})
+	c, err := Resolve(map[string]string{KeyListen: "0.0.0.0:8080", KeyDataDir: "x"}, Env{LookupEnv: lookupOf(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +48,7 @@ func TestPrecedenceFlagsEnvFileDefaults(t *testing.T) {
 		"/etc/pb.conf": "# comment\nPICBERTH_LISTEN=127.0.0.1:1111\nPICBERTH_LOG_LEVEL=\"warn\"\nPICBERTH_PUBLIC_URL=https://file.example\nPICBERTH_DATA_DIR=/file/data\nPICBERTH_LOG_FORMAT=json\n",
 	}
 	env := Env{
-		Getenv: envOf(map[string]string{
+		LookupEnv: lookupOf(map[string]string{
 			KeyConfig:    "/etc/pb.conf",
 			KeyListen:    "127.0.0.1:2222",
 			KeyPublicURL: "https://env.example/",
@@ -80,7 +84,7 @@ func TestFlagSetIntegration(t *testing.T) {
 	if err := fs.Parse([]string{"--listen", "127.0.0.1:9", "--trusted-proxies", "10.0.0.0/8, ::1", "--data-dir", "d"}); err != nil {
 		t.Fatal(err)
 	}
-	c, err := f.Resolve(Env{Getenv: envOf(map[string]string{KeyListen: "127.0.0.1:1", KeyHardMaxUpload: "2048"})})
+	c, err := f.Resolve(Env{LookupEnv: lookupOf(map[string]string{KeyListen: "127.0.0.1:1", KeyHardMaxUpload: "2048"})})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +93,38 @@ func TestFlagSetIntegration(t *testing.T) {
 	}
 	if c.Trusted == nil || c.Trusted.Empty() {
 		t.Fatal("trusted proxies not parsed")
+	}
+}
+
+func TestEmptyFlagMasksFile(t *testing.T) {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	f := RegisterFlags(fs)
+	if err := fs.Parse([]string{"--config", "config.env", "--trusted-proxies", "", "--public-url", "", "--data-dir", t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := f.Resolve(Env{LookupEnv: lookupOf(nil), ReadFile: func(string) ([]byte, error) {
+		return []byte("PICBERTH_TRUSTED_PROXIES=0.0.0.0/0\nPICBERTH_PUBLIC_URL=https://file.example\n"), nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.TrustedProxies) != 0 || c.PublicURLSet {
+		t.Fatalf("empty flags did not mask the file: %+v", c)
+	}
+}
+
+func TestEmptyEnvironmentMasksFile(t *testing.T) {
+	c, err := Resolve(nil, Env{
+		LookupEnv: lookupOf(map[string]string{KeyConfig: "config.env", KeyDataDir: t.TempDir(), KeyTrustedProxies: "", KeyPublicURL: ""}),
+		ReadFile: func(string) ([]byte, error) {
+			return []byte("PICBERTH_TRUSTED_PROXIES=0.0.0.0/0\nPICBERTH_PUBLIC_URL=https://file.example\n"), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.TrustedProxies) != 0 || c.PublicURLSet {
+		t.Fatalf("empty environment did not mask the file: %+v", c)
 	}
 }
 
@@ -103,7 +139,7 @@ func TestValidation(t *testing.T) {
 		KeyLogFormat:      "xml",
 	}
 	for k, v := range bad {
-		if _, err := Resolve(map[string]string{k: v, KeyDataDir: "x"}, Env{Getenv: envOf(nil)}); err == nil {
+		if _, err := Resolve(map[string]string{k: v, KeyDataDir: "x"}, Env{LookupEnv: lookupOf(nil)}); err == nil {
 			t.Errorf("%s=%q accepted", k, v)
 		}
 	}

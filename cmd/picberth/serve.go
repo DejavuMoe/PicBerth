@@ -77,7 +77,13 @@ func serve(ctx context.Context, cfg *config.Config, log *slog.Logger, ready chan
 
 	var web fs.FS
 	if cfg.DevWebDir != "" {
-		web = os.DirFS(cfg.DevWebDir)
+		root, err := os.OpenRoot(cfg.DevWebDir)
+		if err != nil {
+			svc.Close()
+			return fmt.Errorf("opening development web directory: %w", err)
+		}
+		defer root.Close()
+		web = root.FS()
 		log.Warn("serving the web UI from a directory (development mode)", "dir", cfg.DevWebDir)
 	} else {
 		web = webui.FS()
