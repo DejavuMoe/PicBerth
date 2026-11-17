@@ -11,7 +11,7 @@ gh workflow run release.yml --ref master -f version=v0.0.2
 ```
 
 演练执行完整 CI，构建四个平台的压缩包及双架构容器。四个 `binary-*` 与两个 `image-*` artifact 保留 7 天；后者包含原生 CPU 构建的 OCI 归档。不会创建标签、发布 Release、推送镜像或上传 GitHub 构建证明。
-下载并检查四个压缩包内的程序、MIT 许可证和校验和，核对程序的版本、提交 SHA；遍历 OCI index，检查 amd64/arm64 平台、ELF 架构、运行用户和 SBOM/provenance 描述符。构建成功不能替代产物核验。
+下载并检查四个压缩包内的程序、MIT 许可证和校验和，核对程序的版本、提交 SHA；遍历 OCI index，检查 amd64/arm64 平台、ELF 架构、运行用户和 SBOM/provenance 内容及其 subject 对镜像摘要的绑定。构建成功不能替代产物核验。
 演练和正式发布都要求目标提交已包含在远程 `master` 中；非默认分支上的新提交不能直接进入发布流水线。
 
 ## 正式发布
@@ -37,6 +37,6 @@ Release 附件使用与目标 CPU 相同的 Linux runner；Windows AMD64 和 mac
 镜像使用独立 BuildKit，不使用 Buildx 或 QEMU。普通 CI 和演练按架构缓存中间层，每次保存只保留本次构建可达的缓存；正式镜像不导入这些缓存。
 发布附件不恢复 mise、pnpm、Go 模块和编译缓存，执行 `go mod verify` 并通过 `go build -a` 重新编译；普通 CI 保留缓存并验证 Go 模块。
 两个架构先推送带 run ID、attempt 和架构的暂存标签，附件与镜像全部成功后才合并正式标签，保留 SBOM/provenance。
-演练输出 OCI 归档到 runner 临时目录，不推送仓库。原生 runner 的实际排队时间和冷/热缓存耗时需通过 Actions 演练测量。
+演练使用带名称的 OCI 导出，在保存 artifact 前检查 SBOM 与 provenance 都绑定到运行镜像的摘要；缺失或空 subject 会直接失败。归档输出到 runner 临时目录，不推送仓库。原生 runner 的实际排队时间和冷/热缓存耗时需通过 Actions 演练测量。
 
 正式版本使用同一个完整标签：Git tag 和 GitHub Release 为 `v0.0.2`，Docker 镜像为 `ghcr.io/dejavumoe/picberth:v0.0.2`。不自动发布 `0.0.2`、`v0.0` 或 `latest` 别名。程序内嵌及 API 返回版本统一为 `v0.0.2`；npm 包管理元数据仍使用 `0.0.2`，源码开发默认值为 `v0.0.2-dev`。发布日志按中文、英文两节维护，功能、安装、安全提示和附件说明保持一致。
