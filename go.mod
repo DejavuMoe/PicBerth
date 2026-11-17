@@ -1,8 +1,8 @@
 module picberth
 
-go 1.26.10
+go 1.26.11
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 ignore ./web/node_modules
 

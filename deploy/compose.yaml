@@ -22,6 +22,11 @@ services:
       # (published ports reachable from the LAN after a firewalld reload).
       - picberth-data:/data
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     stop_grace_period: 30s
     read_only: true
     security_opt:
