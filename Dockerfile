@@ -3,9 +3,9 @@
 ARG BUILDARCH
 # Use the same complete, checksummed pnpm distributions as mise.lock.
 FROM scratch AS pnpm-amd64
-ADD --checksum=sha256:502a275984a4cd01e5579ac72049a241091cac5118e44becf84951130c3e079e https://github.com/pnpm/pnpm/releases/download/v12.10.1/pnpm-linux-x64.tar.gz /pnpm.tar.gz
+ADD --checksum=sha256:3726060e236c0db3e7124c0a5af123c840ba0cb76682149b63ea0baf290017c2 https://github.com/pnpm/pnpm/releases/download/v12.18.0/pnpm-linux-x64.tar.gz /pnpm.tar.gz
 FROM scratch AS pnpm-arm64
-ADD --checksum=sha256:18dbb118de1dbef0e4516c17bf847d6ee206fc4deffb2bb488ec8e1d2814e078 https://github.com/pnpm/pnpm/releases/download/v12.10.1/pnpm-linux-arm64.tar.gz /pnpm.tar.gz
+ADD --checksum=sha256:700bd1aa4028465b80e62b7c5bec8455be60bbafaf53a3262a4ab8e2057712ac https://github.com/pnpm/pnpm/releases/download/v12.18.0/pnpm-linux-arm64.tar.gz /pnpm.tar.gz
 FROM pnpm-${BUILDARCH} AS pnpm
 
 # ---- web: build the Svelte SPA (Vite writes to /src/internal/webui/dist) ----
@@ -27,7 +27,7 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=web /src/internal/webui/dist ./internal/webui/dist
-ARG VERSION=v0.0.1-dev
+ARG VERSION=v0.0.2-dev
 ARG COMMIT=unknown
 ARG TARGETOS
 ARG TARGETARCH
