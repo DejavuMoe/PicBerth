@@ -1025,8 +1025,6 @@ kbd {
   .thumb { width: 40px; height: 40px; }
   .mobile-meta { display: flex !important; }
   .row-actions { opacity: 1; }
-  .col-act { width: 52px !important; }
-  .row-actions .more { display: none; }
 }
 .mobile-meta { display: none; gap: 12px; color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); margin-top: 2px; }
 .mobile-meta span { white-space: nowrap; }

@@ -158,11 +158,11 @@
   <div class="panel-main">
     <LibraryHead {lib} bind:searchEl bind:searching />
     <ActiveFilters {lib} omitQuery={phone.matches && searching} />
-    {#if !trash && lib.retention === null}
+    {#if lib.retention === null}
       <div class="retention-note">
         <span role="status">{lib.retentionFailed ? '无法读取回收站保留时间。' : '正在读取回收站保留时间…'}</span>
         {#if lib.retentionFailed}
-          <button type="button" class="btn btn-ghost" onclick={() => void lib.loadRetention()}>重试</button>
+          <button type="button" class="btn btn-ghost" onclick={() => void lib.loadRetention(true)}>重试</button>
         {/if}
       </div>
     {/if}
