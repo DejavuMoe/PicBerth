@@ -23,8 +23,8 @@ func (s *Server) createFolder(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Name     string         `json:"name"`
-		ParentID nullableString `json:"parentId"`
+		Name     string           `json:"name"`
+		ParentID nullable[string] `json:"parentId"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
@@ -43,8 +43,8 @@ func (s *Server) patchFolder(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Name     *string        `json:"name"`
-		ParentID nullableString `json:"parentId"`
+		Name     *string          `json:"name"`
+		ParentID nullable[string] `json:"parentId"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)

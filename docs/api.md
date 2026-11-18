@@ -176,7 +176,7 @@ max 50 MP per frame.
 | `GET /api/v1/images/facets` | same as list (`state=trashed` needs `manage`) | `?state=active\|trashed` (default `active`) | `200 Facets` |
 | `GET /api/v1/images/{id}` | same | — | `200 Image` |
 | `PATCH /api/v1/images/{id}` | session, `manage` | any non-empty subset of `{"filename": string, "folderId": string\|null}` | `200 Image` |
-| `DELETE /api/v1/images/{id}` | session, `manage` | — | `204` (moves to trash; idempotent) |
+| `DELETE /api/v1/images/{id}` | session, `manage` | — | `204` (moves an active image to trash, or permanently deletes it when retention is zero) |
 | `POST /api/v1/images/{id}/restore` | session, `manage` | — | `200 Image`; `409 conflict` if not trashed |
 | `POST /api/v1/images/{id}/purge` | session, `manage` | — | `204`; `409 conflict` if not trashed |
 | `POST /api/v1/images/batch` | session, `manage` | `{"action": "trash"\|"restore"\|"purge"\|"move", "ids": [≤500], "folderId"?: string\|null, "expectedTrashRetentionDays"?: integer}` | `200 {"results": [{"id", "ok": bool, "code"?: string}]}` |
@@ -185,7 +185,8 @@ max 50 MP per frame.
 
 For batch `trash`, clients can send `expectedTrashRetentionDays` from settings. A mismatch returns
 `409 trash-retention-changed` before any image changes. Sending `0` confirms immediate permanent
-deletion. Omitting the field uses the existing trash behavior.
+deletion. Omitting the field uses the server's current retention policy. An explicit `null` returns
+`400 validation` before any image changes.
 
 List query parameters:
 

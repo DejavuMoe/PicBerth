@@ -193,25 +193,15 @@ func jsonErrDetail(err error) string {
 	return "invalid body."
 }
 
-// nullableString distinguishes an absent JSON field from an explicit null. UnmarshalJSON runs only when
-// the field is present, so Set records exactly that.
-type nullableString struct {
+// UnmarshalJSON runs only for a present field, so Set distinguishes absence from an explicit null.
+type nullable[T any] struct {
 	Set   bool
-	Value *string
+	Value *T
 }
 
-func (n *nullableString) UnmarshalJSON(b []byte) error {
+func (n *nullable[T]) UnmarshalJSON(b []byte) error {
 	n.Set = true
-	if string(b) == "null" {
-		n.Value = nil
-		return nil
-	}
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	n.Value = &s
-	return nil
+	return json.Unmarshal(b, &n.Value)
 }
 
 // requireAdmin answers 401/403 before any request body is parsed. core re-checks every operation.
