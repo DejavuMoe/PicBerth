@@ -300,13 +300,20 @@
         "files": [
           "web/src/screens/Library.svelte",
           "web/src/lib/library.svelte.ts",
+          "web/src/lib/api.ts",
+          "web/src/components/library/BulkActions.svelte",
+          "web/src/components/library/DetailPanel.svelte",
+          "web/src/components/library/RowMenu.svelte",
           "web/src/components/library/PurgeConfirm.svelte",
+          "web/src/components/Modal.svelte",
+          "internal/httpapi/handlers_images.go",
+          "internal/core/images.go",
           "web/src/screens/Settings.svelte"
         ],
         "interfaces": ["POST /api/v1/images/batch", "/api/v1/settings"],
-        "tests": []
+        "tests": ["web/e2e/trash-retention.spec.ts", "web/e2e/trash-undo.spec.ts", "internal/httpapi/api_test.go", "internal/core/core_test.go"]
       },
-      "status": "approved"
+      "status": "implemented"
     }
   ]
 }

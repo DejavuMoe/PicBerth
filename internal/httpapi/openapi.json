@@ -241,7 +241,8 @@
                 "properties": {
                   "action": { "type": "string", "enum": ["trash", "restore", "purge", "move"] },
                   "ids": { "type": "array", "minItems": 1, "maxItems": 500, "items": { "type": "string" } },
-                  "folderId": { "type": ["string", "null"], "description": "Destination for action=move; null or absent means the root." }
+                  "folderId": { "type": ["string", "null"], "description": "Destination for action=move; null or absent means the root." },
+                  "expectedTrashRetentionDays": { "type": "integer", "minimum": 0, "maximum": 365, "description": "Optional precondition for action=trash. A mismatch returns 409 before changing any image. Zero confirms immediate permanent deletion." }
                 }
               }
             }
@@ -276,7 +277,8 @@
           "400": { "$ref": "#/components/responses/Validation" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "Trash retention changed (trash-retention-changed)", "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } } }
         }
       }
     },

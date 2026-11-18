@@ -2,7 +2,7 @@
 // the current folder comes from the path.
 
 import { SvelteSet } from 'svelte/reactivity';
-import { api, errorMessage, isAbort, rawUrl } from './api';
+import { api, ApiError, errorMessage, isAbort, rawUrl } from './api';
 import { copyText } from './clipboard';
 import { facetsFor, refreshFacets } from './facets.svelte';
 import { startOfDay } from './format';
@@ -144,6 +144,8 @@ export class Library {
   errorText = $state('');
   errorKind = $state<'images' | 'folders'>('images');
   retention = $state<number | null>(null);
+  retentionFailed = $state(false);
+  deleteLabel = $derived(this.retention === null ? '删除' : this.retention === 0 ? '永久删除' : '移到回收站');
 
   view = $state<ViewMode>(loadView());
   sel = new SvelteSet<string>();
@@ -152,6 +154,8 @@ export class Library {
   /** An image to open once the list for its folder has loaded (e.g. 查看 on an upload elsewhere). */
   pendingOpen = $state<string | null>(null);
   purgeIds = $state<string[] | null>(null);
+  purgeBusy = $state(false);
+  purgeFailed = $state(false);
   /** The viewer (the image at window size) is open on the active image. */
   viewing = $state(false);
 
@@ -171,6 +175,7 @@ export class Library {
 
   #seq = 0;
   #ctrl: AbortController | null = null;
+  #retentionSeq = 0;
   #anchor: string | null = null;
   #suppress = false;
   alive = true;
@@ -391,11 +396,16 @@ export class Library {
     }
   }
 
-  loadRetention() {
-    api
-      .getSettings()
-      .then((s) => (this.retention = s.trashRetentionDays))
-      .catch(() => {});
+  async loadRetention() {
+    const seq = ++this.#retentionSeq;
+    this.retention = null;
+    this.retentionFailed = false;
+    try {
+      const settings = await api.getSettings();
+      if (seq === this.#retentionSeq) this.retention = settings.trashRetentionDays;
+    } catch {
+      if (seq === this.#retentionSeq) this.retentionFailed = true;
+    }
   }
 
   /** A fresh upload joins the top of the plain newest-first list when it belongs here. */
@@ -508,15 +518,19 @@ export class Library {
 
   // ---- batch actions -----------------------------------------------------------------------------
 
-  async #batch(action: BatchAction, ids: string[], folderId?: string | null) {
-    try {
-      const results = await api.batch(action, ids, folderId);
-      const ok = results.filter((r) => r.ok).map((r) => r.id);
-      return { ok, failed: results.length - ok.length };
-    } catch (e) {
-      toast(errorMessage(e));
-      return null;
+  async #batch(action: BatchAction, ids: string[], folderId?: string | null, expectedRetention?: number) {
+    const { results, error } = await api.batch(action, ids, folderId, expectedRetention);
+    const ok = results.filter((r) => r.ok).map((r) => r.id);
+    const policyChanged = error instanceof ApiError && error.code === 'trash-retention-changed';
+    if (policyChanged) {
+      toast('回收站保留时间已更改，请重新确认。');
+      void this.loadRetention();
+    } else if (error && expectedRetention !== 0) {
+      toast(errorMessage(error));
+      if (results.length === 0) return null;
     }
+    const missing = results.filter((r) => r.code === 'not-found').map((r) => r.id);
+    return { ok, missing, failed: ids.length - ok.length, policyChanged };
   }
 
   #take(ids: string[]): Removed[] {
@@ -532,8 +546,8 @@ export class Library {
     return removed;
   }
 
-  async #undo(inverse: 'restore' | 'trash', removed: Removed[], forSeq: number) {
-    const r = await this.#batch(inverse, removed.map((x) => x.image.id));
+  async #undo(inverse: 'restore' | 'trash', removed: Removed[], forSeq: number, expectedRetention?: number) {
+    const r = await this.#batch(inverse, removed.map((x) => x.image.id), undefined, expectedRetention);
     if (!r) return;
     if (this.alive) {
       if (this.#seq === forSeq) {
@@ -545,15 +559,20 @@ export class Library {
       }
     }
     this.#refresh();
-    if (r.failed > 0) toast(`${r.failed} 张未能撤销`);
+    if (r.failed > 0 && !r.policyChanged) toast(`${r.failed} 张未能撤销`);
   }
 
   async #move(action: 'trash' | 'restore', ids: string[]) {
-    const r = await this.#batch(action, ids);
+    const retention = this.retention ?? undefined;
+    const r = await this.#batch(action, ids, undefined, action === 'trash' ? retention : undefined);
     if (!r) return;
     const forSeq = this.#seq;
     const removed = this.#take(r.ok);
-    this.clearSel();
+    if (r.policyChanged) {
+      for (const id of r.ok) this.sel.delete(id);
+    } else {
+      this.clearSel();
+    }
     const tail = r.failed > 0 ? `，${r.failed} 张失败` : '';
     if (r.ok.length > 0) {
       const text =
@@ -564,14 +583,21 @@ export class Library {
           : r.ok.length > 1
             ? `已恢复 ${r.ok.length} 张图片${tail}`
             : `已恢复${tail}`;
-      toast(text, { action: { label: '撤销', run: () => void this.#undo(action === 'trash' ? 'restore' : 'trash', removed, forSeq) } });
-    } else if (r.failed > 0) {
+      const undo = action === 'trash'
+        ? () => void this.#undo('restore', removed, forSeq)
+        : retention !== undefined && retention > 0
+          ? () => void this.#undo('trash', removed, forSeq, retention)
+          : undefined;
+      toast(text, undo ? { action: { label: '撤销', run: undo } } : {});
+    } else if (r.failed > 0 && !r.policyChanged) {
       toast(action === 'trash' ? `${r.failed} 张未能移到回收站` : `${r.failed} 张未能恢复`);
     }
     this.#refresh();
   }
 
   trash(ids: string[]) {
+    if (this.retention === null || this.purgeBusy) return;
+    if (this.retention === 0) return this.requestPurge(ids);
     return this.#move('trash', ids);
   }
 
@@ -580,19 +606,39 @@ export class Library {
   }
 
   requestPurge(ids: string[]) {
-    if (ids.length > 0) this.purgeIds = ids;
+    if (ids.length > 0 && !this.purgeBusy) {
+      this.purgeFailed = false;
+      this.purgeIds = ids;
+    }
   }
 
   async confirmPurge() {
     const ids = this.purgeIds;
-    this.purgeIds = null;
-    if (!ids) return;
-    const r = await this.#batch('purge', ids);
+    if (!ids || this.purgeBusy) return;
+    const fromLibrary = this.mode === 'library';
+    if (fromLibrary) {
+      this.purgeBusy = true;
+      this.purgeFailed = false;
+    } else {
+      this.purgeIds = null;
+    }
+    const r = await this.#batch(fromLibrary ? 'trash' : 'purge', ids, undefined, fromLibrary ? 0 : undefined);
+    this.purgeBusy = false;
     if (!r) return;
-    this.#take(r.ok);
-    this.clearSel();
-    if (r.ok.length === 0) toast(`${r.failed} 张未能删除`);
-    else if (r.failed > 0) toast(`已永久删除 ${r.ok.length} 张，${r.failed} 张失败`);
+    const done = fromLibrary ? [...r.ok, ...r.missing] : r.ok;
+    this.#take(done);
+    if (fromLibrary && (r.policyChanged || r.failed > 0)) {
+      for (const id of done) this.sel.delete(id);
+      const remaining = ids.filter((id) => !done.includes(id));
+      this.purgeIds = r.policyChanged || remaining.length === 0 ? null : remaining;
+      this.purgeFailed = this.purgeIds !== null;
+    } else {
+      this.purgeIds = null;
+      this.clearSel();
+    }
+    if (r.ok.length === 0) {
+      if (!this.purgeFailed && !r.policyChanged) toast(`${r.failed} 张未能删除`);
+    } else if (r.failed > 0) toast(`已永久删除 ${r.ok.length} 张，${r.failed} 张失败`);
     else toast(r.ok.length > 1 ? `已永久删除 ${r.ok.length} 张图片` : '已永久删除');
     if (this.mode === 'trash' && this.items.length === 0 && this.cursor) void this.reload();
     this.#refresh();

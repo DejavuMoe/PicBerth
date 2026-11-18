@@ -68,10 +68,12 @@
       >
       <MenuItem
         icon="trash"
+        danger={lib.retention === 0}
+        disabled={lib.retention === null || lib.purgeBusy}
         onclick={() => {
           lib.trash([image.id]);
           close();
-        }}>移到回收站</MenuItem
+        }}>{lib.deleteLabel}</MenuItem
       >
     {/if}
   {/snippet}

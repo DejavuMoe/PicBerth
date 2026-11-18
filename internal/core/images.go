@@ -564,19 +564,27 @@ func (s *Service) applyMove(ctx context.Context, p Principal, im *meta.Image, fo
 // Trash moves an image to the trash. Trashing a trashed image is a no-op. With a retention of 0 days
 // the image is purged right away.
 func (s *Service) Trash(ctx context.Context, p Principal, id string) error {
+	return s.trash(ctx, p, id, false)
+}
+
+func (s *Service) trash(ctx context.Context, p Principal, id string, confirmedPurge bool) error {
 	if p.Kind == KindAnonymous {
 		return unauthorized()
 	}
 	if !p.CanManage() {
 		return forbidden("Deleting requires the manage scope.")
 	}
+	unlock := s.lockImage(id)
 	im, err := s.getVisible(ctx, p, id)
 	if err != nil {
+		unlock.Unlock()
 		return err
 	}
-	unlock := s.lockImage(id)
 	if im.State == meta.StateTrashed {
 		unlock.Unlock()
+		if confirmedPurge {
+			return s.purge(ctx, p, id)
+		}
 		return nil
 	}
 	ok, err := s.db.MarkTrashed(ctx, id, s.nowMs())
@@ -756,7 +764,7 @@ type BatchResult struct {
 
 // Batch applies one action to up to 500 images. Per-image failures are reported, not fatal. For move,
 // folderID is the destination (nil = root) and is resolved once for the whole batch.
-func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, folderID *string) ([]BatchResult, error) {
+func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, folderID *string, expectedTrashRetentionDays *int) ([]BatchResult, error) {
 	if p.Kind == KindAnonymous {
 		return nil, unauthorized()
 	}
@@ -770,6 +778,19 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 	}
 	if len(idList) == 0 || len(idList) > 500 {
 		return nil, validation("ids must contain between 1 and 500 entries.")
+	}
+	confirmedPurge := false
+	if expectedTrashRetentionDays != nil {
+		if action != "trash" || *expectedTrashRetentionDays < 0 || *expectedTrashRetentionDays > 365 {
+			return nil, validation("expectedTrashRetentionDays must be between 0 and 365 and is only supported for action=trash.")
+		}
+		// Keep the checked policy in force until the batch finishes applying it.
+		s.settingsMu.Lock()
+		defer s.settingsMu.Unlock()
+		if s.Settings().TrashRetentionDays != *expectedTrashRetentionDays {
+			return nil, newErr(CodeTrashRetentionChanged, "The trash retention period changed. Review the action and try again.")
+		}
+		confirmedPurge = *expectedTrashRetentionDays == 0
 	}
 	if action == "move" {
 		if err := s.checkFolderRef(ctx, p, folderID); err != nil {
@@ -786,7 +807,7 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 		var err error
 		switch action {
 		case "trash":
-			err = s.Trash(ctx, p, id)
+			err = s.trash(ctx, p, id, confirmedPurge)
 		case "restore":
 			_, err = s.Restore(ctx, p, id)
 		case "purge":

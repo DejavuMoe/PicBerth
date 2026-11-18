@@ -449,7 +449,7 @@ func TestAuthorizationMatrix(t *testing.T) {
 	_, err = e.svc.Restore(ctx, upTok, own.ID)
 	wantCode(t, err, CodeForbidden)
 	wantCode(t, e.svc.Purge(ctx, upTok, own.ID), CodeForbidden)
-	_, err = e.svc.Batch(ctx, upTok, "trash", []string{own.ID}, nil)
+	_, err = e.svc.Batch(ctx, upTok, "trash", []string{own.ID}, nil, nil)
 	wantCode(t, err, CodeForbidden)
 	_, err = e.svc.PatchImage(ctx, upTok, own.ID, ImagePatch{FolderID: nil, MoveFolder: true})
 	wantCode(t, err, CodeForbidden)
@@ -784,6 +784,31 @@ func TestRetentionZeroPurgesImmediately(t *testing.T) {
 	if im.State != "purged" || e.fileExists("trash/"+v.ID[0:2]+"/"+v.ID[2:4]+"/"+v.ID+".png") || e.fileExists("objects/"+v.ID[0:2]+"/"+v.ID[2:4]+"/"+v.ID+".png") {
 		t.Fatalf("not purged: %+v", im)
 	}
+}
+
+func TestConfirmedZeroDayBatchResumesPurge(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{TrashRetentionDays: ptr(0)}); err != nil {
+		t.Fatal(err)
+	}
+	img := e.mustUpload(e.admin, "retry.png", makePNG(t, 5, 5, 28))
+	e.svc.Fault = crashAt(FaultTrashAfterDB)
+	ids := []string{img.ID}
+	result, err := e.svc.Batch(ctx, e.admin, "trash", ids, nil, ptr(0))
+	if err != nil || len(result) != 1 || result[0].OK {
+		t.Fatalf("interrupted batch: %+v, %v", result, err)
+	}
+	e.svc.Fault = nil
+	result, err = e.svc.Batch(ctx, e.admin, "trash", ids, nil, ptr(0))
+	if err != nil || len(result) != 1 || !result[0].OK {
+		t.Fatalf("retried batch: %+v, %v", result, err)
+	}
+	im, err := e.db.GetImage(ctx, img.ID)
+	if err != nil || im.State != meta.StatePurged {
+		t.Fatalf("retried purge state: %+v, %v", im, err)
+	}
+	assertInvariants(t, e)
 }
 
 func TestPurgeExpired(t *testing.T) {
@@ -1340,31 +1365,31 @@ func TestBatch(t *testing.T) {
 	ctx := context.Background()
 	a := e.mustUpload(e.admin, "a.png", makePNG(t, 5, 5, 600))
 	b := e.mustUpload(e.admin, "b.png", makePNG(t, 5, 5, 601))
-	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, nil)
+	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res) != 4 || !res[0].OK || !res[1].OK || res[2].OK || res[2].Code != CodeNotFound || res[3].Code != CodeNotFound {
 		t.Fatalf("results: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("purge: %+v", res)
 	}
 	// move a trashed image and restore it
 	f := e.folder(e.admin, "batch", nil)
-	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, &f.ID)
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, &f.ID, nil)
 	if !res[0].OK {
 		t.Fatalf("move on trashed: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("restore: %+v", res)
 	}
 	if got, _ := e.svc.GetImage(ctx, e.admin, b.ID); got.FolderID == nil || *got.FolderID != f.ID {
 		t.Fatalf("move not applied: %+v", got)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("move to root: %+v", res)
 	}
@@ -1372,17 +1397,17 @@ func TestBatch(t *testing.T) {
 		t.Fatalf("not at root: %+v", got)
 	}
 	// an unknown destination fails the whole batch
-	if _, err := e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, ptr("0000000000000000")); ErrorCode(err) != CodeNotFound {
+	if _, err := e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, ptr("0000000000000000"), nil); ErrorCode(err) != CodeNotFound {
 		t.Fatalf("unknown folder: %v", err)
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, nil, nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{a.ID}, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{a.ID}, nil, nil); err == nil {
 		t.Fatal("removed visibility action accepted")
 	}
 	tooMany := make([]string, 501)
-	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, nil, nil); err == nil {
 		t.Fatal("501 ids accepted")
 	}
 }
