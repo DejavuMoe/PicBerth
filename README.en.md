@@ -133,10 +133,10 @@ No API token can manage other tokens or modify server configuration. Interactive
 
 ```sh
 # Create a snapshot via CLI when service is stopped (use the web console Status page when running)
-picberth snapshot --out /backup/picberth-2026-11-17
+picberth snapshot --out /backup/picberth
 
-# Restore from a snapshot into a clean data directory
-picberth restore --from /backup/picberth-2026-11-17 --data-dir /var/lib/picberth-new
+# Use the timestamped subdirectory printed by snapshot, which contains MANIFEST.json
+picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/picberth-new
 
 # Verify file hashes and filesystem structural integrity
 picberth check --full --data-dir /var/lib/picberth-new

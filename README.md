@@ -133,10 +133,10 @@ curl -H "Authorization: Bearer pb_..." \
 
 ```sh
 # 服务停止时通过 CLI 创建快照（服务运行中建议在「状态」页面在线创建）
-picberth snapshot --out /backup/picberth-2026-11-17
+picberth snapshot --out /backup/picberth
 
-# 从快照恢复到新的数据目录
-picberth restore --from /backup/picberth-2026-11-17 --data-dir /var/lib/picberth-new
+# 将 --from 指向上一条命令输出的时间戳子目录，其中包含 MANIFEST.json
+picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/picberth-new
 
 # 校验文件哈希与结构完整性
 picberth check --full --data-dir /var/lib/picberth-new
