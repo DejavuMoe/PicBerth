@@ -155,30 +155,31 @@ func (s *Service) Snapshot(ctx context.Context, p Principal, parent string) (inf
 // copyVerified places one referenced file into the snapshot (hard link, falling back to a copy) and
 // compares size and SHA-256 with the recorded values.
 func (s *Service) copyVerified(droot *os.Root, r meta.ImageRef) error {
-	area := blob.Objects
-	if r.State == meta.StateTrashed {
-		area = blob.Trash
-	}
-	// A restore or trash after the VACUUM may have moved the file to the other area; look in both.
-	var srcAbs string
-	for _, a := range []blob.Area{area, area.Other()} {
-		if _, err := s.blobs.Stat(a, r.ObjectKey); err == nil {
-			srcAbs = s.dir.Abs(string(a) + "/" + r.ObjectKey)
-			break
-		}
-	}
-	if srcAbs == "" {
-		return fmt.Errorf("image %s: file %s is missing", r.ID, r.ObjectKey)
-	}
+	area := areaFor(r.State)
 	rel := string(area) + "/" + r.ObjectKey
 	if err := droot.MkdirAll(path.Dir(rel), 0o700); err != nil {
 		return err
 	}
 	dstAbs := filepath.Join(droot.Name(), filepath.FromSlash(rel))
-	if err := os.Link(srcAbs, dstAbs); err != nil {
-		if cerr := copyFile(srcAbs, droot, rel); cerr != nil {
-			return fmt.Errorf("image %s: cannot link or copy %s: %w", r.ID, r.ObjectKey, cerr)
-		}
+
+	// A trash or restore can move the source after VACUUM. Pin it before releasing the image lock.
+	unlock := s.lockImage(r.ID)
+	src, err := s.blobs.Open(area, r.ObjectKey)
+	if errors.Is(err, fs.ErrNotExist) {
+		src, err = s.blobs.Open(area.Other(), r.ObjectKey)
+	}
+	if err != nil {
+		unlock.Unlock()
+		return fmt.Errorf("image %s: opening %s: %w", r.ID, r.ObjectKey, err)
+	}
+	err = os.Link(src.Name(), dstAbs)
+	unlock.Unlock()
+	if err != nil {
+		err = copyFile(src, droot, rel)
+	}
+	src.Close()
+	if err != nil {
+		return fmt.Errorf("image %s: cannot link or copy %s: %w", r.ID, r.ObjectKey, err)
 	}
 	size, sum, err := hashFile(droot, rel)
 	if err != nil {
@@ -190,12 +191,7 @@ func (s *Service) copyVerified(droot *os.Root, r meta.ImageRef) error {
 	return nil
 }
 
-func copyFile(srcAbs string, droot *os.Root, rel string) error {
-	in, err := os.Open(srcAbs)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
+func copyFile(in *os.File, droot *os.Root, rel string) error {
 	out, err := droot.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
