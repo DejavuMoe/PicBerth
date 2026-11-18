@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1197,6 +1198,24 @@ func TestListFiltersAndPagination(t *testing.T) {
 		if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 5 {
 			t.Fatalf("%s should be ignored, got %d items: %s", gps, len(l.Items), body)
 		}
+	}
+}
+
+func TestSearchFilenameCharacterLimit(t *testing.T) {
+	h := newHarness(t, harnessOpts{})
+	img := h.mustUploadWeb(505)
+	for _, char := range []string{"图", "a"} {
+		filename := strings.Repeat(char, 200)
+		resp, body := h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"filename": filename})
+		wantStatus(t, resp, body, 200)
+		resp, body = h.web("GET", "/api/v1/images?q="+url.QueryEscape(filename), nil)
+		wantStatus(t, resp, body, 200)
+		got := decode[struct{ Items []imageJSON }](t, body)
+		if len(got.Items) != 1 || got.Items[0].ID != img.ID {
+			t.Fatalf("search for %q: %s", char, body)
+		}
+		resp, body = h.web("GET", "/api/v1/images?q="+url.QueryEscape(filename+char), nil)
+		wantProblem(t, resp, body, 400, "validation")
 	}
 }
 
