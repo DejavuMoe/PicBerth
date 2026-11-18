@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicBerth</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    [hidden] { display: none !important; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .retention-shell .side-nav { flex: 1; align-content: start; }
+    .retention-list { padding: 0 var(--gutter); }
+    .retention-list li {
+      display: grid; grid-template-columns: 20px 60px minmax(0, 1fr) auto;
+      align-items: center; gap: 12px; padding: 12px 0; border-bottom: var(--bw) solid var(--hairline);
+    }
+    .retention-list img { width: 60px; height: 44px; object-fit: cover; border-radius: var(--r-m); }
+    .retention-list .filename { overflow-wrap: anywhere; }
+    .retention-list .btn { justify-self: end; }
+    .retention-selection { padding: 8px var(--gutter); display: flex; gap: 8px; align-items: center; border-bottom: var(--bw) solid var(--hairline); }
+    .retention-note, .retention-empty { margin: 12px var(--gutter); color: var(--muted); }
+    .retention-settings .hint { color: var(--muted); font-size: var(--fs-s); }
+    .retention-dialog {
+      position: fixed; inset: 0; margin: auto; width: calc(100% - 32px);
+      border: 0; padding: 0; color: var(--text);
+    }
+    .retention-dialog::backdrop { background: var(--scrim); }
+    .retention-toast { position: fixed; z-index: 80; bottom: 24px; right: 24px; max-width: calc(100% - 32px); }
+    @media (max-width: 720px) {
+      .retention-shell { display: flex; flex-direction: column-reverse; }
+      .retention-shell .side {
+        display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 8px 16px;
+        border-top: var(--bw) solid var(--hairline);
+      }
+      .retention-shell .brand-row { display: none; }
+      .retention-shell .side-nav { display: flex; gap: 4px; }
+      .retention-shell .main { flex: 1; }
+      .retention-list li { grid-template-columns: 20px 44px minmax(0, 1fr) auto; gap: 8px; }
+      .retention-list img { width: 44px; height: 36px; }
+      .retention-toast { bottom: 64px; right: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell retention-shell">
+    <aside class="side">
+      <div class="brand-row"><span class="brand"><span class="brand-mark" aria-hidden="true"></span>PicBerth</span></div>
+      <nav class="side-nav" aria-label="主导航">
+        <button type="button" class="nav-item" data-page="library" aria-current="page">图片</button>
+        <button type="button" class="nav-item" data-page="trash">回收站</button>
+        <button type="button" class="nav-item" data-page="settings">设置</button>
+      </nav>
+      <button type="button" class="btn btn-ghost" id="theme">浅色</button>
+    </aside>
+    <main class="main">
+      <div class="panel">
+        <div class="panel-main">
+          <header class="head"><div class="head-title"><h1 tabindex="-1">图片</h1><span id="count" class="count"></span></div></header>
+          <div id="images" class="scroll">
+            <div class="retention-selection" id="selection" hidden>
+              <span id="selected"></span>
+              <button type="button" class="btn btn-ghost btn-danger-text" id="batch"></button>
+            </div>
+            <div class="retention-note" id="policy-status" hidden>
+              <span role="status" id="policy-message"></span>
+              <button type="button" class="btn btn-ghost" id="retry-policy" hidden>重试</button>
+            </div>
+            <ul class="retention-list" id="list"></ul>
+            <p id="empty" class="retention-empty" hidden></p>
+          </div>
+          <div class="scroll" id="settings" hidden>
+            <form class="page retention-settings" id="settings-form">
+              <section class="section">
+                <h2>回收站</h2>
+                <div class="rows">
+                  <div class="form-row">
+                    <label class="k" for="days">保留时间</label>
+                    <div class="ctl">
+                      <div class="field-wrap has-suffix w-num">
+                        <input class="input" id="days" type="number" min="0" max="365" required aria-describedby="zero-hint">
+                        <span class="suffix">天</span>
+                      </div>
+                      <span class="hint" id="zero-hint" hidden>设为 0 天时，删除图片前需确认永久删除。</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section class="section">
+                <h2>操作记录</h2>
+                <div class="rows">
+                  <div class="form-row">
+                    <label class="k" for="audit-days">保留时间</label>
+                    <div class="ctl">
+                      <div class="field-wrap has-suffix w-num">
+                        <input class="input" id="audit-days" type="number" min="7" max="3650" required>
+                        <span class="suffix">天</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="section-head" id="settings-actions" hidden>
+                  <button type="button" class="btn btn-secondary" id="discard">放弃</button>
+                  <button type="submit" class="btn btn-primary" id="save">保存</button>
+                </div>
+              </section>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <dialog class="dialog retention-dialog" aria-labelledby="purge-title" aria-describedby="purge-note">
+    <header class="dialog-head" id="purge-title"></header>
+    <div class="dialog-body">
+      <p id="purge-note">图片删除后无法恢复。</p>
+      <p class="field-error" role="alert" id="delete-error" hidden>永久删除失败，请重试。</p>
+    </div>
+    <footer class="dialog-foot">
+      <button type="button" class="btn btn-secondary" id="cancel" autofocus>取消</button>
+      <button type="button" class="btn btn-danger" id="confirm">永久删除</button>
+    </footer>
+  </dialog>
+  <div class="toast retention-toast" id="toast" hidden>
+    <span role="status" id="toast-message"></span>
+    <button type="button" id="undo" hidden>撤销</button>
+  </div>
+  <template id="row">
+    <li><input type="checkbox"><img alt=""><span class="filename"></span>
+      <button type="button" class="btn btn-ghost"></button></li>
+  </template>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const params = new URLSearchParams(location.search);
+    let scenario = params.get('state');
+    let retention = params.get('retention') === '30' || scenario === 'policy-changed' ? 30 : 0;
+    let auditDays = 180;
+    let policy = scenario === 'unavailable' ? 'unavailable' : 'ready';
+    let page = 'library';
+    let pending = false;
+    let targets = [];
+    let undoImages = [];
+    let toastTimer;
+    const selected = new Set();
+    const images = [
+      { name: 'lake-morning.jpg', state: 'library' },
+      { name: 'mountain-dusk.jpg', state: 'library' },
+      { name: 'city-night.jpg', state: 'library' },
+    ];
+    const dialog = $('dialog');
+    const titles = { library: '图片', trash: '回收站', settings: '设置' };
+
+    function notify(message, undo = []) {
+      clearTimeout(toastTimer);
+      undoImages = undo;
+      $('#toast-message').textContent = message;
+      $('#undo').hidden = !undo.length;
+      $('#toast').hidden = false;
+      toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 6000);
+    }
+
+    function renderSelection() {
+      $('#selection').hidden = page !== 'library' || selected.size === 0;
+      $('#selected').textContent = `已选 ${selected.size} 张`;
+    }
+
+    function renderImages() {
+      const list = $('#list');
+      const visible = images.filter((img) => img.state === page);
+      const action = retention === 0 ? '永久删除' : '移到回收站';
+      $('#count').textContent = visible.length;
+      $('#policy-status').hidden = page !== 'library' || policy === 'ready';
+      $('#policy-message').textContent = policy === 'unavailable' ? '无法读取回收站保留时间。' : '正在读取回收站保留时间…';
+      $('#retry-policy').hidden = policy !== 'unavailable';
+      $('#batch').textContent = policy === 'ready' ? action : '删除';
+      $('#batch').disabled = pending || policy !== 'ready';
+      renderSelection();
+      list.replaceChildren();
+      for (const img of visible) {
+        const row = $('#row').content.firstElementChild.cloneNode(true);
+        const box = row.querySelector('input');
+        box.hidden = page === 'trash';
+        box.checked = selected.has(img);
+        box.setAttribute('aria-label', `选择 ${img.name}`);
+        box.addEventListener('change', () => {
+          if (box.checked) selected.add(img);
+          else selected.delete(img);
+          renderSelection();
+        });
+        row.querySelector('img').src = `assets/fixtures/${img.name}`;
+        row.querySelector('.filename').textContent = img.name;
+        const button = row.querySelector('button');
+        button.disabled = pending || (page === 'library' && policy !== 'ready');
+        button.textContent = page === 'trash' ? '恢复' : policy === 'ready' ? action : '删除';
+        button.classList.toggle('btn-danger-text', page === 'library');
+        button.setAttribute('aria-label', `${button.textContent} ${img.name}`);
+        button.addEventListener('click', () => {
+          if (page === 'trash') {
+            img.state = 'library';
+            renderImages();
+            $('h1').focus();
+            notify('已恢复');
+          } else {
+            requestRemoval([img]);
+          }
+        });
+        list.append(row);
+      }
+      $('#empty').hidden = visible.length > 0;
+      $('#empty').textContent = page === 'trash' ? '回收站是空的' : '没有图片';
+    }
+
+    function resetSettings() {
+      $('#days').value = retention;
+      $('#audit-days').value = auditDays;
+      updateSettings();
+    }
+
+    function updateSettings() {
+      $('#zero-hint').hidden = $('#days').valueAsNumber !== 0;
+      $('#settings-actions').hidden = $('#days').valueAsNumber === retention && $('#audit-days').valueAsNumber === auditDays;
+      $('#save').disabled = !$('#settings-form').checkValidity();
+    }
+
+    function openPage(next) {
+      page = next;
+      selected.clear();
+      $('h1').textContent = titles[page];
+      $('#images').hidden = page === 'settings';
+      $('#count').hidden = page === 'settings';
+      $('#settings').hidden = page !== 'settings';
+      for (const button of document.querySelectorAll('.nav-item')) {
+        if (button.dataset.page === page) button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
+      }
+      if (page === 'settings') resetSettings();
+      else renderImages();
+    }
+
+    function requestRemoval(items) {
+      if (pending || policy !== 'ready') return;
+      if (retention > 0) {
+        void remove(items, false);
+        return;
+      }
+      targets = items;
+      $('#purge-title').textContent = items.length === 1
+        ? `永久删除“${items[0].name}”？` : `永久删除 ${items.length} 张图片？`;
+      $('#delete-error').hidden = true;
+      dialog.showModal();
+    }
+
+    async function remove(items, permanent) {
+      pending = true;
+      $('#cancel').disabled = true;
+      $('#confirm').disabled = true;
+      $('#confirm').textContent = '正在删除…';
+      if (!permanent) renderImages();
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      pending = false;
+      $('#cancel').disabled = false;
+      $('#confirm').disabled = false;
+      $('#confirm').textContent = '永久删除';
+      if (scenario === 'delete-error' && permanent) {
+        scenario = null;
+        $('#delete-error').hidden = false;
+        $('#confirm').focus();
+        return;
+      }
+      if (scenario === 'policy-changed') {
+        scenario = null;
+        retention = 0;
+        renderImages();
+        $('h1').focus();
+        notify('回收站保留时间已更改，请重新确认。');
+        return;
+      }
+      for (const img of items) img.state = permanent ? 'deleted' : 'trash';
+      selected.clear();
+      if (dialog.open) dialog.close();
+      renderImages();
+      $('h1').focus();
+      const count = items.length > 1 ? `${items.length} 张图片` : '';
+      notify(permanent ? `已永久删除${count ? ' ' + count : ''}`
+        : count ? `已将 ${count} 移到回收站` : '已移到回收站', permanent ? [] : items);
+    }
+
+    document.querySelector('nav').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-page]');
+      if (button && !pending) openPage(button.dataset.page);
+    });
+    $('#batch').addEventListener('click', () => requestRemoval([...selected]));
+    $('#cancel').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('cancel', (event) => { if (pending) event.preventDefault(); });
+    $('#confirm').addEventListener('click', () => { if (!pending) void remove(targets, true); });
+    $('#retry-policy').addEventListener('click', () => {
+      policy = 'loading';
+      renderImages();
+      setTimeout(() => {
+        policy = 'ready';
+        renderImages();
+        if (page === 'library') $('h1').focus();
+      }, 200);
+    });
+    $('#undo').addEventListener('click', () => {
+      for (const img of undoImages) img.state = 'library';
+      renderImages();
+      $('h1').focus();
+      notify('已恢复');
+    });
+    $('#theme').addEventListener('click', () => {
+      const light = document.documentElement.dataset.theme === 'dark';
+      document.documentElement.dataset.theme = light ? 'light' : 'dark';
+      $('#theme').textContent = light ? '深色' : '浅色';
+    });
+    $('#settings-form').addEventListener('input', updateSettings);
+    $('#discard').addEventListener('click', resetSettings);
+    $('#settings-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      retention = $('#days').valueAsNumber;
+      auditDays = $('#audit-days').valueAsNumber;
+      updateSettings();
+      notify('设置已保存');
+    });
+    openPage('library');
+  </script>
+</body>
+</html>
