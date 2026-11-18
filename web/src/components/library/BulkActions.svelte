@@ -60,12 +60,14 @@
   <button
     type="button"
     class="btn btn-ghost"
-    class:btn-icon={compact}
-    aria-label={compact ? '移到回收站' : undefined}
-    title={compact ? '移到回收站' : undefined}
+    class:btn-icon={compact && lib.retention !== 0}
+    class:btn-danger-text={lib.retention === 0}
+    aria-label={compact ? lib.deleteLabel : undefined}
+    title={compact ? lib.deleteLabel : undefined}
+    disabled={lib.retention === null || lib.purgeBusy}
     onclick={() => lib.trash(ids)}
   >
     <Icon name="trash" />
-    {#if !compact}移到回收站{/if}
+    {#if !compact || lib.retention === 0}{lib.deleteLabel}{/if}
   </button>
 {/if}

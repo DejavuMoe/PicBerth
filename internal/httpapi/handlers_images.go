@@ -260,15 +260,16 @@ func (s *Server) batchImages(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Action   string         `json:"action"`
-		IDs      []string       `json:"ids"`
-		FolderID nullableString `json:"folderId"`
+		Action                     string         `json:"action"`
+		IDs                        []string       `json:"ids"`
+		FolderID                   nullableString `json:"folderId"`
+		ExpectedTrashRetentionDays *int           `json:"expectedTrashRetentionDays"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.FolderID.Value)
+	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.FolderID.Value, req.ExpectedTrashRetentionDays)
 	if err != nil {
 		s.writeError(w, r, err)
 		return

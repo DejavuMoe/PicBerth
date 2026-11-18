@@ -39,6 +39,8 @@ var problemMeta = map[string]struct {
 	core.CodeFolderDepth:         {http.StatusUnprocessableEntity, "Folder depth exceeded"},
 	core.CodeInvalidScope:        {http.StatusUnprocessableEntity, "Invalid token scope"},
 	core.CodeInternal:            {http.StatusInternalServerError, "Internal error"},
+
+	core.CodeTrashRetentionChanged: {http.StatusConflict, "Trash retention changed"},
 }
 
 // writeProblem sends an RFC 9457 problem document for a stable code.

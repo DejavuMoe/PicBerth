@@ -701,6 +701,47 @@ func TestThumbnailEndpoint(t *testing.T) {
 	}
 }
 
+func TestBatchTrashRetentionPrecondition(t *testing.T) {
+	h := newHarness(t, harnessOpts{})
+	img := h.mustUploadWeb(190)
+	path := "/api/v1/images/" + img.ID
+	batch := func(expected int) (*http.Response, []byte) {
+		return h.web("POST", "/api/v1/images/batch", map[string]any{
+			"action": "trash", "ids": []string{img.ID}, "expectedTrashRetentionDays": expected,
+		})
+	}
+	resp, body := batch(0)
+	wantProblem(t, resp, body, 409, "trash-retention-changed")
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantStatus(t, resp, body, 200)
+
+	resp, body = h.web("PATCH", "/api/v1/settings", map[string]int{"trashRetentionDays": 0})
+	wantStatus(t, resp, body, 200)
+	resp, body = batch(30)
+	wantProblem(t, resp, body, 409, "trash-retention-changed")
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantStatus(t, resp, body, 200)
+	resp, body = h.web("GET", path, nil)
+	wantStatus(t, resp, body, 200)
+	if got := decode[imageJSON](t, body); got.State != "active" {
+		t.Fatalf("stale batch changed state: %s", got.State)
+	}
+
+	resp, body = batch(0)
+	wantStatus(t, resp, body, 200)
+	if !strings.Contains(string(body), `"ok":true`) {
+		t.Fatalf("confirmed batch: %s", body)
+	}
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantProblem(t, resp, body, 404, "not-found")
+
+	legacy := h.mustUploadWeb(191)
+	resp, body = h.web("POST", "/api/v1/images/batch", map[string]any{"action": "trash", "ids": []string{legacy.ID}})
+	wantStatus(t, resp, body, 200)
+	resp, body = h.web("GET", "/api/v1/images/"+legacy.ID, nil)
+	wantProblem(t, resp, body, 404, "not-found")
+}
+
 func TestTrashRestorePurgeFlow(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	img := h.mustUploadWeb(81)

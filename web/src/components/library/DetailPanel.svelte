@@ -277,9 +277,14 @@
         <Icon name="download" />
         下载
       </button>
-      <button type="button" class="btn btn-ghost btn-danger-text" onclick={() => lib.trash([image.id])}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-danger-text"
+        disabled={lib.retention === null || lib.purgeBusy}
+        onclick={() => lib.trash([image.id])}
+      >
         <Icon name="trash" />
-        移到回收站
+        {lib.deleteLabel}
       </button>
     {/if}
   </div>
