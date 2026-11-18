@@ -837,6 +837,101 @@ func TestPurgeExpired(t *testing.T) {
 	assertInvariants(t, e)
 }
 
+func TestPurgeExpiredKeepsRetrashedImage(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	first := e.mustUpload(e.admin, "first.png", makePNG(t, 5, 5, 30))
+	firstLock := e.svc.lockImage(first.ID)
+	firstLock.Unlock()
+	var renewed ImageView
+	for seed := 31; ; seed++ {
+		renewed = e.mustUpload(e.admin, "renewed.png", makePNG(t, 5, 5, seed))
+		lock := e.svc.lockImage(renewed.ID)
+		lock.Unlock()
+		if lock != firstLock {
+			break
+		}
+	}
+
+	today := time.Now()
+	now := today.Add(-42 * 24 * time.Hour)
+	e.svc.Now = func() time.Time { return now }
+	if err := e.svc.Trash(ctx, e.admin, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	now = today.Add(-41 * 24 * time.Hour)
+	if err := e.svc.Trash(ctx, e.admin, renewed.ID); err != nil {
+		t.Fatal(err)
+	}
+	now = today
+
+	// Renew the second image after the sweep selected its batch.
+	retrashed := false
+	e.svc.Fault = func(point string) error {
+		if point != FaultPurgeAfterDB || retrashed {
+			return nil
+		}
+		retrashed = true
+		if _, err := e.svc.Restore(ctx, e.admin, renewed.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.svc.Trash(ctx, e.admin, renewed.ID); err != nil {
+			t.Fatal(err)
+		}
+		return nil
+	}
+	if n, err := e.svc.PurgeExpired(ctx); err != nil || n != 1 || !retrashed {
+		t.Errorf("sweep purged %d images, retrash ran=%v, error=%v", n, retrashed, err)
+	}
+	im, err := e.db.GetImage(ctx, renewed.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if im.State != meta.StateTrashed || im.TrashedAt == nil || *im.TrashedAt != today.UnixMilli() {
+		t.Errorf("renewed image state=%s, trashedAt=%v", im.State, im.TrashedAt)
+	}
+	if !e.fileExists("trash/" + im.ObjectKey) {
+		t.Error("renewed image lost its original")
+	}
+	e.svc.Fault = nil
+	if err := e.svc.Purge(ctx, e.admin, renewed.ID); err != nil {
+		t.Fatal("manual purge of recently trashed image:", err)
+	}
+	assertInvariants(t, e)
+}
+
+func TestPurgeExpiredHonorsExtendedRetention(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	today := time.Now()
+	e.svc.Now = func() time.Time { return today.Add(-40 * 24 * time.Hour) }
+	for i := range 2 {
+		img := e.mustUpload(e.admin, "old.png", makePNG(t, 5, 5, 40+i))
+		if err := e.svc.Trash(ctx, e.admin, img.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.svc.Now = func() time.Time { return today }
+	e.svc.Fault = func(point string) error {
+		if point == FaultPurgeAfterDB {
+			e.svc.Fault = nil
+			days := 90
+			_, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{TrashRetentionDays: &days})
+			return err
+		}
+		return nil
+	}
+	n, err := e.svc.PurgeExpired(ctx)
+	if err != nil || n != 1 {
+		t.Fatalf("extended retention during sweep: purged %d, want 1, error %v", n, err)
+	}
+	remaining, _, err := e.svc.ListImages(ctx, e.admin, ListParams{State: meta.StateTrashed})
+	if err != nil || len(remaining) != 1 {
+		t.Fatalf("remaining images in trash: %+v, %v", remaining, err)
+	}
+	assertInvariants(t, e)
+}
+
 func TestThumbnailWorker(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()

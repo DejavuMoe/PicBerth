@@ -583,7 +583,7 @@ func (s *Service) trash(ctx context.Context, p Principal, id string, confirmedPu
 	if im.State == meta.StateTrashed {
 		unlock.Unlock()
 		if confirmedPurge {
-			return s.purge(ctx, p, id)
+			return s.purge(ctx, p, id, nil)
 		}
 		return nil
 	}
@@ -608,7 +608,7 @@ func (s *Service) trash(ctx context.Context, p Principal, id string, confirmedPu
 	s.audit(ctx, p, "image.trash", id, "")
 	unlock.Unlock()
 	if s.Settings().TrashRetentionDays == 0 {
-		return s.purge(ctx, p, id)
+		return s.purge(ctx, p, id, nil)
 	}
 	return nil
 }
@@ -671,10 +671,10 @@ func (s *Service) Purge(ctx context.Context, p Principal, id string) error {
 	if _, err := s.getVisible(ctx, p, id); err != nil {
 		return err
 	}
-	return s.purge(ctx, p, id)
+	return s.purge(ctx, p, id, nil)
 }
 
-func (s *Service) purge(ctx context.Context, p Principal, id string) error {
+func (s *Service) purge(ctx context.Context, p Principal, id string, sweepStart *time.Time) error {
 	s.purgeMu.RLock()
 	defer s.purgeMu.RUnlock()
 	unlock := s.lockImage(id)
@@ -693,7 +693,7 @@ func (s *Service) purge(ctx context.Context, p Principal, id string) error {
 		return conflict("Only images in the trash can be purged.")
 	}
 	// Tombstone first, then bytes.
-	ok, err := s.db.MarkPurged(ctx, id, s.nowMs())
+	ok, err := s.markPurged(ctx, im, sweepStart)
 	if err != nil {
 		return err
 	}
@@ -706,6 +706,25 @@ func (s *Service) purge(ctx context.Context, p Principal, id string) error {
 	s.removeFiles(im)
 	s.audit(ctx, p, "image.purge", id, "")
 	return nil
+}
+
+func (s *Service) trashCutoff(at time.Time) int64 {
+	days := s.settings.Load().TrashRetentionDays
+	return at.Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+}
+
+func (s *Service) markPurged(ctx context.Context, im *meta.Image, sweepStart *time.Time) (bool, error) {
+	if sweepStart != nil {
+		// Guarded UI batches take the settings lock first. Yield to a settings writer while holding the image lock.
+		if !s.settingsMu.TryRLock() {
+			return false, nil
+		}
+		defer s.settingsMu.RUnlock()
+		if im.TrashedAt == nil || *im.TrashedAt > s.trashCutoff(*sweepStart) {
+			return false, nil
+		}
+	}
+	return s.db.MarkPurged(ctx, im.ID, s.nowMs())
 }
 
 // removeFiles deletes an image's bytes (wherever they are) and thumbnails; failures are left to the check.
@@ -722,12 +741,11 @@ func (s *Service) removeFiles(im *meta.Image) {
 
 // PurgeExpired purges trashed images older than the retention period. It returns how many were purged.
 func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
-	days := s.Settings().TrashRetentionDays
-	cutoff := s.now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+	start := s.now()
 	total := 0
 	actor := Principal{Kind: KindCLI, Username: "system"}
 	for {
-		idsBatch, err := s.db.ExpiredTrash(ctx, cutoff, 200)
+		idsBatch, err := s.db.ExpiredTrash(ctx, s.trashCutoff(start), 200)
 		if err != nil {
 			return total, err
 		}
@@ -739,7 +757,7 @@ func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
 			if err := ctx.Err(); err != nil {
 				return total, err
 			}
-			err := s.purge(ctx, actor, id)
+			err := s.purge(ctx, actor, id, &start)
 			if err == nil {
 				total++
 				progressed = true
@@ -785,8 +803,8 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 			return nil, validation("expectedTrashRetentionDays must be between 0 and 365 and is only supported for action=trash.")
 		}
 		// Keep the checked policy in force until the batch finishes applying it.
-		s.settingsMu.Lock()
-		defer s.settingsMu.Unlock()
+		s.settingsMu.RLock()
+		defer s.settingsMu.RUnlock()
 		if s.Settings().TrashRetentionDays != *expectedTrashRetentionDays {
 			return nil, newErr(CodeTrashRetentionChanged, "The trash retention period changed. Review the action and try again.")
 		}
