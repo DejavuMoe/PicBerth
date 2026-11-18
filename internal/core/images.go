@@ -270,7 +270,7 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 		return nil, "", validation("limit must be between 1 and 200.")
 	}
 	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
-	if len(q.Q) > 200 {
+	if utf8Len(q.Q) > maxNameRunes {
 		return nil, "", validation("q is too long.")
 	}
 	var err error
