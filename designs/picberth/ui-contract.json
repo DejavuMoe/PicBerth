@@ -275,6 +275,38 @@
         "tests": []
       },
       "status": "approved"
+    },
+    {
+      "id": "trash-retention",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "retention.html",
+        "assetPath": "retention.html",
+        "files": ["retention.html", "styles.css"],
+        "states": [
+          "zero-day-single-confirm",
+          "zero-day-batch-confirm",
+          "zero-day-cancel",
+          "zero-day-delete-retry",
+          "positive-retention-undo",
+          "retention-unavailable",
+          "retention-changed",
+          "zero-day-save-other-setting"
+        ],
+        "stableIds": ["images", "settings", "batch", "cancel", "confirm"]
+      },
+      "production": {
+        "routeOrWindow": "/library, /settings",
+        "files": [
+          "web/src/screens/Library.svelte",
+          "web/src/lib/library.svelte.ts",
+          "web/src/components/library/PurgeConfirm.svelte",
+          "web/src/screens/Settings.svelte"
+        ],
+        "interfaces": ["POST /api/v1/images/batch", "/api/v1/settings"],
+        "tests": []
+      },
+      "status": "approved"
     }
   ]
 }
