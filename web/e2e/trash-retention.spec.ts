@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
-  checkPageHealth, expect, finishUploads, libraryItem, login, samplePng, storedImages, test,
+  checkPageHealth, expect, finishUploads, libraryItem, login, samplePng, storedImages, test, uniqueName,
 } from './harness/test-base.js';
 
 async function settings(page: Page, patch: Record<string, number>) {
@@ -36,10 +36,11 @@ async function select(page: Page, names: string[], mobile: boolean) {
 
 test('confirms zero-day deletion, supports retry, and saves other settings at zero', async ({ page }, info) => {
   const mobile = info.project.name === 'mobile';
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
   await login(page);
   const before = await (await page.request.get('/api/v1/settings')).json();
-  const names = ['a', 'b'].map((x) => `zero-${info.project.name}-${x}.png`);
+  const prefix = uniqueName('zero', info);
+  const names = ['a', 'b'].map((x) => `${prefix}-${x}.png`);
   let batchRequests = 0;
   try {
     await settings(page, { trashRetentionDays: 0 });
@@ -68,7 +69,12 @@ test('confirms zero-day deletion, supports retry, and saves other settings at ze
     const cancel = dialog.getByRole('button', { name: '取消' });
     await expect(cancel).toBeFocused();
     if (mobile) await cancel.tap();
-    else await page.keyboard.press('Escape');
+    else {
+      await page.keyboard.press('Tab');
+      await expect(dialog.getByRole('button', { name: '永久删除' })).toBeFocused();
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Enter');
+    }
     await expect(dialog).toHaveCount(0);
     expect(batchRequests).toBe(0);
     expect(await storedImages(page, names[0]!)).toHaveLength(1);

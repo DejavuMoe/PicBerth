@@ -32,6 +32,14 @@
     class="dialog"
     class:dialog-wide={wide}
     class:leaving={leave.leaving}
+    inert={leave.leaving}
+    onclickcapture={(e) => {
+      // A focused button can still receive keyboard activation before the browser moves focus.
+      if (leave.leaving) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }}
     role="dialog"
     aria-modal="true"
     aria-labelledby="dlg-title"
