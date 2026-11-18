@@ -128,6 +128,7 @@
                 class="btn btn-ghost btn-sm btn-icon"
                 aria-label={`恢复 ${im.filename}`}
                 title="恢复"
+                disabled={lib.pending.has(im.id)}
                 onclick={() => lib.restore([im.id])}
               >
                 <Icon name="restore" />

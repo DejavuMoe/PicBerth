@@ -13,6 +13,7 @@
 
   const trash = $derived(lib.mode === 'trash');
   const ids = $derived([...lib.sel]);
+  const pending = $derived(ids.every((id) => lib.pending.has(id)));
   const selected = $derived(lib.items.filter((i) => lib.sel.has(i.id)));
   const commonFolder = $derived(
     selected.length > 0 && selected.every((i) => (i.folderId ?? null) === (selected[0]?.folderId ?? null))
@@ -22,12 +23,12 @@
 </script>
 
 {#if trash}
-  <button type="button" class="btn btn-ghost" onclick={() => lib.restore(ids)}>
+  <button type="button" class="btn btn-ghost" disabled={pending} onclick={() => lib.restore(ids)}>
     <Icon name="restore" />
     恢复
   </button>
   {#if compact}<span class="grow"></span>{/if}
-  <button type="button" class="btn btn-ghost btn-danger-text" onclick={() => lib.requestPurge(ids)}>
+  <button type="button" class="btn btn-ghost btn-danger-text" disabled={pending} onclick={() => lib.requestPurge(ids)}>
     永久删除
   </button>
 {:else}
@@ -64,7 +65,7 @@
     class:btn-danger-text={lib.retention === 0}
     aria-label={compact ? lib.deleteLabel : undefined}
     title={compact ? lib.deleteLabel : undefined}
-    disabled={lib.retention === null || lib.purgeBusy}
+    disabled={lib.retention === null || lib.purgeBusy || pending}
     onclick={() => lib.trash(ids)}
   >
     <Icon name="trash" />

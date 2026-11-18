@@ -259,9 +259,9 @@ export const api = {
   facets: (state: ImageState) => request<Facets>('GET', '/images/facets', { query: { state } }),
   batch: async (action: BatchAction, ids: string[], folderId?: string | null, expectedTrashRetentionDays?: number) => {
     const results: BatchResult[] = [];
-    try {
-      for (let i = 0; i < ids.length; i += 500) {
-        const chunk = ids.slice(i, i + 500);
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      try {
         const res = await request<{ results: BatchResult[] }>('POST', '/images/batch', {
           json: {
             action,
@@ -271,11 +271,11 @@ export const api = {
           },
         });
         results.push(...res.results);
+      } catch (error) {
+        return { results, error, unconfirmed: chunk };
       }
-      return { results };
-    } catch (error) {
-      return { results, error };
     }
+    return { results };
   },
 
   listFolders: () => request<{ items: Folder[] }>('GET', '/folders'),

@@ -35,6 +35,7 @@
       <MenuItem
         danger
         icon="trash"
+        disabled={lib.pending.has(image.id)}
         onclick={() => {
           lib.requestPurge([image.id]);
           close();
@@ -69,7 +70,7 @@
       <MenuItem
         icon="trash"
         danger={lib.retention === 0}
-        disabled={lib.retention === null || lib.purgeBusy}
+        disabled={lib.retention === null || lib.purgeBusy || lib.pending.has(image.id)}
         onclick={() => {
           lib.trash([image.id]);
           close();
