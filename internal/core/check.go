@@ -151,6 +151,9 @@ func (s *Service) checkImage(ctx context.Context, id string, full bool, rep *Che
 	}
 	rep.Checked++
 	bad, err := s.checkStructure(ctx, im, rep)
+	if err == nil && full {
+		err = s.resetMissingThumbnail(ctx, im, rep)
+	}
 	unlock.Unlock()
 	if err != nil {
 		return err
@@ -166,6 +169,36 @@ func (s *Service) checkImage(ctx context.Context, id string, full bool, rep *Che
 		if _, err := s.db.SetBroken(ctx, id, nil); err != nil {
 			return err
 		}
+	}
+	if !bad && full && im.State == meta.StateActive && im.Thumb == "" {
+		s.enqueueThumb(id)
+	}
+	return nil
+}
+
+// Snapshots omit the thumbnail cache. Treat a missing cache file as pending regeneration.
+func (s *Service) resetMissingThumbnail(ctx context.Context, im *meta.Image, rep *CheckReport) error {
+	if im.Thumb != "jpg" && im.Thumb != "png" {
+		return nil
+	}
+	f, err := s.blobs.OpenThumb(im.ID, im.Thumb)
+	if errors.Is(err, fs.ErrNotExist) {
+		if _, err := s.db.SetThumb(ctx, im.ID, ""); err != nil {
+			return err
+		}
+		im.Thumb = ""
+		return nil
+	}
+	if err == nil {
+		err = f.Close()
+	}
+	if err != nil {
+		path := ""
+		if !errors.Is(err, blob.ErrInvalidKey) {
+			path = "cache/thumbs/" + im.ID[:2] + "/" + im.ID + "." + im.Thumb
+		}
+		rep.add(IssueMissingFile, im.ID, path, false)
+		s.log.Warn("check: cannot read thumbnail", "id", im.ID, "path", path, "err", err)
 	}
 	return nil
 }
@@ -186,6 +219,11 @@ func (s *Service) checkPurged(ctx context.Context, im *meta.Image, rep *CheckRep
 	}
 	for _, ext := range blob.ThumbExts {
 		f, err := s.blobs.OpenThumb(im.ID, ext)
+		if errors.Is(err, blob.ErrInvalidKey) {
+			rep.add(IssueOrphanFile, im.ID, "", false)
+			s.log.Warn("check: cannot inspect purged thumbnails", "id", im.ID, "err", err)
+			return nil
+		}
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
