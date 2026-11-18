@@ -706,7 +706,7 @@ func TestBatchTrashRetentionPrecondition(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	img := h.mustUploadWeb(190)
 	path := "/api/v1/images/" + img.ID
-	batch := func(expected int) (*http.Response, []byte) {
+	batch := func(expected any) (*http.Response, []byte) {
 		return h.web("POST", "/api/v1/images/batch", map[string]any{
 			"action": "trash", "ids": []string{img.ID}, "expectedTrashRetentionDays": expected,
 		})
@@ -718,6 +718,8 @@ func TestBatchTrashRetentionPrecondition(t *testing.T) {
 
 	resp, body = h.web("PATCH", "/api/v1/settings", map[string]int{"trashRetentionDays": 0})
 	wantStatus(t, resp, body, 200)
+	resp, body = batch(nil)
+	wantProblem(t, resp, body, 400, "validation")
 	resp, body = batch(30)
 	wantProblem(t, resp, body, 409, "trash-retention-changed")
 	resp, body = h.web("GET", path+"/raw", nil)

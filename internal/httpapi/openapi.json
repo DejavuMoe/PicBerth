@@ -322,9 +322,9 @@
       },
       "delete": {
         "tags": ["images"],
-        "summary": "Move an image to the trash",
+        "summary": "Trash an active image, permanently deleting it when retention is zero",
         "responses": {
-          "204": { "description": "Trashed (idempotent)" },
+          "204": { "description": "Trashed, already in the trash, or permanently deleted under zero retention" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
