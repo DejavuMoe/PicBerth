@@ -79,10 +79,30 @@ jobs:
       - name: Go vulnerability check
         if: runner.arch == 'X64'
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Audit production frontend dependencies
+        if: runner.arch == 'X64'
+        working-directory: web
+        run: pnpm audit --prod --audit-level moderate
       - name: Frontend dependency audit (including build tools)
         if: runner.arch == 'X64'
         working-directory: web
-        run: pnpm audit --audit-level moderate
+        env:
+          ALLOW_BUILD_ADVISORY_EXCEPTION: ${{ github.workflow == 'CI' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch')) }}
+        shell: bash
+        run: |
+          # picomatch is in the build toolchain. Remove this exception when the lockfile has the fix.
+          expires=2026-11-25
+          today=$(date -u +%F)
+          if [[ "$ALLOW_BUILD_ADVISORY_EXCEPTION" == true && "$today" < "$expires" ]]; then
+            audit_dir=$(mktemp -d)
+            trap 'rm -rf -- "$audit_dir"' EXIT
+            cp -- package.json pnpm-lock.yaml pnpm-workspace.yaml "$audit_dir/"
+            printf '\naudit:\n  ignore:\n    - GHSA-fc5q-39xc-vjpf\n' >> "$audit_dir/pnpm-workspace.yaml"
+            echo "::notice title=Temporary build dependency exception::GHSA-fc5q-39xc-vjpf expires at 00:00 UTC on $expires."
+            pnpm --dir "$audit_dir" audit --audit-level moderate
+          else
+            pnpm audit --audit-level moderate
+          fi
       - name: Check design export tools
         if: runner.arch == 'X64'
         run: |
