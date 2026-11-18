@@ -1256,8 +1256,17 @@ func TestSnapshotDuringUploadsAndRestore(t *testing.T) {
 		e.mustUpload(e.admin, fmt.Sprintf("seed%d.png", i), makePNG(t, 6, 6, 200+i))
 	}
 	trashed := e.mustUpload(e.admin, "trashed.png", makePNG(t, 6, 6, 250))
-	e.svc.Trash(ctx, e.admin, trashed.ID)
-	e.mustUpload(e.admin, "j.jpg", makeJPEG(t, 3))
+	active := e.mustUpload(e.admin, "j.jpg", makeJPEG(t, 3))
+	e.svc.ProcessThumbnails(ctx)
+	for _, img := range []ImageView{active, trashed} {
+		v, err := e.svc.GetImage(ctx, e.admin, img.ID)
+		if err != nil || !v.HasThumb {
+			t.Fatalf("missing fixture thumbnail, image %+v: %v", v, err)
+		}
+	}
+	if err := e.svc.Trash(ctx, e.admin, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
@@ -1334,6 +1343,28 @@ func TestSnapshotDuringUploadsAndRestore(t *testing.T) {
 	rep2, err := svc2.Check(ctx, CLIPrincipal(), CheckFull)
 	if err != nil || !rep2.OK || len(rep2.Issues) != 0 {
 		t.Fatalf("check after restore: %+v %v", rep2, err)
+	}
+
+	v, err := svc2.GetImage(ctx, e.admin, trashed.ID)
+	if err != nil || v.HasThumb || v.SHA256 != trashed.SHA256 {
+		t.Errorf("restored trash metadata: %+v, %v", v, err)
+	}
+	svc2.ProcessThumbnails(ctx)
+	thumb, err := svc2.OpenThumb(ctx, e.admin, active.ID)
+	if err != nil {
+		t.Errorf("active thumbnail was not regenerated: %v", err)
+	} else {
+		thumb.File.Close()
+	}
+	if _, err := svc2.Restore(ctx, e.admin, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
+	svc2.ProcessThumbnails(ctx)
+	thumb, err = svc2.OpenThumb(ctx, e.admin, trashed.ID)
+	if err != nil {
+		t.Errorf("thumbnail was not regenerated after moving out of trash: %v", err)
+	} else {
+		thumb.File.Close()
 	}
 
 	// restore refuses a non-empty target and a non-snapshot source

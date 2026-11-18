@@ -328,3 +328,7 @@ Warning codes: `public-url-unset`, `insecure-public-url`, `untrusted-forwarded`,
 
 Quick check: every active/trashed record's file exists with the right size; completes pending moves; removes stale temp files.
 Full check: quick + re-hash every file + directory walk for orphans (orphans are moved to `quarantine/`, never deleted).
+When an expected thumbnail under `cache/thumbs/` cannot be accessed, the full check reports
+`missing-file` with its cache path and `repaired: false`. The server log records the I/O error, and
+the check continues verifying originals. If the stored image ID cannot form a valid cache path,
+the issue carries the image ID and a null path. A thumbnail absent from the cache is marked for regeneration.
