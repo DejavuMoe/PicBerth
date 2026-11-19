@@ -108,7 +108,7 @@ jobs:
           retention-days: 7
 
   image:
-    needs: verify
+    needs: source
     strategy:
       fail-fast: false
       matrix:
