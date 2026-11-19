@@ -3,7 +3,7 @@
   import { daysLeft, thumbSrc } from '../../lib/image';
   import { copyLink, type Library } from '../../lib/library.svelte';
   import { longpress } from '../../lib/longpress';
-  import type { Image } from '../../lib/types';
+  import { createGridLayout } from './grid-layout';
   import Check from '../Check.svelte';
   import Icon from '../Icon.svelte';
 
@@ -23,35 +23,8 @@
     return { destroy: () => ro.disconnect() };
   }
 
-  const narrow = $derived(width > 0 && width < 560);
-  const gap = $derived(narrow ? 8 : 12);
-
-  interface Row {
-    h: number;
-    items: { im: Image; r: number }[];
-  }
-
-  /** Rows of equal height that fill the width; every image keeps its proportions (ratio clamped 0.6 to 2.4). */
-  function justify(list: readonly Image[], w: number, target: number, g: number): Row[] {
-    const rows: Row[] = [];
-    let row: Row['items'] = [];
-    let sum = 0;
-    for (const im of list) {
-      const r = Math.max(0.6, Math.min(2.4, im.width / im.height || 1));
-      row.push({ im, r });
-      sum += r;
-      const h = (w - g * (row.length - 1)) / sum;
-      if (h <= target) {
-        rows.push({ h, items: row });
-        row = [];
-        sum = 0;
-      }
-    }
-    if (row.length) rows.push({ h: Math.min(target, (w - g * (row.length - 1)) / sum), items: row });
-    return rows;
-  }
-
-  const rows = $derived(width ? justify(lib.items, width, narrow ? 132 : 188, gap) : []);
+  const layout = createGridLayout();
+  const rows = $derived(width ? layout(lib.items, width) : []);
 
   function tileKey(e: KeyboardEvent, id: string) {
     if (e.target !== e.currentTarget) return;
