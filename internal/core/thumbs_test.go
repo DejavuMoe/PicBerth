@@ -179,3 +179,47 @@ func TestFullCheckReportsInvalidThumbnailKey(t *testing.T) {
 		})
 	}
 }
+
+func TestThumbnailRetry(t *testing.T) {
+	for _, failure := range []string{"cache", "outcome"} {
+		t.Run(failure, func(t *testing.T) {
+			e := newEnv(t)
+			ctx := context.Background()
+			im := e.mustUpload(e.admin, "retry.png", makePNG(t, 3, 3, 120))
+			exec := func(query string) {
+				t.Helper()
+				if _, err := e.db.Writer().ExecContext(ctx, query); err != nil {
+					t.Fatal(err)
+				}
+			}
+			shard := e.dir.Abs("cache/thumbs/" + im.ID[:2])
+			if failure == "cache" {
+				if err := os.WriteFile(shard, nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				exec("CREATE TRIGGER fail_thumb BEFORE UPDATE OF thumb ON images BEGIN SELECT RAISE(ABORT, 'temporary failure'); END")
+			}
+			e.svc.thumbOne(ctx, <-e.svc.thumbQ)
+			if len(e.svc.thumbQ) != 0 || !e.svc.thumbDirty.Swap(false) {
+				t.Fatal("expected retry on next tick with no immediate requeue")
+			}
+			if failure == "cache" {
+				if err := os.Remove(shard); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				exec("DROP TRIGGER fail_thumb")
+			}
+			e.svc.ProcessThumbnails(ctx)
+			thumb, err := e.svc.OpenThumb(ctx, e.admin, im.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			thumb.File.Close()
+			if e.svc.thumbDirty.Load() {
+				t.Fatal("successful retry scheduled another backfill")
+			}
+		})
+	}
+}
