@@ -17,7 +17,7 @@ def regctl(*args, data=None):
     config = Path.home() / '.docker' / 'config.json'
     return subprocess.run([
         'docker', 'run', '--rm', '-i', '-v', f'{config}:/home/appuser/.docker/config.json:ro',
-        'regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b',
+        'regclient/regctl:v0.11.7@sha256:45b57933c2b67bb1e280b4baaa220ef1ab212c81268ab19589fa1e83719c7c82',
         *args,
     ], input=data, stdout=subprocess.PIPE, check=True).stdout
 
@@ -40,7 +40,7 @@ def publish(source, target, run=regctl):
         if sha256(raw_index) != digest:
             raise ValueError('Staged image index digest mismatch')
         index = json.loads(raw_index)
-        runnable = verify_index(index, read, arch)
+        runnable = verify_index(index, read, arch, require_references=True)
         platforms = [descriptor for descriptor in index['manifests']
                      if descriptor.get('platform', {}).get('os') == 'linux']
         if len(platforms) != 1 or platforms[0]['platform'].get('architecture') != arch or platforms[0]['digest'] != runnable:

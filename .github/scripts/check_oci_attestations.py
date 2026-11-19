@@ -4,7 +4,7 @@ import sys
 import tarfile
 
 
-def verify_index(index, read, architecture):
+def verify_index(index, read, architecture, *, require_references=False):
     images, statements, seen = {}, [], set()
 
     def load(descriptor, kind):
@@ -28,22 +28,29 @@ def verify_index(index, read, architecture):
         config = load(manifest['config'], 'blob')
         if config.get('os') == 'linux':
             images[descriptor['digest'].split(':', 1)[1]] = config.get('architecture')
+        annotations = descriptor.get('annotations', {})
+        reference = manifest.get('subject', {}).get('digest')
+        if annotations.get('vnd.docker.reference.type') == 'attestation-manifest':
+            reference = annotations.get('vnd.docker.reference.digest')
         for layer in manifest.get('layers', []):
             if layer['mediaType'] == 'application/vnd.in-toto+json':
-                statements.append(load(layer, 'blob'))
+                statements.append((load(layer, 'blob'), reference))
 
     for descriptor in index['manifests']:
         visit(descriptor)
     if len(images) != 1 or set(images.values()) != {architecture}:
         raise ValueError('Unexpected runnable image architecture')
     predicates = set()
-    for statement in statements:
+    runnable = 'sha256:' + next(iter(images))
+    for statement, reference in statements:
+        if require_references and reference != runnable:
+            raise ValueError('Attestation descriptor does not refer to the runnable image')
         if not any(subject.get('digest', {}).get('sha256') in images for subject in statement.get('subject', [])):
             raise ValueError('Attestation subject does not bind the runnable image')
         predicates.add(statement['predicateType'])
     if 'https://spdx.dev/Document' not in predicates or not any(p.startswith('https://slsa.dev/provenance/') for p in predicates):
         raise ValueError('Both an SBOM and provenance are required')
-    return 'sha256:' + next(iter(images))
+    return runnable
 
 
 def verify(path, architecture):
