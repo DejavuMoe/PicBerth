@@ -99,3 +99,36 @@ test('filters the operation log by category and pages it ten at a time', async (
   }
   await checkPageHealth(page);
 });
+
+test('keeps the token cursor after a late folder response', async ({ page }) => {
+  await login(page);
+  const release = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  await page.route('**/api/v1/audit?*', async route => {
+    const query = new URL(route.request().url()).searchParams;
+    const kind = query.get('kind');
+    if (kind === 'folder') {
+      started.resolve();
+      await release.promise;
+    }
+    await route.fulfill({ json: { items: [{ id: query.get('cursor') || 'first', at: Date.now(), actor: 'admin', action: 'audit-test', target: kind }], nextCursor: kind } });
+  });
+  await page.goto('/status');
+  const filter = page.getByRole('button', { name: '操作类型' });
+  await filter.click();
+  await page.getByRole('menuitemradio', { name: '文件夹', exact: true }).click();
+  await started.promise;
+  try {
+    await filter.click();
+    await page.getByRole('menuitemradio', { name: '令牌', exact: true }).click();
+    await expect(page.getByText('token', { exact: true })).toBeVisible();
+  } finally {
+    const finished = page.waitForEvent('requestfinished', req => req.url().includes('kind=folder'));
+    release.resolve();
+    await finished;
+  }
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const next = page.waitForRequest(req => req.url().includes('/audit?') && req.url().includes('cursor='));
+  await page.getByRole('button', { name: '加载更多' }).click();
+  expect(new URL((await next).url()).searchParams.get('cursor')).toBe('token');
+});

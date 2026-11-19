@@ -185,20 +185,25 @@
   let kind = $state('');
   let auditRetention = $state<number | null>(null);
 
+  let auditRequest = 0;
+
   /** `quiet` reloads the first page without swapping the list for a loading line. */
   async function loadAudit(more = false, quiet = false) {
-    if (more) auditMore = true;
-    else if (!quiet || auditPhase !== 'ready') auditPhase = 'loading';
+    const request = ++auditRequest;
+    auditMore = more;
+    if (!more && (!quiet || auditPhase !== 'ready')) auditPhase = 'loading';
     try {
       const page = await api.audit(PAGE, more ? auditCursor : null, kind);
+      if (request !== auditRequest) return;
       audit = more ? [...audit, ...page.items] : page.items;
       auditCursor = page.nextCursor;
       auditPhase = 'ready';
     } catch (e) {
+      if (request !== auditRequest) return;
       auditError = errorMessage(e);
       if (!more && !quiet) auditPhase = 'error';
     } finally {
-      auditMore = false;
+      if (request === auditRequest) auditMore = false;
     }
   }
 
