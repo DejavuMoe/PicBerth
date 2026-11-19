@@ -15,7 +15,7 @@
 
 设计约束见 [`docs/product/constraints.md`](docs/product/constraints.md)；实现与接口说明见 [`docs/architecture.md`](docs/architecture.md)、[`docs/api.md`](docs/api.md)。
 
-> **版本提示**：`v0.0.2` 正在准备，尚未发布。GitHub Releases 当前提供 `v0.0.1`；本仓库中的源码与 Compose 构建示例面向 v0.0.2 候选版本。
+本页对应 `v0.0.2`。本版本的变更与升级说明见 [v0.0.2 发布说明](docs/releases/v0.0.2.md)。
 
 ---
 
@@ -42,7 +42,7 @@ echo 'your-secure-password' | picberth admin create --username admin --password-
 
 ## Docker 部署
 
-当前源码构建的候选镜像使用 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。Compose 示例启用只读根文件系统，并从当前检出构建镜像：
+发布镜像为 `ghcr.io/dejavumoe/picberth:v0.0.2`。镜像基于 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。Compose 示例启用只读根文件系统，并从当前检出构建镜像：
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -133,10 +133,10 @@ curl -H "Authorization: Bearer pb_..." \
 
 ```sh
 # 服务停止时通过 CLI 创建快照（服务运行中建议在「状态」页面在线创建）
-picberth snapshot --out /backup/picberth-2026-11-17
+picberth snapshot --out /backup/picberth
 
-# 从快照恢复到新的数据目录
-picberth restore --from /backup/picberth-2026-11-17 --data-dir /var/lib/picberth-new
+# 将 --from 指向上一条命令输出的时间戳子目录，其中包含 MANIFEST.json
+picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/picberth-new
 
 # 校验文件哈希与结构完整性
 picberth check --full --data-dir /var/lib/picberth-new

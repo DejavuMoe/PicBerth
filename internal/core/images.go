@@ -270,7 +270,7 @@ func (s *Service) ListImages(ctx context.Context, p Principal, lp ListParams) ([
 		return nil, "", validation("limit must be between 1 and 200.")
 	}
 	q := meta.ListQuery{State: lp.State, Q: strings.TrimSpace(lp.Q), TokenID: lp.TokenID, Sort: lp.Sort, Limit: lp.Limit}
-	if len(q.Q) > 200 {
+	if utf8Len(q.Q) > maxNameRunes {
 		return nil, "", validation("q is too long.")
 	}
 	var err error
@@ -564,19 +564,27 @@ func (s *Service) applyMove(ctx context.Context, p Principal, im *meta.Image, fo
 // Trash moves an image to the trash. Trashing a trashed image is a no-op. With a retention of 0 days
 // the image is purged right away.
 func (s *Service) Trash(ctx context.Context, p Principal, id string) error {
+	return s.trash(ctx, p, id, false)
+}
+
+func (s *Service) trash(ctx context.Context, p Principal, id string, confirmedPurge bool) error {
 	if p.Kind == KindAnonymous {
 		return unauthorized()
 	}
 	if !p.CanManage() {
 		return forbidden("Deleting requires the manage scope.")
 	}
+	unlock := s.lockImage(id)
 	im, err := s.getVisible(ctx, p, id)
 	if err != nil {
+		unlock.Unlock()
 		return err
 	}
-	unlock := s.lockImage(id)
 	if im.State == meta.StateTrashed {
 		unlock.Unlock()
+		if confirmedPurge {
+			return s.purge(ctx, p, id, nil)
+		}
 		return nil
 	}
 	ok, err := s.db.MarkTrashed(ctx, id, s.nowMs())
@@ -600,7 +608,7 @@ func (s *Service) Trash(ctx context.Context, p Principal, id string) error {
 	s.audit(ctx, p, "image.trash", id, "")
 	unlock.Unlock()
 	if s.Settings().TrashRetentionDays == 0 {
-		return s.purge(ctx, p, id)
+		return s.purge(ctx, p, id, nil)
 	}
 	return nil
 }
@@ -663,10 +671,10 @@ func (s *Service) Purge(ctx context.Context, p Principal, id string) error {
 	if _, err := s.getVisible(ctx, p, id); err != nil {
 		return err
 	}
-	return s.purge(ctx, p, id)
+	return s.purge(ctx, p, id, nil)
 }
 
-func (s *Service) purge(ctx context.Context, p Principal, id string) error {
+func (s *Service) purge(ctx context.Context, p Principal, id string, sweepStart *time.Time) error {
 	s.purgeMu.RLock()
 	defer s.purgeMu.RUnlock()
 	unlock := s.lockImage(id)
@@ -685,7 +693,7 @@ func (s *Service) purge(ctx context.Context, p Principal, id string) error {
 		return conflict("Only images in the trash can be purged.")
 	}
 	// Tombstone first, then bytes.
-	ok, err := s.db.MarkPurged(ctx, id, s.nowMs())
+	ok, err := s.markPurged(ctx, im, sweepStart)
 	if err != nil {
 		return err
 	}
@@ -698,6 +706,25 @@ func (s *Service) purge(ctx context.Context, p Principal, id string) error {
 	s.removeFiles(im)
 	s.audit(ctx, p, "image.purge", id, "")
 	return nil
+}
+
+func (s *Service) trashCutoff(at time.Time) int64 {
+	days := s.settings.Load().TrashRetentionDays
+	return at.Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+}
+
+func (s *Service) markPurged(ctx context.Context, im *meta.Image, sweepStart *time.Time) (bool, error) {
+	if sweepStart != nil {
+		// Guarded UI batches take the settings lock first. Yield to a settings writer while holding the image lock.
+		if !s.settingsMu.TryRLock() {
+			return false, nil
+		}
+		defer s.settingsMu.RUnlock()
+		if im.TrashedAt == nil || *im.TrashedAt > s.trashCutoff(*sweepStart) {
+			return false, nil
+		}
+	}
+	return s.db.MarkPurged(ctx, im.ID, s.nowMs())
 }
 
 // removeFiles deletes an image's bytes (wherever they are) and thumbnails; failures are left to the check.
@@ -714,12 +741,11 @@ func (s *Service) removeFiles(im *meta.Image) {
 
 // PurgeExpired purges trashed images older than the retention period. It returns how many were purged.
 func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
-	days := s.Settings().TrashRetentionDays
-	cutoff := s.now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+	start := s.now()
 	total := 0
 	actor := Principal{Kind: KindCLI, Username: "system"}
 	for {
-		idsBatch, err := s.db.ExpiredTrash(ctx, cutoff, 200)
+		idsBatch, err := s.db.ExpiredTrash(ctx, s.trashCutoff(start), 200)
 		if err != nil {
 			return total, err
 		}
@@ -731,7 +757,7 @@ func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
 			if err := ctx.Err(); err != nil {
 				return total, err
 			}
-			err := s.purge(ctx, actor, id)
+			err := s.purge(ctx, actor, id, &start)
 			if err == nil {
 				total++
 				progressed = true
@@ -756,7 +782,7 @@ type BatchResult struct {
 
 // Batch applies one action to up to 500 images. Per-image failures are reported, not fatal. For move,
 // folderID is the destination (nil = root) and is resolved once for the whole batch.
-func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, folderID *string) ([]BatchResult, error) {
+func (s *Service) Batch(ctx context.Context, p Principal, action string, idList []string, folderID *string, expectedTrashRetentionDays *int) ([]BatchResult, error) {
 	if p.Kind == KindAnonymous {
 		return nil, unauthorized()
 	}
@@ -770,6 +796,19 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 	}
 	if len(idList) == 0 || len(idList) > 500 {
 		return nil, validation("ids must contain between 1 and 500 entries.")
+	}
+	confirmedPurge := false
+	if expectedTrashRetentionDays != nil {
+		if action != "trash" || *expectedTrashRetentionDays < 0 || *expectedTrashRetentionDays > 365 {
+			return nil, validation("expectedTrashRetentionDays must be between 0 and 365 and is only supported for action=trash.")
+		}
+		// Keep the checked policy in force until the batch finishes applying it.
+		s.settingsMu.RLock()
+		defer s.settingsMu.RUnlock()
+		if s.Settings().TrashRetentionDays != *expectedTrashRetentionDays {
+			return nil, newErr(CodeTrashRetentionChanged, "The trash retention period changed. Review the action and try again.")
+		}
+		confirmedPurge = *expectedTrashRetentionDays == 0
 	}
 	if action == "move" {
 		if err := s.checkFolderRef(ctx, p, folderID); err != nil {
@@ -786,7 +825,7 @@ func (s *Service) Batch(ctx context.Context, p Principal, action string, idList 
 		var err error
 		switch action {
 		case "trash":
-			err = s.Trash(ctx, p, id)
+			err = s.trash(ctx, p, id, confirmedPurge)
 		case "restore":
 			_, err = s.Restore(ctx, p, id)
 		case "purge":

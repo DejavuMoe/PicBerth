@@ -61,7 +61,7 @@ type Service struct {
 	Fault     func(point string) error
 
 	settings   atomic.Pointer[Settings]
-	settingsMu sync.Mutex
+	settingsMu sync.RWMutex
 
 	uploadSem      chan struct{}
 	uploadLimit    *ratelimit.Limiter

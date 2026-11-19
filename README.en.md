@@ -15,7 +15,7 @@ A personal self-hosted image hosting service designed for a single administrator
 
 Design constraints: [`docs/product/constraints.md`](docs/product/constraints.md); architecture and API specifications: [`docs/architecture.md`](docs/architecture.md), [`docs/api.md`](docs/api.md).
 
-> **Release status**: `v0.0.2` is being prepared and has not been published. GitHub Releases currently provides `v0.0.1`; the source and Compose build examples in this checkout target the v0.0.2 candidate.
+This page covers `v0.0.2`. See the [v0.0.2 release notes](docs/releases/v0.0.2.md) for changes and upgrade instructions.
 
 ---
 
@@ -42,7 +42,7 @@ Then configure your reverse proxy (Caddy or Nginx) to forward public traffic to 
 
 ## Docker Deployment
 
-Candidate images built from the current source use `gcr.io/distroless/static-debian13:nonroot`, run as UID/GID `65532:65532`, and contain no shell. The Compose example enables a read-only root filesystem and builds from the current checkout:
+The release image is `ghcr.io/dejavumoe/picberth:v0.0.2`. It uses `gcr.io/distroless/static-debian13:nonroot`, runs as UID/GID `65532:65532`, and contains no shell. The Compose example enables a read-only root filesystem and builds from the current checkout:
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -133,10 +133,10 @@ No API token can manage other tokens or modify server configuration. Interactive
 
 ```sh
 # Create a snapshot via CLI when service is stopped (use the web console Status page when running)
-picberth snapshot --out /backup/picberth-2026-11-17
+picberth snapshot --out /backup/picberth
 
-# Restore from a snapshot into a clean data directory
-picberth restore --from /backup/picberth-2026-11-17 --data-dir /var/lib/picberth-new
+# Use the timestamped subdirectory printed by snapshot, which contains MANIFEST.json
+picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/picberth-new
 
 # Verify file hashes and filesystem structural integrity
 picberth check --full --data-dir /var/lib/picberth-new

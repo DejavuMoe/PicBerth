@@ -5,6 +5,7 @@
 
   interface Props {
     title: string;
+    descriptionId?: string;
     onclose: () => void;
     /** The 560px dialog. */
     wide?: boolean;
@@ -16,7 +17,7 @@
     children: Snippet<[() => void]>;
     footer?: Snippet<[() => void]>;
   }
-  let { title, onclose, wide = false, dismissible = true, blocksDrop = true, children, footer }: Props = $props();
+  let { title, descriptionId, onclose, wide = false, dismissible = true, blocksDrop = true, children, footer }: Props = $props();
 
   const leave = createLeave(() => onclose, 250);
 </script>
@@ -31,9 +32,18 @@
     class="dialog"
     class:dialog-wide={wide}
     class:leaving={leave.leaving}
+    inert={leave.leaving}
+    onclickcapture={(e) => {
+      // A focused button can still receive keyboard activation before the browser moves focus.
+      if (leave.leaving) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }}
     role="dialog"
     aria-modal="true"
     aria-labelledby="dlg-title"
+    aria-describedby={descriptionId}
     use:overlay={{ onescape: dismissible ? leave.close : undefined, blocksDrop }}
   >
     <h2 class="dialog-head" id="dlg-title">{title}</h2>

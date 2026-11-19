@@ -27,6 +27,8 @@ const (
 	CodeFolderDepth         = "folder-depth"
 	CodeInvalidScope        = "invalid-scope"
 	CodeInternal            = "internal"
+
+	CodeTrashRetentionChanged = "trash-retention-changed"
 )
 
 // Error is a domain error with a stable code and a human message that is safe to show to clients.

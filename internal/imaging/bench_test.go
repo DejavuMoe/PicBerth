@@ -66,6 +66,7 @@ func BenchmarkThumbnail24MP(b *testing.B) {
 func BenchmarkInspect24MP(b *testing.B) {
 	data, _ := benchJPEG(b)
 	b.SetBytes(int64(len(data)))
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := Inspect(bytes.NewReader(data), int64(len(data)), Limits{MaxPixels: 50_000_000}); err != nil {
 			b.Fatal(err)
