@@ -52,6 +52,7 @@ func (s *Service) ProcessThumbnails(ctx context.Context) {
 		pending, err := s.db.PendingThumbs(ctx, after, 200)
 		if err != nil || len(pending) == 0 {
 			if err != nil && ctx.Err() == nil {
+				s.thumbDirty.Store(true)
 				s.log.Warn("thumbnail backfill failed", "err", err)
 			}
 			return
