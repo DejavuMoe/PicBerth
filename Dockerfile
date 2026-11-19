@@ -3,9 +3,9 @@
 ARG BUILDARCH
 # Use the same complete, checksummed pnpm distributions as mise.lock.
 FROM scratch AS pnpm-amd64
-ADD --checksum=sha256:3726060e236c0db3e7124c0a5af123c840ba0cb76682149b63ea0baf290017c2 https://github.com/pnpm/pnpm/releases/download/v12.18.0/pnpm-linux-x64.tar.gz /pnpm.tar.gz
+ADD --checksum=sha256:568fd50dd174a57e80efacc04be1d6a228bb41fbebe557f2ef63a1c3a721a5f4 https://github.com/pnpm/pnpm/releases/download/v12.20.0/pnpm-linux-x64.tar.gz /pnpm.tar.gz
 FROM scratch AS pnpm-arm64
-ADD --checksum=sha256:700bd1aa4028465b80e62b7c5bec8455be60bbafaf53a3262a4ab8e2057712ac https://github.com/pnpm/pnpm/releases/download/v12.18.0/pnpm-linux-arm64.tar.gz /pnpm.tar.gz
+ADD --checksum=sha256:e6edbf380ee2299be4cde0f5b8f7183529a8963916637896dd6b3ac71a216ae0 https://github.com/pnpm/pnpm/releases/download/v12.20.0/pnpm-linux-arm64.tar.gz /pnpm.tar.gz
 FROM pnpm-${BUILDARCH} AS pnpm
 
 # ---- web: build the Svelte SPA (Vite writes to /src/internal/webui/dist) ----
