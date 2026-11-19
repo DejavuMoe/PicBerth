@@ -142,6 +142,8 @@ picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/pi
 picberth check --full --data-dir /var/lib/picberth-new
 ```
 
+If a restore is interrupted, leave the partial directory in place. Run the restore command again with the same snapshot and a fresh, empty destination. Run check --full against the new directory before pointing the service at it.
+
 - **Never copy a running database directly**: Copying `picberth.db` while the server is active can result in a corrupted WAL state. Always generate an atomic consistency snapshot using the CLI or the web console status page, and then back up the snapshot directory with tools like restic, borg, or rsync.
 - **Snapshots contain full credentials**: Snapshots contain the database and all referenced images, restoring administrator credentials, sessions, and API tokens. Restore only from trusted backups protected against tampering.
 - **File permissions and directory security**: Other operating-system accounts must not be able to write the data or backup directories. Use restrictive Unix permissions or Windows ACLs. PicBerth opens databases through absolute SQLite paths, not an isolated filesystem sandbox.
