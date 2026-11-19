@@ -11,7 +11,7 @@ from publish_oci_image import publish, sha256
 
 
 class AttestationTest(unittest.TestCase):
-    def fixture(self, directory, subject=True, wrong=False, provenance=True, nested=False, arch='amd64'):
+    def fixture(self, directory, subject=True, wrong=False, provenance=True, nested=False, arch='amd64', reference=True):
         blobs = {}
 
         def add(value, media='application/vnd.oci.image.manifest.v1+json'):
@@ -30,6 +30,9 @@ class AttestationTest(unittest.TestCase):
         for predicate in types:
             layers.append(add(dict(predicateType=predicate, subject=[dict(name='fixture', digest=dict(sha256=digest))] if subject else []), 'application/vnd.in-toto+json'))
         attestation = add(dict(config=add({}), layers=layers))
+        if reference:
+            attestation['annotations'] = {'vnd.docker.reference.type': 'attestation-manifest',
+                                          'vnd.docker.reference.digest': image['digest']}
         index = dict(manifests=[image, attestation])
         if nested:
             index = dict(manifests=[add(index, 'application/vnd.oci.image.index.v1+json')])
@@ -58,7 +61,7 @@ class AttestationTest(unittest.TestCase):
                 verify(self.fixture(directory), 'arm64')
 
     def test_publish_validates_both_architectures_before_writing(self):
-        for arm_options in ({}, dict(provenance=False), dict(wrong=True)):
+        for arm_options in ({}, dict(provenance=False), dict(wrong=True), dict(reference=False)):
             with self.subTest(arm_options=arm_options), tempfile.TemporaryDirectory() as directory:
                 tags, contents, writes = {}, {}, []
                 for arch, options in [('amd64', {}), ('arm64', arm_options)]:
