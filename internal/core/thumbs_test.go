@@ -211,6 +211,12 @@ func TestThumbnailRetry(t *testing.T) {
 			} else {
 				exec("DROP TRIGGER fail_thumb")
 			}
+			exec("ALTER TABLE images RENAME TO delayed_images")
+			e.svc.ProcessThumbnails(ctx)
+			if !e.svc.thumbDirty.Swap(false) {
+				t.Fatal("failed pending-image query lost the scheduled retry")
+			}
+			exec("ALTER TABLE delayed_images RENAME TO images")
 			e.svc.ProcessThumbnails(ctx)
 			thumb, err := e.svc.OpenThumb(ctx, e.admin, im.ID)
 			if err != nil {
