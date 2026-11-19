@@ -142,6 +142,8 @@ picberth restore --from /backup/picberth/20261117T120000Z --data-dir /var/lib/pi
 picberth check --full --data-dir /var/lib/picberth-new
 ```
 
+恢复中断后，请保留未完成的目标目录，使用同一个快照重新运行上面的 restore 命令，并将 --data-dir 改为另一个新的空目录。对新目录运行 check --full，检查通过后再将服务切换到该目录。
+
 - **严禁直接复制运行中的数据库**：在线运行时直接复制 `picberth.db` 可能产生损坏的 WAL 状态。请务必使用内置快照命令（或状态页快照功能）生成一致性备份，再通过 restic、borg、rsync 等工具归档快照目录。
 - **快照包含完整凭据**：快照包含数据库与全部图片引用，因此会完整恢复管理员账户凭据、活跃会话和 API 令牌。**只能从可信且防篡改的安全备份源执行恢复**。
 - **文件权限与目录安全**：数据目录和备份目录严禁赋予其他非特权操作系统账户写入权限；PicBerth 数据库由 SQLite 通过绝对路径打开，并非独立文件系统沙箱。
