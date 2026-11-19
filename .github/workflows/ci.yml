@@ -82,6 +82,13 @@ jobs:
         if: runner.arch == 'X64'
         run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - run: mise run test
+        if: runner.arch == 'X64'
+      - name: Test the native ARM64 service
+        if: runner.arch == 'ARM64'
+        run: |
+          mise run web:build
+          go vet ./...
+          go test ./...
       - name: Go vulnerability check
         if: runner.arch == 'X64'
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
@@ -142,7 +149,8 @@ jobs:
       - run: mise run web:build
       - name: Cross-compile smoke build
         run: |
-          for target in linux/amd64 linux/arm64 windows/amd64 darwin/arm64; do
+          # Linux binaries are built and checked by both native image jobs.
+          for target in windows/amd64 darwin/arm64; do
             GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -o "dist/${target//\//-}/" ./cmd/picberth
           done
 
