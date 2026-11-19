@@ -257,17 +257,25 @@ export const api = {
   patchImage: (id: string, patch: ImagePatch) =>
     request<Image>('PATCH', `/images/${encodeURIComponent(id)}`, { json: patch }),
   facets: (state: ImageState) => request<Facets>('GET', '/images/facets', { query: { state } }),
-  batch: async (action: BatchAction, ids: string[], folderId?: string | null): Promise<BatchResult[]> => {
-    const out: BatchResult[] = [];
-    // The server accepts at most 500 ids per call.
+  batch: async (action: BatchAction, ids: string[], folderId?: string | null, expectedTrashRetentionDays?: number) => {
+    const results: BatchResult[] = [];
     for (let i = 0; i < ids.length; i += 500) {
       const chunk = ids.slice(i, i + 500);
-      const res = await request<{ results: BatchResult[] }>('POST', '/images/batch', {
-        json: action === 'move' ? { action, ids: chunk, folderId: folderId ?? null } : { action, ids: chunk },
-      });
-      out.push(...res.results);
+      try {
+        const res = await request<{ results: BatchResult[] }>('POST', '/images/batch', {
+          json: {
+            action,
+            ids: chunk,
+            folderId: action === 'move' ? (folderId ?? null) : undefined,
+            expectedTrashRetentionDays,
+          },
+        });
+        results.push(...res.results);
+      } catch (error) {
+        return { results, error, unconfirmed: chunk };
+      }
     }
-    return out;
+    return { results };
   },
 
   listFolders: () => request<{ items: Folder[] }>('GET', '/folders'),

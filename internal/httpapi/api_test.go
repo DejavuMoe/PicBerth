@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -701,6 +702,49 @@ func TestThumbnailEndpoint(t *testing.T) {
 	}
 }
 
+func TestBatchTrashRetentionPrecondition(t *testing.T) {
+	h := newHarness(t, harnessOpts{})
+	img := h.mustUploadWeb(190)
+	path := "/api/v1/images/" + img.ID
+	batch := func(expected any) (*http.Response, []byte) {
+		return h.web("POST", "/api/v1/images/batch", map[string]any{
+			"action": "trash", "ids": []string{img.ID}, "expectedTrashRetentionDays": expected,
+		})
+	}
+	resp, body := batch(0)
+	wantProblem(t, resp, body, 409, "trash-retention-changed")
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantStatus(t, resp, body, 200)
+
+	resp, body = h.web("PATCH", "/api/v1/settings", map[string]int{"trashRetentionDays": 0})
+	wantStatus(t, resp, body, 200)
+	resp, body = batch(nil)
+	wantProblem(t, resp, body, 400, "validation")
+	resp, body = batch(30)
+	wantProblem(t, resp, body, 409, "trash-retention-changed")
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantStatus(t, resp, body, 200)
+	resp, body = h.web("GET", path, nil)
+	wantStatus(t, resp, body, 200)
+	if got := decode[imageJSON](t, body); got.State != "active" {
+		t.Fatalf("stale batch changed state: %s", got.State)
+	}
+
+	resp, body = batch(0)
+	wantStatus(t, resp, body, 200)
+	if !strings.Contains(string(body), `"ok":true`) {
+		t.Fatalf("confirmed batch: %s", body)
+	}
+	resp, body = h.web("GET", path+"/raw", nil)
+	wantProblem(t, resp, body, 404, "not-found")
+
+	legacy := h.mustUploadWeb(191)
+	resp, body = h.web("POST", "/api/v1/images/batch", map[string]any{"action": "trash", "ids": []string{legacy.ID}})
+	wantStatus(t, resp, body, 200)
+	resp, body = h.web("GET", "/api/v1/images/"+legacy.ID, nil)
+	wantProblem(t, resp, body, 404, "not-found")
+}
+
 func TestTrashRestorePurgeFlow(t *testing.T) {
 	h := newHarness(t, harnessOpts{})
 	img := h.mustUploadWeb(81)
@@ -1156,6 +1200,24 @@ func TestListFiltersAndPagination(t *testing.T) {
 		if l := decode[struct{ Items []imageJSON }](t, body); len(l.Items) != 5 {
 			t.Fatalf("%s should be ignored, got %d items: %s", gps, len(l.Items), body)
 		}
+	}
+}
+
+func TestSearchFilenameCharacterLimit(t *testing.T) {
+	h := newHarness(t, harnessOpts{})
+	img := h.mustUploadWeb(505)
+	for _, char := range []string{"图", "a"} {
+		filename := strings.Repeat(char, 200)
+		resp, body := h.web("PATCH", "/api/v1/images/"+img.ID, map[string]string{"filename": filename})
+		wantStatus(t, resp, body, 200)
+		resp, body = h.web("GET", "/api/v1/images?q="+url.QueryEscape(filename), nil)
+		wantStatus(t, resp, body, 200)
+		got := decode[struct{ Items []imageJSON }](t, body)
+		if len(got.Items) != 1 || got.Items[0].ID != img.ID {
+			t.Fatalf("search for %q: %s", char, body)
+		}
+		resp, body = h.web("GET", "/api/v1/images?q="+url.QueryEscape(filename+char), nil)
+		wantProblem(t, resp, body, 400, "validation")
 	}
 }
 

@@ -2,7 +2,11 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"slices"
 	"testing"
 
 	"picberth/internal/meta"
@@ -33,6 +37,144 @@ func TestThumbnailBackfillPassesUnsettledPage(t *testing.T) {
 			got, err := e.db.GetImage(ctx, im.ID)
 			if err != nil || got.Thumb == "" {
 				t.Fatalf("unreadable head page blocked a healthy image: %+v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestFullCheckRepairsMissingThumbnail(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	missing := e.mustUpload(e.admin, "missing-thumb.png", makePNG(t, 3, 3, 124))
+	cached := e.mustUpload(e.admin, "cached.png", makePNG(t, 3, 3, 125))
+	e.svc.ProcessThumbnails(ctx)
+	if err := e.svc.blobs.RemoveThumbs(missing.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if rep := e.mustCheck(CheckFull); !rep.OK || len(rep.Issues) != 0 {
+		t.Fatalf("full check: %+v", rep)
+	}
+	for _, tc := range []struct {
+		id   string
+		want string
+	}{{missing.ID, ""}, {cached.ID, "png"}} {
+		im, err := e.db.GetImage(ctx, tc.id)
+		if err != nil || im.Thumb != tc.want {
+			t.Errorf("image %s: %+v, %v, want thumb state %q", tc.id, im, err, tc.want)
+		}
+	}
+	e.svc.ProcessThumbnails(ctx)
+	thumb, err := e.svc.OpenThumb(ctx, e.admin, missing.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thumb.File.Close()
+}
+
+func TestFullCheckContinuesAfterUnreadableThumbnail(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	first := e.mustUpload(e.admin, "first.png", makePNG(t, 5, 5, 126))
+	next := e.mustUpload(e.admin, "next.png", makePNG(t, 5, 5, 127))
+	if next.ID < first.ID { // Check visits records in ID order.
+		first, next = next, first
+	}
+	e.svc.ProcessThumbnails(ctx)
+	thumbPath := "cache/thumbs/" + first.ID[:2] + "/" + first.ID + ".png"
+	if err := os.Chmod(e.dir.Abs(thumbPath), 0); err != nil {
+		t.Fatal(err)
+	}
+	f, err := e.svc.blobs.OpenThumb(first.ID, "png")
+	if err == nil {
+		f.Close()
+		t.Skip("this account can read a mode-000 file")
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatal(err)
+	}
+
+	for _, id := range []string{first.ID, next.ID} {
+		im, err := e.db.GetImage(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		name := "objects/" + im.ObjectKey
+		data, err := e.dir.Root().ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data[len(data)-1] ^= 1
+		if err := e.dir.Root().WriteFile(name, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rep := e.mustCheck(CheckFull)
+	if rep.OK || rep.Checked != 2 || len(rep.Issues) != 3 {
+		t.Fatalf("full check: %+v", rep)
+	}
+	if !slices.ContainsFunc(rep.Issues, func(i Issue) bool {
+		return i.Kind == IssueMissingFile && !i.Repaired && i.ImageID != nil && *i.ImageID == first.ID &&
+			i.Path != nil && *i.Path == thumbPath
+	}) {
+		t.Fatalf("missing unreadable thumbnail in report: %+v", rep.Issues)
+	}
+	for _, id := range []string{first.ID, next.ID} {
+		if !slices.ContainsFunc(rep.Issues, func(i Issue) bool {
+			return i.Kind == IssueHashMismatch && !i.Repaired && i.ImageID != nil && *i.ImageID == id
+		}) {
+			t.Errorf("missing hash mismatch for %s", id)
+		}
+		_, err := e.svc.LookupPublic(ctx, id, "png")
+		wantCode(t, err, CodeNotFound)
+	}
+}
+
+func TestFullCheckReportsInvalidThumbnailKey(t *testing.T) {
+	for _, tc := range []struct {
+		state, kind string
+		checked     int
+	}{
+		{meta.StateActive, IssueMissingFile, 2},
+		{meta.StateTrashed, IssueMissingFile, 2},
+		{meta.StatePurged, IssueOrphanFile, 1},
+	} {
+		t.Run(tc.state, func(t *testing.T) {
+			e := newEnv(t)
+			ctx := context.Background()
+			bad := e.mustUpload(e.admin, "bad-id.png", makePNG(t, 5, 5, 128))
+			later := e.mustUpload(e.admin, "later.png", makePNG(t, 5, 5, 129))
+			e.svc.ProcessThumbnails(ctx)
+			if tc.state != meta.StateActive {
+				if err := e.svc.Trash(ctx, e.admin, bad.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.state == meta.StatePurged {
+				if err := e.svc.Purge(ctx, e.admin, bad.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// The schema accepts a short ID. Its object key still points to the original.
+			if _, err := e.db.Writer().ExecContext(ctx, "UPDATE images SET id = '!' WHERE id = ?", bad.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := e.db.SetBroken(ctx, later.ID, ptr(int64(1))); err != nil {
+				t.Fatal(err)
+			}
+
+			rep := e.mustCheck(CheckFull)
+			if rep.OK || rep.Checked != tc.checked || len(rep.Issues) != 1 {
+				t.Fatalf("full check: %+v", rep)
+			}
+			i := rep.Issues[0]
+			if i.Kind != tc.kind || i.ImageID == nil || *i.ImageID != "!" || i.Path != nil || i.Repaired {
+				t.Fatalf("invalid cache key: %+v", i)
+			}
+			im, err := e.db.GetImage(ctx, later.ID)
+			if err != nil || im.BrokenAt != nil {
+				t.Fatalf("later original did not pass its hash check: %+v, %v", im, err)
 			}
 		})
 	}

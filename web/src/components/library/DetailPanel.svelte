@@ -265,11 +265,11 @@
 
   <div class="detail-foot">
     {#if trash}
-      <button type="button" class="btn btn-secondary" onclick={() => lib.restore([image.id])}>
+      <button type="button" class="btn btn-secondary" disabled={lib.pending.has(image.id)} onclick={() => lib.restore([image.id])}>
         <Icon name="restore" />
         恢复
       </button>
-      <button type="button" class="btn btn-ghost btn-danger-text" onclick={() => lib.requestPurge([image.id])}>
+      <button type="button" class="btn btn-ghost btn-danger-text" disabled={lib.pending.has(image.id)} onclick={() => lib.requestPurge([image.id])}>
         永久删除
       </button>
     {:else}
@@ -277,9 +277,14 @@
         <Icon name="download" />
         下载
       </button>
-      <button type="button" class="btn btn-ghost btn-danger-text" onclick={() => lib.trash([image.id])}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-danger-text"
+        disabled={lib.retention === null || lib.purgeBusy || lib.pending.has(image.id)}
+        onclick={() => lib.trash([image.id])}
+      >
         <Icon name="trash" />
-        移到回收站
+        {lib.deleteLabel}
       </button>
     {/if}
   </div>

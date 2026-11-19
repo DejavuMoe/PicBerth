@@ -88,7 +88,7 @@
     return {
       maxMB: Number.isNaN(mb) || values.maxUploadBytes < 1024 || values.maxUploadBytes > hard ? range(1, Math.floor(hard / MB)) : '',
       formats: values.allowedFormats.length === 0 ? '至少保留一种格式' : '',
-      retention: intIn(values.trashRetentionDays, 1, 365),
+      retention: intIn(values.trashRetentionDays, 0, 365),
       audit: intIn(values.auditRetentionDays, 7, 3650),
     };
   });
@@ -172,6 +172,7 @@
       class="input num"
       inputmode={key === 'maxMB' ? 'decimal' : 'numeric'}
       aria-invalid={errors[key] ? 'true' : undefined}
+      aria-describedby={key === 'retention' && values.trashRetentionDays === 0 ? 'zero-retention-hint' : undefined}
       bind:value={form[key]}
     />
     <span class="suffix">{unit}</span>
@@ -252,6 +253,9 @@
               <div class="ctl">
                 {@render numberField('retention', 's-trash', '天')}
               </div>
+              {#if values.trashRetentionDays === 0}
+                <span class="retention-hint" id="zero-retention-hint">设为 0 天时，删除图片前需确认永久删除。</span>
+              {/if}
             </div>
           </div>
         </section>
@@ -307,3 +311,17 @@
     {/snippet}
   </Modal>
 {/if}
+
+<style>
+  .retention-hint {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: var(--fs-s);
+  }
+  @media (max-width: 720px) {
+    .retention-hint {
+      grid-column: 1 / -1;
+      justify-self: end;
+    }
+  }
+</style>

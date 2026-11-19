@@ -1,13 +1,15 @@
 // State and actions of the image list (library and trash). One instance per page; filters live in the URL,
 // the current folder comes from the path.
 
+import { tick } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
-import { api, errorMessage, isAbort, rawUrl } from './api';
+import { api, ApiError, errorMessage, isAbort, rawUrl } from './api';
 import { copyText } from './clipboard';
 import { facetsFor, refreshFacets } from './facets.svelte';
 import { startOfDay } from './format';
 import { folderById, resolvePath, subtreeCount } from './folders';
 import { refreshHealth } from './health.svelte';
+import { modalOpen } from './modal';
 import { librarySegments, router, updateQuery } from './router.svelte';
 import { toast } from './toast.svelte';
 import { tree } from './tree.svelte';
@@ -97,6 +99,27 @@ interface Removed {
   index: number;
 }
 
+// Toast actions outlive the screen that created them.
+let currentLibrary: Library | null = null;
+const pendingChanges = new SvelteSet<string>();
+
+async function focusList(trigger: Element | null) {
+  await tick();
+  if (!currentLibrary || modalOpen() || (document.activeElement !== document.body && document.activeElement !== trigger)) return;
+  const target = document.querySelector<HTMLElement>('#main .head h1') ?? document.getElementById('main');
+  if (target) {
+    target.tabIndex = -1;
+    target.focus({ preventScroll: true });
+  }
+}
+
+function moveMessage(action: 'trash' | 'restore', count: number, failed: number): string {
+  const message = action === 'trash'
+    ? (count === 1 ? '已移到回收站' : `已将 ${count} 张图片移到回收站`)
+    : (count === 1 ? '已恢复' : `已恢复 ${count} 张图片`);
+  return failed ? `${message}，${failed} 张失败` : message;
+}
+
 export function downloadImage(img: Image) {
   const a = document.createElement('a');
   a.href = rawUrl(img.id);
@@ -144,14 +167,19 @@ export class Library {
   errorText = $state('');
   errorKind = $state<'images' | 'folders'>('images');
   retention = $state<number | null>(null);
+  retentionFailed = $state(false);
+  deleteLabel = $derived(this.retention === null ? '删除' : this.retention === 0 ? '永久删除' : '移到回收站');
 
   view = $state<ViewMode>(loadView());
   sel = new SvelteSet<string>();
+  readonly pending = pendingChanges;
   selectMode = $state(false);
   #activeId = $state<string | null>(null);
   /** An image to open once the list for its folder has loaded (e.g. 查看 on an upload elsewhere). */
   pendingOpen = $state<string | null>(null);
   purgeIds = $state<string[] | null>(null);
+  purgeBusy = $state(false);
+  purgeFailed = $state(false);
   /** The viewer (the image at window size) is open on the active image. */
   viewing = $state(false);
 
@@ -171,9 +199,9 @@ export class Library {
 
   #seq = 0;
   #ctrl: AbortController | null = null;
+  #retentionSeq = 0;
   #anchor: string | null = null;
   #suppress = false;
-  alive = true;
 
   /** The image whose detail is open. Without one there is no viewer either. */
   get activeId(): string | null {
@@ -188,6 +216,7 @@ export class Library {
   constructor(mode: 'library' | 'trash') {
     this.mode = mode;
     this.state = mode === 'trash' ? 'trashed' : 'active';
+    currentLibrary = this;
   }
 
   get facets() {
@@ -200,7 +229,7 @@ export class Library {
   }
 
   destroy() {
-    this.alive = false;
+    if (currentLibrary === this) currentLibrary = null;
     this.#ctrl?.abort();
   }
 
@@ -349,7 +378,6 @@ export class Library {
     if (!quiet) {
       this.items = [];
       this.cursor = null;
-      this.more = 'idle';
       this.activeId = null;
       this.clearSel();
     }
@@ -359,6 +387,12 @@ export class Library {
       if (my !== this.#seq) return;
       this.items = page.items;
       this.cursor = page.nextCursor;
+      this.more = 'idle';
+      if (quiet && !page.nextCursor && this.sel.size) {
+        const visible = new Set(page.items.map((im) => im.id));
+        for (const id of this.sel) if (!visible.has(id)) this.sel.delete(id);
+        if (!this.sel.size) this.clearSel();
+      }
       this.phase = 'ready';
       if (this.pendingOpen) {
         if (this.items.some((i) => i.id === this.pendingOpen)) this.activeId = this.pendingOpen;
@@ -391,11 +425,18 @@ export class Library {
     }
   }
 
-  loadRetention() {
-    api
-      .getSettings()
-      .then((s) => (this.retention = s.trashRetentionDays))
-      .catch(() => {});
+  async loadRetention(refocus = false) {
+    const trigger = document.activeElement;
+    const seq = ++this.#retentionSeq;
+    this.retention = null;
+    this.retentionFailed = false;
+    try {
+      const settings = await api.getSettings();
+      if (seq === this.#retentionSeq) this.retention = settings.trashRetentionDays;
+    } catch {
+      if (seq === this.#retentionSeq) this.retentionFailed = true;
+    }
+    if (refocus && seq === this.#retentionSeq && currentLibrary === this) void focusList(trigger);
   }
 
   /** A fresh upload joins the top of the plain newest-first list when it belongs here. */
@@ -416,10 +457,11 @@ export class Library {
     if (i >= 0) this.items[i] = img;
   }
 
-  #refresh() {
+  #refresh(reloadList = false) {
     void refreshFacets();
     void refreshHealth();
     void this.refreshFolders();
+    if (reloadList || currentLibrary !== this) void currentLibrary?.reload(true);
   }
 
   // ---- selection and opening ---------------------------------------------------------------------
@@ -508,18 +550,53 @@ export class Library {
 
   // ---- batch actions -----------------------------------------------------------------------------
 
-  async #batch(action: BatchAction, ids: string[], folderId?: string | null) {
+  async #batch(action: BatchAction, ids: string[], folderId?: string | null, expectedRetention?: number) {
+    const { results, error, unconfirmed } = await api.batch(action, ids, folderId, expectedRetention);
+    // A confirmed delete may have committed before its response was lost.
+    const ok = new Set(results.filter((r) => r.ok || (expectedRetention === 0 && r.code === 'not-found')).map((r) => r.id));
+    let reloadList = false;
+    if (action === 'restore') {
+      const check = results.filter((r) => r.code === 'conflict').map((r) => r.id);
+      if (error instanceof ApiError && (error.status === 0 || error.status === 200 || error.status >= 500)) {
+        check.push(...(unconfirmed ?? []));
+      }
+      // One image can be verified directly. For a batch, refresh the visible list once.
+      if (check.length === 1) {
+        const id = check[0]!;
+        try {
+          if ((await api.getImage(id)).state === 'active') ok.add(id);
+        } catch {
+          reloadList = true;
+        }
+      } else reloadList = check.length > 1;
+    }
+    const unfinished = ids.length - ok.size;
+    const policyChanged = error instanceof ApiError && error.code === 'trash-retention-changed';
+    if (policyChanged) {
+      toast('回收站保留时间已更改，请重新确认。');
+      void currentLibrary?.loadRetention(true);
+    } else if (error && unfinished > 0 && expectedRetention !== 0) {
+      toast(errorMessage(error));
+      if (results.length === 0 && ok.size === 0 && !reloadList) return null;
+    }
+    const rejected = results.filter((r) => !ok.has(r.id) && !(reloadList && r.code === 'conflict')).length;
+    if (reloadList && !error && !ok.size && !rejected) toast(errorMessage(new ApiError({ status: 409, code: 'conflict' })));
+    return { ok: [...ok], unfinished, rejected, policyChanged, reloadList };
+  }
+
+  async #changeState(action: 'trash' | 'restore' | 'purge', ids: string[], expectedRetention?: number) {
+    const targets = ids.filter((id) => !this.pending.has(id));
+    if (!targets.length) return null;
+    for (const id of targets) this.pending.add(id);
     try {
-      const results = await api.batch(action, ids, folderId);
-      const ok = results.filter((r) => r.ok).map((r) => r.id);
-      return { ok, failed: results.length - ok.length };
-    } catch (e) {
-      toast(errorMessage(e));
-      return null;
+      return await this.#batch(action, targets, undefined, expectedRetention);
+    } finally {
+      for (const id of targets) this.pending.delete(id);
     }
   }
 
   #take(ids: string[]): Removed[] {
+    if (!ids.length) return [];
     const set = new Set(ids);
     const removed: Removed[] = [];
     const kept: Image[] = [];
@@ -529,49 +606,60 @@ export class Library {
     });
     this.items = kept;
     if (this.activeId && set.has(this.activeId)) this.activeId = null;
+    const hadSelection = this.sel.size > 0;
+    for (const id of ids) this.sel.delete(id);
+    if (hadSelection && this.sel.size === 0) this.clearSel();
     return removed;
   }
 
-  async #undo(inverse: 'restore' | 'trash', removed: Removed[], forSeq: number) {
-    const r = await this.#batch(inverse, removed.map((x) => x.image.id));
+  async #undo(inverse: 'restore' | 'trash', ids: string[], removed: Removed[], forSeq: number, expectedRetention?: number) {
+    const trigger = document.activeElement;
+    const r = await this.#changeState(inverse, ids, expectedRetention);
     if (!r) return;
-    if (this.alive) {
-      if (this.#seq === forSeq) {
+    let reloadList = r.reloadList;
+    if (r.ok.length && currentLibrary === this) {
+      if (this.#seq === forSeq && removed.length === ids.length) {
         const okIds = new Set(r.ok);
-        const back = removed.filter((x) => okIds.has(x.image.id)).sort((a, b) => a.index - b.index);
-        for (const x of back) this.items.splice(Math.min(x.index, this.items.length), 0, x.image);
+        for (const x of removed) {
+          if (okIds.has(x.image.id)) this.items.splice(Math.min(x.index, this.items.length), 0, x.image);
+        }
       } else {
-        void this.reload();
+        reloadList = true;
       }
+    } else if (currentLibrary && currentLibrary.mode !== this.mode) {
+      currentLibrary.#take(r.ok);
     }
-    this.#refresh();
-    if (r.failed > 0) toast(`${r.failed} 张未能撤销`);
+    this.#refresh(reloadList);
+    if (r.ok.length) {
+      toast(moveMessage(inverse, r.ok.length, r.rejected));
+      void focusList(trigger);
+    } else if (r.rejected && !r.policyChanged) toast(`${r.rejected} 张未能撤销`);
   }
 
   async #move(action: 'trash' | 'restore', ids: string[]) {
-    const r = await this.#batch(action, ids);
-    if (!r) return;
+    const trigger = document.activeElement;
+    const retention = this.retention ?? undefined;
     const forSeq = this.#seq;
+    const r = await this.#changeState(action, ids, action === 'trash' ? retention : undefined);
+    if (!r) return;
     const removed = this.#take(r.ok);
-    this.clearSel();
-    const tail = r.failed > 0 ? `，${r.failed} 张失败` : '';
     if (r.ok.length > 0) {
-      const text =
-        action === 'trash'
-          ? r.ok.length > 1
-            ? `已将 ${r.ok.length} 张图片移到回收站${tail}`
-            : `已移到回收站${tail}`
-          : r.ok.length > 1
-            ? `已恢复 ${r.ok.length} 张图片${tail}`
-            : `已恢复${tail}`;
-      toast(text, { action: { label: '撤销', run: () => void this.#undo(action === 'trash' ? 'restore' : 'trash', removed, forSeq) } });
-    } else if (r.failed > 0) {
-      toast(action === 'trash' ? `${r.failed} 张未能移到回收站` : `${r.failed} 张未能恢复`);
+      const undo = action === 'trash'
+        ? () => void this.#undo('restore', r.ok, removed, forSeq)
+        : retention !== undefined && retention > 0
+          ? () => void this.#undo('trash', r.ok, removed, forSeq, retention)
+          : undefined;
+      toast(moveMessage(action, r.ok.length, r.rejected), undo ? { action: { label: '撤销', run: undo } } : {});
+      if (currentLibrary === this) void focusList(trigger);
+    } else if (r.rejected > 0 && !r.policyChanged) {
+      toast(action === 'trash' ? `${r.rejected} 张未能移到回收站` : `${r.rejected} 张未能恢复`);
     }
-    this.#refresh();
+    this.#refresh(r.reloadList || this.#seq !== forSeq);
   }
 
   trash(ids: string[]) {
+    if (this.retention === null || this.purgeBusy) return;
+    if (this.retention === 0) return this.requestPurge(ids);
     return this.#move('trash', ids);
   }
 
@@ -580,22 +668,40 @@ export class Library {
   }
 
   requestPurge(ids: string[]) {
-    if (ids.length > 0) this.purgeIds = ids;
+    const targets = ids.filter((id) => !this.pending.has(id));
+    if (targets.length > 0 && !this.purgeBusy) {
+      this.purgeFailed = false;
+      this.purgeIds = targets;
+    }
   }
 
   async confirmPurge() {
+    const trigger = document.activeElement;
     const ids = this.purgeIds;
-    this.purgeIds = null;
-    if (!ids) return;
-    const r = await this.#batch('purge', ids);
+    if (!ids || this.purgeBusy) return;
+    const forSeq = this.#seq;
+    const fromLibrary = this.mode === 'library';
+    if (fromLibrary) {
+      this.purgeBusy = true;
+      this.purgeFailed = false;
+    } else {
+      this.purgeIds = null;
+    }
+    const r = await this.#changeState(fromLibrary ? 'trash' : 'purge', ids, fromLibrary ? 0 : undefined);
+    this.purgeBusy = false;
     if (!r) return;
     this.#take(r.ok);
-    this.clearSel();
-    if (r.ok.length === 0) toast(`${r.failed} 张未能删除`);
-    else if (r.failed > 0) toast(`已永久删除 ${r.ok.length} 张，${r.failed} 张失败`);
+    if (fromLibrary) {
+      const done = new Set(r.ok);
+      this.purgeIds = r.policyChanged || !r.unfinished ? null : ids.filter((id) => !done.has(id));
+      this.purgeFailed = this.purgeIds !== null;
+    }
+    if (r.ok.length === 0) {
+      if (!this.purgeFailed && !r.policyChanged) toast(`${r.unfinished} 张未能删除`);
+    } else if (r.rejected > 0) toast(`已永久删除 ${r.ok.length} 张，${r.rejected} 张失败`);
     else toast(r.ok.length > 1 ? `已永久删除 ${r.ok.length} 张图片` : '已永久删除');
-    if (this.mode === 'trash' && this.items.length === 0 && this.cursor) void this.reload();
-    this.#refresh();
+    if (r.ok.length && currentLibrary === this) void focusList(trigger);
+    this.#refresh(this.#seq !== forSeq || (this.mode === 'trash' && !this.items.length && this.cursor !== null));
   }
 
   // ---- moving images -----------------------------------------------------------------------------
@@ -654,8 +760,8 @@ export class Library {
           },
         },
       });
-    } else if (r.failed > 0) {
-      toast(`${r.failed} 张未能移动`);
+    } else if (r.unfinished > 0) {
+      toast(`${r.unfinished} 张未能移动`);
     }
     await this.reload(true);
     this.#refresh();

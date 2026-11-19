@@ -449,7 +449,7 @@ func TestAuthorizationMatrix(t *testing.T) {
 	_, err = e.svc.Restore(ctx, upTok, own.ID)
 	wantCode(t, err, CodeForbidden)
 	wantCode(t, e.svc.Purge(ctx, upTok, own.ID), CodeForbidden)
-	_, err = e.svc.Batch(ctx, upTok, "trash", []string{own.ID}, nil)
+	_, err = e.svc.Batch(ctx, upTok, "trash", []string{own.ID}, nil, nil)
 	wantCode(t, err, CodeForbidden)
 	_, err = e.svc.PatchImage(ctx, upTok, own.ID, ImagePatch{FolderID: nil, MoveFolder: true})
 	wantCode(t, err, CodeForbidden)
@@ -786,6 +786,31 @@ func TestRetentionZeroPurgesImmediately(t *testing.T) {
 	}
 }
 
+func TestConfirmedZeroDayBatchResumesPurge(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{TrashRetentionDays: ptr(0)}); err != nil {
+		t.Fatal(err)
+	}
+	img := e.mustUpload(e.admin, "retry.png", makePNG(t, 5, 5, 28))
+	e.svc.Fault = crashAt(FaultTrashAfterDB)
+	ids := []string{img.ID}
+	result, err := e.svc.Batch(ctx, e.admin, "trash", ids, nil, ptr(0))
+	if err != nil || len(result) != 1 || result[0].OK {
+		t.Fatalf("interrupted batch: %+v, %v", result, err)
+	}
+	e.svc.Fault = nil
+	result, err = e.svc.Batch(ctx, e.admin, "trash", ids, nil, ptr(0))
+	if err != nil || len(result) != 1 || !result[0].OK {
+		t.Fatalf("retried batch: %+v, %v", result, err)
+	}
+	im, err := e.db.GetImage(ctx, img.ID)
+	if err != nil || im.State != meta.StatePurged {
+		t.Fatalf("retried purge state: %+v, %v", im, err)
+	}
+	assertInvariants(t, e)
+}
+
 func TestPurgeExpired(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -808,6 +833,101 @@ func TestPurgeExpired(t *testing.T) {
 	}
 	if im, _ := e.db.GetImage(ctx, fresh.ID); im.State != "trashed" {
 		t.Fatal("fresh image purged")
+	}
+	assertInvariants(t, e)
+}
+
+func TestPurgeExpiredKeepsRetrashedImage(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	first := e.mustUpload(e.admin, "first.png", makePNG(t, 5, 5, 30))
+	firstLock := e.svc.lockImage(first.ID)
+	firstLock.Unlock()
+	var renewed ImageView
+	for seed := 31; ; seed++ {
+		renewed = e.mustUpload(e.admin, "renewed.png", makePNG(t, 5, 5, seed))
+		lock := e.svc.lockImage(renewed.ID)
+		lock.Unlock()
+		if lock != firstLock {
+			break
+		}
+	}
+
+	today := time.Now()
+	now := today.Add(-42 * 24 * time.Hour)
+	e.svc.Now = func() time.Time { return now }
+	if err := e.svc.Trash(ctx, e.admin, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	now = today.Add(-41 * 24 * time.Hour)
+	if err := e.svc.Trash(ctx, e.admin, renewed.ID); err != nil {
+		t.Fatal(err)
+	}
+	now = today
+
+	// Renew the second image after the sweep selected its batch.
+	retrashed := false
+	e.svc.Fault = func(point string) error {
+		if point != FaultPurgeAfterDB || retrashed {
+			return nil
+		}
+		retrashed = true
+		if _, err := e.svc.Restore(ctx, e.admin, renewed.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.svc.Trash(ctx, e.admin, renewed.ID); err != nil {
+			t.Fatal(err)
+		}
+		return nil
+	}
+	if n, err := e.svc.PurgeExpired(ctx); err != nil || n != 1 || !retrashed {
+		t.Errorf("sweep purged %d images, retrash ran=%v, error=%v", n, retrashed, err)
+	}
+	im, err := e.db.GetImage(ctx, renewed.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if im.State != meta.StateTrashed || im.TrashedAt == nil || *im.TrashedAt != today.UnixMilli() {
+		t.Errorf("renewed image state=%s, trashedAt=%v", im.State, im.TrashedAt)
+	}
+	if !e.fileExists("trash/" + im.ObjectKey) {
+		t.Error("renewed image lost its original")
+	}
+	e.svc.Fault = nil
+	if err := e.svc.Purge(ctx, e.admin, renewed.ID); err != nil {
+		t.Fatal("manual purge of recently trashed image:", err)
+	}
+	assertInvariants(t, e)
+}
+
+func TestPurgeExpiredHonorsExtendedRetention(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	today := time.Now()
+	e.svc.Now = func() time.Time { return today.Add(-40 * 24 * time.Hour) }
+	for i := range 2 {
+		img := e.mustUpload(e.admin, "old.png", makePNG(t, 5, 5, 40+i))
+		if err := e.svc.Trash(ctx, e.admin, img.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.svc.Now = func() time.Time { return today }
+	e.svc.Fault = func(point string) error {
+		if point == FaultPurgeAfterDB {
+			e.svc.Fault = nil
+			days := 90
+			_, err := e.svc.UpdateSettings(ctx, e.admin, SettingsPatch{TrashRetentionDays: &days})
+			return err
+		}
+		return nil
+	}
+	n, err := e.svc.PurgeExpired(ctx)
+	if err != nil || n != 1 {
+		t.Fatalf("extended retention during sweep: purged %d, want 1, error %v", n, err)
+	}
+	remaining, _, err := e.svc.ListImages(ctx, e.admin, ListParams{State: meta.StateTrashed})
+	if err != nil || len(remaining) != 1 {
+		t.Fatalf("remaining images in trash: %+v, %v", remaining, err)
 	}
 	assertInvariants(t, e)
 }
@@ -1136,8 +1256,17 @@ func TestSnapshotDuringUploadsAndRestore(t *testing.T) {
 		e.mustUpload(e.admin, fmt.Sprintf("seed%d.png", i), makePNG(t, 6, 6, 200+i))
 	}
 	trashed := e.mustUpload(e.admin, "trashed.png", makePNG(t, 6, 6, 250))
-	e.svc.Trash(ctx, e.admin, trashed.ID)
-	e.mustUpload(e.admin, "j.jpg", makeJPEG(t, 3))
+	active := e.mustUpload(e.admin, "j.jpg", makeJPEG(t, 3))
+	e.svc.ProcessThumbnails(ctx)
+	for _, img := range []ImageView{active, trashed} {
+		v, err := e.svc.GetImage(ctx, e.admin, img.ID)
+		if err != nil || !v.HasThumb {
+			t.Fatalf("missing fixture thumbnail, image %+v: %v", v, err)
+		}
+	}
+	if err := e.svc.Trash(ctx, e.admin, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
@@ -1214,6 +1343,28 @@ func TestSnapshotDuringUploadsAndRestore(t *testing.T) {
 	rep2, err := svc2.Check(ctx, CLIPrincipal(), CheckFull)
 	if err != nil || !rep2.OK || len(rep2.Issues) != 0 {
 		t.Fatalf("check after restore: %+v %v", rep2, err)
+	}
+
+	v, err := svc2.GetImage(ctx, e.admin, trashed.ID)
+	if err != nil || v.HasThumb || v.SHA256 != trashed.SHA256 {
+		t.Errorf("restored trash metadata: %+v, %v", v, err)
+	}
+	svc2.ProcessThumbnails(ctx)
+	thumb, err := svc2.OpenThumb(ctx, e.admin, active.ID)
+	if err != nil {
+		t.Errorf("active thumbnail was not regenerated: %v", err)
+	} else {
+		thumb.File.Close()
+	}
+	if _, err := svc2.Restore(ctx, e.admin, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
+	svc2.ProcessThumbnails(ctx)
+	thumb, err = svc2.OpenThumb(ctx, e.admin, trashed.ID)
+	if err != nil {
+		t.Errorf("thumbnail was not regenerated after moving out of trash: %v", err)
+	} else {
+		thumb.File.Close()
 	}
 
 	// restore refuses a non-empty target and a non-snapshot source
@@ -1340,31 +1491,31 @@ func TestBatch(t *testing.T) {
 	ctx := context.Background()
 	a := e.mustUpload(e.admin, "a.png", makePNG(t, 5, 5, 600))
 	b := e.mustUpload(e.admin, "b.png", makePNG(t, 5, 5, 601))
-	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, nil)
+	res, err := e.svc.Batch(ctx, e.admin, "trash", []string{a.ID, b.ID, a.ID, "00000000000000000000", "nonsense"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res) != 4 || !res[0].OK || !res[1].OK || res[2].OK || res[2].Code != CodeNotFound || res[3].Code != CodeNotFound {
 		t.Fatalf("results: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "purge", []string{a.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("purge: %+v", res)
 	}
 	// move a trashed image and restore it
 	f := e.folder(e.admin, "batch", nil)
-	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, &f.ID)
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, &f.ID, nil)
 	if !res[0].OK {
 		t.Fatalf("move on trashed: %+v", res)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "restore", []string{b.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("restore: %+v", res)
 	}
 	if got, _ := e.svc.GetImage(ctx, e.admin, b.ID); got.FolderID == nil || *got.FolderID != f.ID {
 		t.Fatalf("move not applied: %+v", got)
 	}
-	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, nil)
+	res, _ = e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, nil, nil)
 	if !res[0].OK {
 		t.Fatalf("move to root: %+v", res)
 	}
@@ -1372,17 +1523,17 @@ func TestBatch(t *testing.T) {
 		t.Fatalf("not at root: %+v", got)
 	}
 	// an unknown destination fails the whole batch
-	if _, err := e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, ptr("0000000000000000")); ErrorCode(err) != CodeNotFound {
+	if _, err := e.svc.Batch(ctx, e.admin, "move", []string{b.ID}, ptr("0000000000000000"), nil); ErrorCode(err) != CodeNotFound {
 		t.Fatalf("unknown folder: %v", err)
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "explode", []string{a.ID}, nil, nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{a.ID}, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "visibility", []string{a.ID}, nil, nil); err == nil {
 		t.Fatal("removed visibility action accepted")
 	}
 	tooMany := make([]string, 501)
-	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, nil); err == nil {
+	if _, err := e.svc.Batch(ctx, e.admin, "trash", tooMany, nil, nil); err == nil {
 		t.Fatal("501 ids accepted")
 	}
 }

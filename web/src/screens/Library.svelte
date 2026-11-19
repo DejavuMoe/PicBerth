@@ -39,7 +39,7 @@
     void refreshFacets();
     // Images dropped on the sidebar tree move through this screen's list.
     tree.mover = (ids, to) => void lib.moveImages(ids, to);
-    if (trash) lib.loadRetention();
+    void lib.loadRetention();
     const off = onUploaded((img) => {
       void refreshFacets();
       void lib.refreshFolders();
@@ -158,6 +158,14 @@
   <div class="panel-main">
     <LibraryHead {lib} bind:searchEl bind:searching />
     <ActiveFilters {lib} omitQuery={phone.matches && searching} />
+    {#if lib.retention === null}
+      <div class="retention-note">
+        <span role="status">{lib.retentionFailed ? '无法读取回收站保留时间。' : '正在读取回收站保留时间…'}</span>
+        {#if lib.retentionFailed}
+          <button type="button" class="btn btn-ghost" onclick={() => void lib.loadRetention(true)}>重试</button>
+        {/if}
+      </div>
+    {/if}
     <div class="scroll" bind:this={scroller} onscroll={maybeLoadMore}>
       {#if lib.view === 'grid' && lib.phase === 'ready'}
         <FolderChips {lib} />
@@ -205,3 +213,13 @@
 {#if lib.purgeIds}
   <PurgeConfirm {lib} />
 {/if}
+
+<style>
+  .retention-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px var(--gutter);
+    color: var(--muted);
+  }
+</style>

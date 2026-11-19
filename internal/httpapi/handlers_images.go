@@ -213,8 +213,8 @@ func (s *Server) patchImage(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Filename *string        `json:"filename"`
-		FolderID nullableString `json:"folderId"`
+		Filename *string          `json:"filename"`
+		FolderID nullable[string] `json:"folderId"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
@@ -260,15 +260,21 @@ func (s *Server) batchImages(w http.ResponseWriter, r *http.Request, c *call) {
 		return
 	}
 	var req struct {
-		Action   string         `json:"action"`
-		IDs      []string       `json:"ids"`
-		FolderID nullableString `json:"folderId"`
+		Action                     string           `json:"action"`
+		IDs                        []string         `json:"ids"`
+		FolderID                   nullable[string] `json:"folderId"`
+		ExpectedTrashRetentionDays nullable[int]    `json:"expectedTrashRetentionDays"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		s.writeError(w, r, err)
 		return
 	}
-	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.FolderID.Value)
+	expected := req.ExpectedTrashRetentionDays
+	if expected.Set && expected.Value == nil {
+		s.writeError(w, r, &core.Error{Code: core.CodeValidation, Detail: "expectedTrashRetentionDays must be an integer."})
+		return
+	}
+	res, err := s.core.Batch(r.Context(), c.p, req.Action, req.IDs, req.FolderID.Value, expected.Value)
 	if err != nil {
 		s.writeError(w, r, err)
 		return
