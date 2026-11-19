@@ -98,12 +98,14 @@ func (s *Service) thumbOne(ctx context.Context, id string) {
 	}
 	if outcome != "none" {
 		if err := s.blobs.WriteThumb(id, outcome, data); err != nil {
+			s.thumbDirty.Store(true)
 			s.log.Warn("thumbnail: write failed", "id", id, "err", err)
 			return
 		}
 	}
 	ok, err := s.db.SetThumb(ctx, id, outcome)
 	if err != nil {
+		s.thumbDirty.Store(true)
 		s.log.Warn("thumbnail: recording outcome failed", "id", id, "err", err)
 		return
 	}
