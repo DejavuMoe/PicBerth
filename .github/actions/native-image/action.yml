@@ -51,7 +51,7 @@ runs:
           -v "$HOME/.docker:/root/.docker:ro" \
           -v "$RUNNER_TEMP/buildkit-cache:/cache" \
           -v "$RUNNER_TEMP:/output" \
-          --entrypoint buildctl-daemonless.sh moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e build \
+          --entrypoint buildctl-daemonless.sh moby/buildkit:v0.35.0@sha256:aa632b921ef07411d2cb77292cd34213d4f7b384001d6fceef1e1f25bf9752bb build \
           --frontend dockerfile.v0 --local context=/src --local dockerfile=/src \
           --opt "platform=linux/$ARCH" \
           --opt "build-arg:VERSION=$VERSION" --opt "build-arg:COMMIT=$GITHUB_SHA" \

@@ -52,6 +52,7 @@ func (s *Service) ProcessThumbnails(ctx context.Context) {
 		pending, err := s.db.PendingThumbs(ctx, after, 200)
 		if err != nil || len(pending) == 0 {
 			if err != nil && ctx.Err() == nil {
+				s.thumbDirty.Store(true)
 				s.log.Warn("thumbnail backfill failed", "err", err)
 			}
 			return
@@ -98,12 +99,14 @@ func (s *Service) thumbOne(ctx context.Context, id string) {
 	}
 	if outcome != "none" {
 		if err := s.blobs.WriteThumb(id, outcome, data); err != nil {
+			s.thumbDirty.Store(true)
 			s.log.Warn("thumbnail: write failed", "id", id, "err", err)
 			return
 		}
 	}
 	ok, err := s.db.SetThumb(ctx, id, outcome)
 	if err != nil {
+		s.thumbDirty.Store(true)
 		s.log.Warn("thumbnail: recording outcome failed", "id", id, "err", err)
 		return
 	}

@@ -38,7 +38,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   binaries:
-    needs: verify
+    needs: source
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     permissions:
@@ -108,7 +108,7 @@ jobs:
           retention-days: 7
 
   image:
-    needs: verify
+    needs: source
     strategy:
       fail-fast: false
       matrix:
@@ -149,35 +149,26 @@ jobs:
 
   manifest:
     if: github.event_name == 'push'
-    needs: [binaries, image]
+    needs: [verify, binaries, image]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
       packages: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Merge native images and retain attestations
+      - name: Verify and publish the multi-architecture image
         env:
-          TAGS: ghcr.io/dejavumoe/picberth:${{ github.ref_name }}
-        shell: bash
+          TAG: ghcr.io/dejavumoe/picberth:${{ github.ref_name }}
         run: |
-          regctl() {
-            docker run --rm -i -v "$HOME/.docker/config.json:/home/appuser/.docker/config.json:ro" regclient/regctl:v0.8.3@sha256:d0cda0dabd3c328ff5649502b18913109ecbb4a169db6a91e7089f6f89cd958b "$@"
-          }
-          image=ghcr.io/dejavumoe/picberth
-          source="$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          while IFS= read -r tag; do
-            regctl manifest get "$source-amd64" --format raw-body > amd64.json
-            regctl manifest get "$source-arm64" --format raw-body > arm64.json
-            jq -s '.[0].manifests += .[1].manifests | .[0]' amd64.json arm64.json | regctl manifest put "$tag"
-            regctl manifest get "$tag" --format raw-body | jq -e '
-              [.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]'
-          done <<< "$TAGS"
+          python3 .github/scripts/publish_oci_image.py "build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$TAG"
 
   release:
     if: github.event_name == 'push'
