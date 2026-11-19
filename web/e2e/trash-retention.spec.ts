@@ -230,7 +230,7 @@ test('keeps the next row confirmation open when a previous trash purge finishes'
   }
 });
 
-test('retries only the unfinished selection after the second trash chunk loses its response', async ({ page }, info) => {
+for (const committed of [false, true]) test(committed ? 'undo includes the committed second trash chunk' : 'retries only the unfinished selection after the second trash chunk loses its response', async ({ page }, info) => {
   await useListView(page);
   await login(page);
   const before = await (await page.request.get('/api/v1/settings')).json();
@@ -249,20 +249,23 @@ test('retries only the unfinished selection after the second trash chunk loses i
     });
     await page.route('**/api/v1/images?*', (route) => {
       listReads++;
-      return route.fulfill({ json: { items: images.filter((im) => active.has(im.id)), nextCursor: null } });
+      const trashed = new URL(route.request().url()).searchParams.get('state') === 'trashed';
+      return route.fulfill({ json: { items: images.filter((im) => active.has(im.id) !== trashed), nextCursor: null } });
     });
     const chunks: string[][] = [];
     await page.route('**/api/v1/images/batch', (route) => {
       const { action, ids, expectedTrashRetentionDays } = route.request().postDataJSON();
       if (action === 'restore') {
-        expect(ids).toEqual(chunks[0]);
+        if (!committed) expect(ids).toEqual(chunks[0]);
         for (const id of ids) active.add(id);
-        return route.abort();
+        if (!committed) return route.abort();
+        return route.fulfill({ json: { results: ids.map((id: string) => ({ id, ok: true })) } });
       }
       expect(expectedTrashRetentionDays).toBe(30);
       chunks.push(ids);
-      if (chunks.length === 2) return route.abort();
+      if (chunks.length === 2 && !committed) return route.abort();
       for (const id of ids) active.delete(id);
+      if (chunks.length === 2) return route.abort();
       return route.fulfill({ json: { results: ids.map((id: string) => ({ id, ok: true })) } });
     });
     await page.goto('/library');
@@ -271,6 +274,17 @@ test('retries only the unfinished selection after the second trash chunk loses i
     await libraryItem(page, 'chunk-502.png').click();
     const trash = bulk.getByRole('button', { name: '移到回收站' });
     await trash.click();
+    if (committed) {
+      await expect(page.getByText('已将 502 张图片移到回收站')).toBeVisible();
+      await expect(page.locator('table.table tbody tr')).toHaveCount(1);
+      await expect(libraryItem(page, 'chunk-502.png')).toHaveAttribute('aria-selected', 'false');
+      await page.locator('.toast').getByRole('button', { name: '撤销' }).click();
+      await expect(page.locator('table.table tbody tr')).toHaveCount(503);
+      expect(active.size).toBe(503);
+      expect(chunks.map(ids => ids.length)).toEqual([500, 2]);
+      expect(itemReads).toBe(0);
+      return;
+    }
     await expect(page.getByText('已选 2 张')).toBeVisible();
     await expect(libraryItem(page, 'chunk-502.png')).toHaveAttribute('aria-selected', 'false');
     await trash.click();

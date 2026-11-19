@@ -555,9 +555,31 @@ export class Library {
     // A confirmed delete may have committed before its response was lost.
     const ok = new Set(results.filter((r) => r.ok || (expectedRetention === 0 && r.code === 'not-found')).map((r) => r.id));
     let reloadList = false;
+    const ambiguous = error instanceof ApiError && (error.status === 0 || error.status === 200 || error.status >= 500);
+    if (action === 'trash' && expectedRetention !== undefined && expectedRetention > 0 && ambiguous && unconfirmed?.length) {
+      // Replaying trash could delete an image restored by someone else in the meantime.
+      try {
+        if (unconfirmed.length === 1) {
+          const image = await api.getImage(unconfirmed[0]!);
+          if (image.state === 'trashed') ok.add(image.id);
+        } else {
+          const pending = new Set(unconfirmed);
+          let cursor: string | undefined;
+          do {
+            const page = await api.listImages({ state: 'trashed', limit: 200, cursor });
+            for (const image of page.items) {
+              if (pending.delete(image.id)) ok.add(image.id);
+            }
+            cursor = page.nextCursor ?? undefined;
+          } while (cursor && pending.size);
+        }
+      } catch {
+        reloadList = true;
+      }
+    }
     if (action === 'restore') {
       const check = results.filter((r) => r.code === 'conflict').map((r) => r.id);
-      if (error instanceof ApiError && (error.status === 0 || error.status === 200 || error.status >= 500)) {
+      if (ambiguous) {
         check.push(...(unconfirmed ?? []));
       }
       // One image can be verified directly. For a batch, refresh the visible list once.
