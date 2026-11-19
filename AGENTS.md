@@ -20,6 +20,14 @@
 - Preview design prototypes: `python -m http.server 4321 --directory designs` then
   `http://localhost:4321/picberth/index.html`
 
+## Git commits
+
+Every commit message must end with this exact line as its sole `Co-Authored-By` trailer.
+
+```text
+Co-Authored-By: DeepSeek v4.1 Flash Codex (1M context) <noreply@openai.com>
+```
+
 ## Prototype-first gate
 
 - Every user-visible layout, copy, navigation, interaction, workflow, component state, dialog, menu, or
