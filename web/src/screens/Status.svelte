@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SystemHead from '../components/SystemHead.svelte';
   import { onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import Select from '../components/Select.svelte';
@@ -263,15 +264,12 @@
 </script>
 
 <div class="panel-main">
-  <div class="head">
-    <div class="head-title">
-      <h1>状态</h1>
-    </div>
+  <SystemHead>
     <button type="button" class="btn btn-ghost" disabled={refreshing || phase === 'loading'} onclick={() => void refresh()}>
       <Icon name="refresh" />
       刷新
     </button>
-  </div>
+  </SystemHead>
   <div class="scroll">
     {#if phase === 'loading' || phase === 'error' || !status}
       <div class="page page-wide">

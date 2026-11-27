@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SystemHead from '../components/SystemHead.svelte';
   import { onDestroy, onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import Modal from '../components/Modal.svelte';
@@ -192,11 +193,7 @@
 {/snippet}
 
 <div class="panel-main">
-  <div class="head">
-    <div class="head-title">
-      <h1>设置</h1>
-    </div>
-  </div>
+  <SystemHead />
   <div class="scroll">
     <div class="page">
       {#if phase === 'loading'}

@@ -59,6 +59,7 @@
   });
 
   const NAV_ITEMS: { key: string; title: string; icon: IconName; to: string }[] = [
+    { key: 'go-recent', title: '最近', icon: 'clock', to: '/recent' },
     { key: 'go-library', title: '图片', icon: 'image', to: '/library' },
     { key: 'go-trash', title: '回收站', icon: 'trash', to: '/trash' },
     { key: 'go-tokens', title: '令牌', icon: 'key', to: '/tokens' },

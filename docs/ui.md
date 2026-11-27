@@ -24,20 +24,36 @@ The earlier 「暗房」 design was rejected and no longer exists in the code.
 
 ## Shell and routes
 
-From 1100 px: sidebar with brand, navigation without group headings, a warning dot on 状态 when there are
-warnings, a count on 回收站, and an account menu at the bottom with the theme options and 退出. 721–1099 px: the
-sidebar is an icon rail (tooltips, warning dot). ≤ 720 px: a full-bleed panel with a sticky header and a fixed
-bottom tab bar 图片 / 回收站 / 令牌 / 设置 / 状态. There is no top bar and no disk meter.
+From 1100 px: sidebar with brand, a 搜索 (Ctrl K) button that opens the command palette, then 最近, the folder tree
+under 图片, 回收站 with its count, and at the bottom 系统 and the account menu (theme options and 退出). 系统 carries a
+dot only for warnings that need action (a broken image, a failed check); a missing or old snapshot shows on the 快照
+row only. 721–1099 px: the sidebar is an icon rail (tooltips, the same dot). ≤ 720 px: a full-bleed panel with a
+sticky header and a fixed bottom tab bar 最近 / 图片 / 回收站 / 系统. There is no top bar and no disk meter.
+系统 groups 状态, 令牌 and 设置 as tabs in the page header (a row under the header on phones); each tab keeps its
+own route.
 
-Routes: `/library` and `/library/<folder path>` (folder names joined by `/`, each segment URL-encoded, e.g.
+Routes: `/recent`, `/library` and `/library/<folder path>` (folder names joined by `/`, each segment URL-encoded, e.g.
 `/library/旅行/2026/云南`), `/trash`, `/tokens`, `/settings`, `/status`, `/docs/api`, `/login`, `/setup`.
-`/` is not a screen of its own: signed in it is replaced with `/library`; signed out it goes to `/login`; before the
+`/` is not a screen of its own: signed in it is replaced with `/recent`; signed out it goes to `/login`; before the
 first administrator exists every console path goes to `/setup`. Signed out, any other known path goes to
-`/login?next=<path>` and sign-in returns there (only same-origin known paths are accepted, else `/library`).
+`/login?next=<path>` and sign-in returns there (only same-origin known paths are accepted, else `/recent`).
 `/docs/api` needs no session. Unknown in-app paths show a not-found page; a folder path that does not exist shows
 文件夹不存在 inside the library. The server returns the SPA for these routes and for any `/library/...` path, so a
 direct request for any other URL gets a plain 404. Sign-in and setup are plain centered cards. Overlays (modal,
 drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced-motion`.
+
+## 最近
+
+- Every active image, newest first, grouped by day (今天, 昨天, then the date). 60 px rows: thumbnail, name, folder
+  and source, then dimensions, size and relative time, then 复制 (in the current link format) and the row ⋯ menu.
+  Each day heading offers 复制全部链接 on hover.
+- The header holds 复制为 URL / Markdown / HTML / BBCode, which sets the remembered link format (`picberth.linkFormat`),
+  and 上传 as a split button whose menu picks the 位置 for uploads, drops and pastes started on 最近 (the root by
+  default; a chosen folder is named next to the button). On phones 复制为 sits in a row under the header.
+- The upload queue is listed at the top of 最近 (the floating upload panel is not shown there). Drops and pastes on
+  screens other than 最近 and the library go to 最近.
+- A row opens the same image detail as the library; `j` / `k` move through 最近, ← / → when the detail is open.
+- States: loading rows, 加载失败 with 重试, and 还没有图片 / 拖入、粘贴或选择文件上传. Paging loads as you scroll.
 
 ## Library and trash
 

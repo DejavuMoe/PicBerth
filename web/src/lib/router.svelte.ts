@@ -1,6 +1,6 @@
 // Tiny History API router: exact paths only, query params, link interception, leave guards.
 
-export const ROUTES = ['/', '/login', '/setup', '/library', '/trash', '/tokens', '/settings', '/status', '/docs/api'] as const;
+export const ROUTES = ['/', '/login', '/setup', '/recent', '/library', '/trash', '/tokens', '/settings', '/status', '/docs/api'] as const;
 
 const state = $state({ path: normalize(location.pathname), search: location.search });
 

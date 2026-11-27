@@ -31,13 +31,18 @@ export async function useListView(page: Page) {
   await page.addInitScript(() => localStorage.setItem('picberth.view', 'list'));
 }
 
-export async function login(page: Page) {
+export async function login(page: Page, landing: 'library' | 'recent' = 'library') {
   await page.goto('/login');
   await page.getByLabel('用户名').fill('testadmin');
   await page.getByLabel('密码').fill('TestPass123!');
   await page.getByRole('button', { name: '登录', exact: true }).click();
-  await expect(page).toHaveURL(/(?:\/|\/library)$/);
+  // Signing in lands on 最近; most tests work in the library, so they start there.
+  await expect(page).toHaveURL(/\/recent$/);
   await expect(page.locator('#main')).toBeVisible();
+  if (landing === 'library') {
+    await page.goto('/library');
+    await expect(page.locator('#main')).toBeVisible();
+  }
 }
 
 export async function checkPageHealth(page: Page) {

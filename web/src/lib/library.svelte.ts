@@ -156,8 +156,11 @@ export async function copyLinks(images: Pick<Image, 'links'>[]) {
   toast(r === 'copied' ? `已复制 ${images.length} 条 ${formatLabel(format)}` : COPY_FAILED);
 }
 
+/** `recent` lists every active image newest first, whatever folder it is in. */
+export type LibraryMode = 'library' | 'trash' | 'recent';
+
 export class Library {
-  readonly mode: 'library' | 'trash' = 'library';
+  readonly mode: LibraryMode = 'library';
   readonly state: ImageState = 'active';
 
   items = $state<Image[]>([]);
@@ -190,8 +193,8 @@ export class Library {
   missing = $derived(this.mode === 'library' && this.resolved === undefined);
   folderId = $derived(this.resolved ?? null);
 
-  filters = $derived(parseFilters(router.query));
-  sort = $derived(parseSort(router.query));
+  filters = $derived(this.mode === 'recent' ? EMPTY_FILTERS : parseFilters(router.query));
+  sort = $derived<ImageSort>(this.mode === 'recent' ? 'new' : parseSort(router.query));
   filtered = $derived(!!this.filters.q || filterCount(this.filters) > 0);
   selecting = $derived(this.sel.size > 0 || this.selectMode);
   active = $derived(this.activeId ? (this.items.find((i) => i.id === this.activeId) ?? null) : null);
@@ -213,7 +216,7 @@ export class Library {
     if (id === null) this.viewing = false;
   }
 
-  constructor(mode: 'library' | 'trash') {
+  constructor(mode: LibraryMode) {
     this.mode = mode;
     this.state = mode === 'trash' ? 'trashed' : 'active';
     currentLibrary = this;
@@ -441,8 +444,8 @@ export class Library {
 
   /** A fresh upload joins the top of the plain newest-first list when it belongs here. */
   addUploaded(img: Image) {
-    if (this.mode !== 'library' || this.filtered || this.sort !== 'new') return;
-    if ((img.folderId ?? null) !== this.folderId) return;
+    if (this.mode === 'trash' || this.filtered || this.sort !== 'new') return;
+    if (this.mode === 'library' && (img.folderId ?? null) !== this.folderId) return;
     // An upload can finish while the folder is still loading; fetch the list again rather than leave
     // the new image invisible until the next navigation.
     if (this.phase !== 'ready') {
@@ -702,7 +705,7 @@ export class Library {
     const ids = this.purgeIds;
     if (!ids || this.purgeBusy) return;
     const forSeq = this.#seq;
-    const fromLibrary = this.mode === 'library';
+    const fromLibrary = this.mode !== 'trash';
     if (fromLibrary) {
       this.purgeBusy = true;
       this.purgeFailed = false;

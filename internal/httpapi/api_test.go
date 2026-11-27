@@ -1223,7 +1223,7 @@ func TestSearchFilenameCharacterLimit(t *testing.T) {
 
 func TestSPAAndNamespaces(t *testing.T) {
 	h := newHarness(t, harnessOpts{imageURL: "https://img.example.com"})
-	for _, p := range []string{"/", "/login", "/setup", "/library", "/library/旅行", "/library/旅行/2026/云南", "/library/", "/docs/api", "/trash", "/tokens", "/settings", "/status"} {
+	for _, p := range []string{"/", "/login", "/setup", "/recent", "/library", "/library/旅行", "/library/旅行/2026/云南", "/library/", "/docs/api", "/trash", "/tokens", "/settings", "/status"} {
 		resp, body := h.do("GET", p, nil)
 		wantStatus(t, resp, body, 200)
 		if !strings.Contains(string(body), "<title>PicBerth</title>") {

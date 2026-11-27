@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SystemHead from '../components/SystemHead.svelte';
   import { onDestroy, onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import TokenCreate from '../components/admin/TokenCreate.svelte';
@@ -111,10 +112,7 @@
 {/snippet}
 
 <div class="panel-main">
-  <div class="head">
-    <div class="head-title">
-      <h1>令牌</h1>
-    </div>
+  <SystemHead>
     <a class="btn btn-ghost" href="/docs/api" target="_blank" rel="noopener">
       API 文档
       <Icon name="external" size="s" />
@@ -123,7 +121,7 @@
       <Icon name="plus" />
       新建令牌
     </button>
-  </div>
+  </SystemHead>
   <div class="scroll">
     <div class="page" style="max-width: 960px;">
       {#if phase === 'loading'}

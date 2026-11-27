@@ -28,17 +28,17 @@
     group: number;
   }
   const NAV: NavEntry[] = [
-    { href: '/library', match: ['/', '/library'], label: '图片', icon: 'image', group: 0 },
+    { href: '/recent', match: ['/', '/recent'], label: '最近', icon: 'clock', group: 0 },
+    { href: '/library', match: ['/library'], label: '图片', icon: 'image', group: 0 },
     { href: '/trash', match: ['/trash'], label: '回收站', icon: 'trash', group: 0 },
-    { href: '/tokens', match: ['/tokens'], label: '令牌', icon: 'key', group: 1 },
-    { href: '/settings', match: ['/settings'], label: '设置', icon: 'sliders', group: 1 },
-    { href: '/status', match: ['/status'], label: '状态', icon: 'pulse', group: 1 },
+    { href: '/status', match: ['/status', '/tokens', '/settings'], label: '系统', icon: 'gear', group: 1 },
   ];
 
-  const isImages = $derived(router.path === '/' || isLibraryPath(router.path));
+  const isImages = $derived(isLibraryPath(router.path));
   const isCurrent = (n: NavEntry) => (n.href === '/library' ? isImages : n.match.includes(router.path));
   const screenKey = $derived(isImages ? 'library' : router.path);
-  const warnings = $derived(health.status?.warnings.length ?? 0);
+  // A missing or old snapshot is shown on the status page only; the dot is kept for problems that need action.
+  const warnings = $derived(health.status?.warnings.filter((w) => w.code !== 'snapshot-stale').length ?? 0);
   const danger = $derived(health.lamp === 'danger');
   const trashCount = $derived(facets.trashed?.total ?? 0);
   const name = $derived(session.user?.name ?? '');
@@ -76,7 +76,7 @@
     <Icon name={n.icon} />
     <span class="label">{n.label}</span>
     {#if n.href === '/trash' && trashCount > 0}<span class="count">{trashCount}</span>{/if}
-    {#if n.href === '/status' && (warnings > 0 || danger)}
+    {#if n.group === 1 && (warnings > 0 || danger)}
       <span class="dot {danger ? 'dot-danger' : 'dot-warning'}" role="img" aria-label={warnings > 0 ? `${warnings} 条警告` : health.label}></span>
     {/if}
   </a>
@@ -91,33 +91,32 @@
         <span class="brand-mark" aria-hidden="true"></span>
         <span class="brand-word">PicBerth</span>
       </span>
-      <button
-        type="button"
-        class="cmdk-btn"
-        aria-label="命令面板"
-        title="命令面板"
-        aria-haspopup="dialog"
-        aria-expanded={palette.open}
-        onclick={openPalette}
-      >
-        {MOD} K
-      </button>
     </div>
+    <button
+      type="button"
+      class="search-trigger"
+      aria-label="命令面板"
+      title="命令面板"
+      aria-haspopup="dialog"
+      aria-expanded={palette.open}
+      onclick={openPalette}
+    >
+      <Icon name="search" />
+      <span class="label">搜索</span>
+      <kbd>{MOD} K</kbd>
+    </button>
+    <div class="side-nav">{@render navLink(NAV[0]!)}</div>
     {#if wideNav.matches}
       <div class="side-scroll">
         <FolderPanel />
       </div>
     {:else}
-      <div class="side-nav">{@render navLink(NAV[0]!)}</div>
+      <div class="side-nav">{@render navLink(NAV[1]!)}</div>
     {/if}
-    <div class="side-nav">{@render navLink(NAV[1]!)}</div>
-    <div class="side-sep"></div>
-    <div class="side-nav">
-      {#each NAV.filter((n) => n.group === 1) as n (n.href)}
-        {@render navLink(n)}
-      {/each}
-    </div>
+    <div class="side-nav">{@render navLink(NAV[2]!)}</div>
     <div class="side-fill"></div>
+    <div class="side-sep"></div>
+    <div class="side-nav">{@render navLink(NAV[3]!)}</div>
     <div class="side-nav side-foot">
       <Menu align="left" width={200} label="账户">
         {#snippet trigger(open, toggle)}
@@ -152,7 +151,7 @@
         <a class="tab" href={n.href} aria-current={isCurrent(n) ? 'page' : undefined}>
           <Icon name={n.icon} />
           {n.label}
-          {#if n.href === '/status' && (warnings > 0 || danger)}
+          {#if n.group === 1 && (warnings > 0 || danger)}
             <span class="dot {danger ? 'dot-danger' : 'dot-warning'}" role="img" aria-label={warnings > 0 ? `${warnings} 条警告` : health.label}></span>
           {/if}
         </a>

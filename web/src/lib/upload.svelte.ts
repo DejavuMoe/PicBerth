@@ -344,9 +344,9 @@ function pastedName(file: File): File {
   return new File([file], `pasted-${stamp}.${ext}`, { type: file.type, lastModified: file.lastModified });
 }
 
-/** Files can only be watched on the library screen, so a drop or paste elsewhere goes there. */
+/** Uploads are listed on 最近 and in the library; a drop or paste on any other screen goes to 最近. */
 function goToLibrary() {
-  if (!isLibraryPath(router.path)) void navigate('/library');
+  if (router.path !== '/recent' && !isLibraryPath(router.path)) void navigate('/recent');
 }
 
 /** Install on authenticated routes. */

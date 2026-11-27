@@ -17,6 +17,7 @@
   import Library from './screens/Library.svelte';
   import Login from './screens/Login.svelte';
   import NotFound from './screens/NotFound.svelte';
+  import Recent from './screens/Recent.svelte';
   import Settings from './screens/Settings.svelte';
   import Setup from './screens/Setup.svelte';
   import Status from './screens/Status.svelte';
@@ -55,13 +56,14 @@
     } else if (p === '/login' || p === '/setup') {
       void navigate(safeNext(router.query.get('next')), { replace: true });
     } else if (p === '/') {
-      void navigate('/library', { replace: true });
+      void navigate('/recent', { replace: true });
     }
   });
 
   const TITLES: Record<string, string> = {
     '/login': '登录',
     '/setup': '初始化',
+    '/recent': '最近',
     '/trash': '回收站',
     '/tokens': '令牌',
     '/settings': '设置',
@@ -70,7 +72,7 @@
   };
   $effect(() => {
     const p = router.path;
-    const t = p === '/' || isLibraryPath(p) ? '图片' : TITLES[p];
+    const t = isLibraryPath(p) ? '图片' : TITLES[p];
     document.title = t ? `${t} - PicBerth` : 'PicBerth';
   });
 
@@ -109,7 +111,7 @@
     }
     if (view !== 'app' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTypingTarget(e.target) || modalOpen()) return;
-    if (router.path !== '/' && !isLibraryPath(router.path)) return;
+    if (router.path !== '/recent' && !isLibraryPath(router.path)) return;
     if (e.key === 'u' || e.key === 'U') {
       e.preventDefault();
       openPicker();
@@ -126,7 +128,9 @@
 
 {#if view === 'app'}
   <Shell>
-    {#if router.path === '/' || isLibraryPath(router.path)}
+    {#if router.path === '/recent'}
+      <Recent />
+    {:else if isLibraryPath(router.path)}
       <Library mode="library" />
     {:else if router.path === '/trash'}
       <Library mode="trash" />

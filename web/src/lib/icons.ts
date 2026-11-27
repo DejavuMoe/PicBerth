@@ -32,6 +32,14 @@ export const ICONS = {
     { t: 'circle', cx: 5.5, cy: 11, r: 1.5 },
   ],
   pulse: [{ t: 'path', d: 'M2 8h2.5L6 4.5l3 7L10.5 8H14' }],
+  clock: [
+    { t: 'circle', cx: 8, cy: 8, r: 5.5 },
+    { t: 'path', d: 'M8 5v3l2 1.5' },
+  ],
+  gear: [
+    { t: 'circle', cx: 8, cy: 8, r: 2 },
+    { t: 'path', d: 'M8 1.8v1.6M8 12.6v1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M1.8 8h1.6M12.6 8h1.6M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1' },
+  ],
   search: [
     { t: 'circle', cx: 7, cy: 7, r: 4.25 },
     { t: 'path', d: 'm10.25 10.25 3.25 3.25' },

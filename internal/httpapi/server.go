@@ -94,7 +94,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("/api/", api) // "/api" itself is answered by handleRootFile (a method-less "/api" pattern would conflict)
 
 	mux.HandleFunc("GET /assets/{path...}", s.handleAsset)
-	for _, p := range []string{"/{$}", "/login", "/setup", "/library", "/trash", "/tokens", "/settings", "/status", "/docs/api"} {
+	for _, p := range []string{"/{$}", "/login", "/setup", "/recent", "/library", "/trash", "/tokens", "/settings", "/status", "/docs/api"} {
 		mux.HandleFunc("GET "+p, s.handleIndex)
 	}
 	// Folder paths are client-side routes: folder names never reach the server as a path segment the

@@ -13,7 +13,7 @@ authentication required); the human reference page is `/docs/api`. Both are kept
 | `/api/v1/...` | JSON API | session cookie (SPA) or `Authorization: Bearer <token>` |
 | `/assets/...` | Hashed SPA assets | none, `Cache-Control: public, max-age=31536000, immutable` |
 | `/healthz`, `/readyz` | Liveness / readiness (`200 ok` / `503`) | none |
-| `/`, `/login`, `/setup`, `/library`, `/trash`, `/tokens`, `/settings`, `/status`, `/docs/api` | SPA entry HTML | none (SPA checks session itself) |
+| `/`, `/login`, `/setup`, `/recent`, `/library`, `/trash`, `/tokens`, `/settings`, `/status`, `/docs/api` | SPA entry HTML | none (SPA checks session itself) |
 | `/library/{folder path}` | SPA entry HTML for any path below `/library` | none |
 
 Anything else → `404`. Folder paths such as `/library/旅行/2026/云南` are client-side routes: the server

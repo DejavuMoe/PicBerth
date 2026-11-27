@@ -4,7 +4,7 @@
 
   let { lib }: { lib: Library } = $props();
 
-  const fromLibrary = $derived(lib.mode === 'library');
+  const fromLibrary = $derived(lib.mode !== 'trash');
   let confirm = $state<HTMLButtonElement>();
   const ids = $derived(lib.purgeIds ?? []);
   const single = $derived(ids.length === 1 ? lib.items.find((i) => i.id === ids[0]) : undefined);
