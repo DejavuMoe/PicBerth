@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PicBerth r8 状态</title>
+<link rel="stylesheet" href="base.css" />
+<style>
+/* Review board only. Not part of the product. */
+body { background: var(--bg); padding: 16px 20px 40px; display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: start; }
+nav { position: sticky; top: 16px; display: grid; gap: 2px; max-height: calc(100vh - 32px); overflow: auto; }
+nav h2 { font-size: var(--fs-s); color: var(--muted); font-weight: var(--w-medium); padding: 12px 8px 4px; }
+nav button { text-align: left; height: 28px; padding: 0 8px; border-radius: var(--r-s); color: var(--muted); }
+nav button:hover { background: var(--hover); color: var(--text); }
+nav button[aria-pressed='true'] { background: var(--sel); color: var(--text); }
+.bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.bar h1 { font-size: var(--fs-l); font-weight: var(--w-strong); }
+.stage { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.frame { display: grid; gap: 8px; }
+.cap { color: var(--muted); font-size: var(--fs-s); display: flex; gap: 12px; }
+.cap a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.box { overflow: hidden; border-radius: var(--r-l); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); background: var(--panel); }
+.box iframe { border: 0; transform-origin: 0 0; display: block; }
+</style>
+</head>
+<body>
+<nav id="list" aria-label="状态"></nav>
+<main>
+  <div class="bar"><h1 id="name"></h1><div class="grow"></div>
+    <div class="seg" id="theme" role="group" aria-label="主题"><button data-t="dark" aria-pressed="true">深色</button><button data-t="light">浅色</button></div></div>
+  <div class="stage" id="stage"></div>
+</main>
+<script>
+const GROUPS = [
+  ['最近', [
+    ['recent', '最近', ''], ['recent-detail', '详情', 'detail=1'], ['recent-markdown', '复制为 Markdown', 'fmt=markdown&detail=2'],
+    ['recent-uploading', '正在上传', 'state=uploading'], ['recent-upload-menu', '上传位置', 'state=upload-menu'], ['recent-dest', '位置：云南', 'dest=yunnan&state=uploading'],
+    ['recent-row-menu', '行菜单', 'state=row-menu'], ['recent-drop', '拖入文件', 'state=drop'],
+    ['recent-empty', '空', 'state=empty'], ['recent-loading', '加载中', 'state=loading'], ['recent-error', '加载失败', 'state=error'],
+  ]],
+  ['图片', [
+    ['library', '列表', 'view=library'], ['library-folder', '文件夹', 'view=library&folder=y2026'], ['library-grid', '网格', 'view=library&layout=grid'],
+    ['library-grid-folder', '网格：文件夹', 'view=library&layout=grid&folder=architecture'], ['library-detail', '详情', 'view=library&detail=1'],
+    ['library-uploading', '正在上传', 'view=library&folder=yunnan&state=uploading'], ['library-select', '多选', 'view=library&state=select'],
+    ['library-select-grid', '多选：网格', 'view=library&layout=grid&state=select'], ['library-filter', '筛选', 'view=library&state=filter'],
+    ['library-filtered', '筛选结果', 'view=library&state=filtered'], ['library-filtered-empty', '没有匹配', 'view=library&state=filtered-empty'],
+    ['library-display', '显示菜单', 'view=library&state=display'], ['library-row-menu', '行菜单', 'view=library&state=row-menu'],
+    ['library-tree', '文件夹（平板、手机）', 'view=library&state=tree'], ['library-drop', '拖入文件', 'view=library&folder=covers&state=drop'],
+    ['library-folder-empty', '空文件夹', 'view=library&folder=y2025'], ['library-empty', '空', 'view=library&state=empty'],
+    ['library-loading', '加载中', 'view=library&state=loading'], ['library-error', '加载失败', 'view=library&state=error'],
+  ]],
+  ['回收站', [
+    ['trash', '列表', 'view=trash'], ['trash-grid', '网格', 'view=trash&layout=grid'], ['trash-detail', '详情', 'view=trash&detail=-1'],
+    ['trash-select', '多选', 'view=trash&state=select'], ['trash-purge', '清空回收站', 'view=trash&state=purge'], ['trash-empty', '空', 'view=trash&state=empty'],
+  ]],
+  ['系统', [
+    ['status', '状态', 'view=system'], ['status-running', '检查中', 'view=system&state=running'], ['status-warn', '警告', 'view=system&state=warn'],
+    ['status-kind', '操作类型', 'view=system&state=kind'], ['status-loading', '加载中', 'view=system&state=loading'], ['status-error', '加载失败', 'view=system&state=error'],
+    ['tokens', '令牌', 'view=system&sec=tokens'], ['tokens-revoke', '确认吊销', 'view=system&sec=tokens&state=revoke'],
+    ['token-create', '新建令牌', 'view=system&sec=tokens&state=token-create'], ['token-invalid', '新建令牌：校验', 'view=system&sec=tokens&state=token-invalid'],
+    ['token-reveal', '令牌已创建', 'view=system&sec=tokens&state=token-reveal'], ['tokens-empty', '令牌：空', 'view=system&sec=tokens&state=empty'],
+    ['tokens-error', '令牌：加载失败', 'view=system&sec=tokens&state=error'],
+    ['settings', '设置', 'view=system&sec=settings'], ['settings-unsaved', '未保存', 'view=system&sec=settings&state=unsaved'],
+    ['settings-invalid', '校验', 'view=system&sec=settings&state=invalid'], ['settings-leave', '离开设置', 'view=system&sec=settings&state=leave'],
+  ]],
+  ['全局', [
+    ['palette', '命令面板', 'state=palette'], ['palette-results', '命令面板：结果', 'state=palette-results'],
+    ['palette-empty', '命令面板：没有结果', 'state=palette-empty'], ['account', '账户菜单', 'state=account'],
+  ]],
+];
+const ALL = GROUPS.flatMap(([, xs]) => xs);
+const q = new URLSearchParams(location.search);
+let cur = q.get('s') || 'recent', t = q.get('theme') || 'dark';
+function frame(src, w, h, scale, cap) {
+  return `<div class="frame"><div class="cap"><span>${cap}</span><a href="${src}" target="_blank" rel="noopener">${w} × ${h}</a></div>
+    <div class="box" style="width:${w * scale}px;height:${h * scale}px"><iframe title="${cap}" src="${src}" width="${w}" height="${h}" style="transform:scale(${scale})"></iframe></div></div>`;
+}
+function render() {
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll('#theme button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === t));
+  document.getElementById('list').innerHTML = GROUPS.map(([g, xs]) => `<h2>${g}</h2>${xs.map(([k, l]) => `<button data-s="${k}" aria-pressed="${k === cur}">${l}</button>`).join('')}`).join('');
+  const s = ALL.find((x) => x[0] === cur) || ALL[0];
+  const g = GROUPS.find(([, xs]) => xs.includes(s))[0];
+  document.getElementById('name').textContent = `${g}：${s[1]}`;
+  const src = `console.html?theme=${t}${s[2] ? '&' + s[2] : ''}`;
+  const avail = Math.max(600, innerWidth - 300 - 390 * 0.8);
+  const scale = Math.min(0.72, avail / 1440);
+  document.getElementById('stage').innerHTML = frame(src, 1440, 900, scale, '桌面') + frame(src, 390, 844, 0.8, '手机') + frame(src, 1024, 768, 0.5, '平板') + frame(src, 1280, 800, 0.5, '笔记本');
+  history.replaceState(null, '', `?s=${s[0]}&theme=${t}`);
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.s) cur = b.dataset.s;
+  if (b.dataset.t) t = b.dataset.t;
+  render();
+});
+addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>

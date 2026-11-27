@@ -282,7 +282,10 @@
       "prototype": {
         "entry": "retention.html",
         "assetPath": "retention.html",
-        "files": ["retention.html", "styles.css"],
+        "files": [
+          "retention.html",
+          "styles.css"
+        ],
         "states": [
           "zero-day-single-confirm",
           "zero-day-batch-confirm",
@@ -293,7 +296,13 @@
           "retention-changed",
           "zero-day-save-other-setting"
         ],
-        "stableIds": ["images", "settings", "batch", "cancel", "confirm"]
+        "stableIds": [
+          "images",
+          "settings",
+          "batch",
+          "cancel",
+          "confirm"
+        ]
       },
       "production": {
         "routeOrWindow": "/library, /settings",
@@ -310,10 +319,342 @@
           "internal/core/images.go",
           "web/src/screens/Settings.svelte"
         ],
-        "interfaces": ["POST /api/v1/images/batch", "/api/v1/settings"],
-        "tests": ["web/e2e/trash-retention.spec.ts", "web/e2e/trash-undo.spec.ts", "internal/httpapi/api_test.go", "internal/core/core_test.go"]
+        "interfaces": [
+          "POST /api/v1/images/batch",
+          "/api/v1/settings"
+        ],
+        "tests": [
+          "web/e2e/trash-retention.spec.ts",
+          "web/e2e/trash-undo.spec.ts",
+          "internal/httpapi/api_test.go",
+          "internal/core/core_test.go"
+        ]
       },
       "status": "implemented"
+    },
+    {
+      "id": "explore-a",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "explore/a.html",
+        "assetPath": "explore/a.html",
+        "files": [
+          "explore/a.html",
+          "explore/base.css",
+          "explore/shared.css",
+          "explore/data.js",
+          "assets/fonts/inter-latin-wght-normal.woff2",
+          "assets/fonts/inter-latin-ext-wght-normal.woff2",
+          "assets/fixtures/architecture.png",
+          "assets/fixtures/avatar.png",
+          "assets/fixtures/banner-wide.webp",
+          "assets/fixtures/bar-chart.png",
+          "assets/fixtures/city-night.jpg",
+          "assets/fixtures/code-snippet.png",
+          "assets/fixtures/dashboard-dark.png",
+          "assets/fixtures/dashboard-light.png",
+          "assets/fixtures/desert-noon.jpg",
+          "assets/fixtures/lake-morning.jpg",
+          "assets/fixtures/line-chart.png",
+          "assets/fixtures/logo-mark.png",
+          "assets/fixtures/mobile-login.png",
+          "assets/fixtures/mountain-dusk.jpg",
+          "assets/fixtures/receipt-scan.jpg",
+          "assets/fixtures/settings-panel.png"
+        ],
+        "states": [
+          "sidebar-desktop",
+          "icon-rail-tablet",
+          "tab-bar-mobile-three",
+          "library-grid-justified-mid-truncation",
+          "folder-chips",
+          "upload-tray-inline",
+          "image-detail-docked",
+          "image-detail-sheet",
+          "library-empty",
+          "library-loading",
+          "trash-days-left",
+          "system-page-status-tokens-settings",
+          "light-dark"
+        ],
+        "stableIds": []
+      },
+      "production": {
+        "routeOrWindow": "/library, /trash, /tokens, /settings, /status",
+        "files": [
+          "web/src/components/Shell.svelte",
+          "web/src/screens/Library.svelte"
+        ],
+        "interfaces": [
+          "GET /api/v1/images",
+          "GET /api/v1/folders",
+          "POST /api/v1/images"
+        ],
+        "tests": []
+      },
+      "status": "needs-review"
+    },
+    {
+      "id": "explore-b",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "explore/b.html",
+        "assetPath": "explore/b.html",
+        "files": [
+          "explore/b.html",
+          "explore/base.css",
+          "explore/shared.css",
+          "explore/data.js",
+          "assets/fonts/inter-latin-wght-normal.woff2",
+          "assets/fonts/inter-latin-ext-wght-normal.woff2",
+          "assets/fixtures/architecture.png",
+          "assets/fixtures/avatar.png",
+          "assets/fixtures/banner-wide.webp",
+          "assets/fixtures/bar-chart.png",
+          "assets/fixtures/city-night.jpg",
+          "assets/fixtures/code-snippet.png",
+          "assets/fixtures/dashboard-dark.png",
+          "assets/fixtures/dashboard-light.png",
+          "assets/fixtures/desert-noon.jpg",
+          "assets/fixtures/lake-morning.jpg",
+          "assets/fixtures/line-chart.png",
+          "assets/fixtures/logo-mark.png",
+          "assets/fixtures/mobile-login.png",
+          "assets/fixtures/mountain-dusk.jpg",
+          "assets/fixtures/receipt-scan.jpg",
+          "assets/fixtures/settings-panel.png"
+        ],
+        "states": [
+          "top-navigation",
+          "recent-stream-by-day",
+          "copy-format-switch",
+          "upload-bar-with-target-folder",
+          "uploading-progress-error",
+          "reader-pane",
+          "reader-drawer-tablet",
+          "library-grid-folder-scope",
+          "trash",
+          "recent-empty",
+          "phone-bottom-bar-upload",
+          "light-dark"
+        ],
+        "stableIds": []
+      },
+      "production": {
+        "routeOrWindow": "/library, /trash, /tokens, /settings, /status",
+        "files": [
+          "web/src/components/Shell.svelte",
+          "web/src/screens/Library.svelte"
+        ],
+        "interfaces": [
+          "GET /api/v1/images",
+          "GET /api/v1/folders",
+          "POST /api/v1/images"
+        ],
+        "tests": []
+      },
+      "status": "needs-review"
+    },
+    {
+      "id": "explore-c",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "explore/c.html",
+        "assetPath": "explore/c.html",
+        "files": [
+          "explore/c.html",
+          "explore/base.css",
+          "explore/shared.css",
+          "explore/data.js",
+          "assets/fonts/inter-latin-wght-normal.woff2",
+          "assets/fonts/inter-latin-ext-wght-normal.woff2",
+          "assets/fixtures/architecture.png",
+          "assets/fixtures/avatar.png",
+          "assets/fixtures/banner-wide.webp",
+          "assets/fixtures/bar-chart.png",
+          "assets/fixtures/city-night.jpg",
+          "assets/fixtures/code-snippet.png",
+          "assets/fixtures/dashboard-dark.png",
+          "assets/fixtures/dashboard-light.png",
+          "assets/fixtures/desert-noon.jpg",
+          "assets/fixtures/lake-morning.jpg",
+          "assets/fixtures/line-chart.png",
+          "assets/fixtures/logo-mark.png",
+          "assets/fixtures/mobile-login.png",
+          "assets/fixtures/mountain-dusk.jpg",
+          "assets/fixtures/receipt-scan.jpg",
+          "assets/fixtures/settings-panel.png"
+        ],
+        "states": [
+          "toolbar-path-bar",
+          "folder-tree",
+          "dense-table-sortable-headers",
+          "folder-rows-in-table",
+          "inspector-folder",
+          "inspector-one",
+          "inspector-multi",
+          "status-bar",
+          "phone-folder-list",
+          "phone-image-list",
+          "phone-detail-push",
+          "light-dark"
+        ],
+        "stableIds": []
+      },
+      "production": {
+        "routeOrWindow": "/library, /trash, /tokens, /settings, /status",
+        "files": [
+          "web/src/components/Shell.svelte",
+          "web/src/screens/Library.svelte"
+        ],
+        "interfaces": [
+          "GET /api/v1/images",
+          "GET /api/v1/folders",
+          "POST /api/v1/images"
+        ],
+        "tests": []
+      },
+      "status": "needs-review"
+    },
+    {
+      "id": "console-r8",
+      "contentProfile": "operational-strict",
+      "prototype": {
+        "entry": "r8/console.html",
+        "assetPath": "r8/console.html",
+        "files": [
+          "r8/console.html",
+          "r8/base.css",
+          "r8/shared.css",
+          "r8/data.js",
+          "assets/fonts/inter-latin-wght-normal.woff2",
+          "assets/fonts/inter-latin-ext-wght-normal.woff2",
+          "assets/fixtures/architecture.png",
+          "assets/fixtures/avatar.png",
+          "assets/fixtures/banner-wide.webp",
+          "assets/fixtures/bar-chart.png",
+          "assets/fixtures/city-night.jpg",
+          "assets/fixtures/code-snippet.png",
+          "assets/fixtures/dashboard-dark.png",
+          "assets/fixtures/dashboard-light.png",
+          "assets/fixtures/desert-noon.jpg",
+          "assets/fixtures/lake-morning.jpg",
+          "assets/fixtures/line-chart.png",
+          "assets/fixtures/logo-mark.png",
+          "assets/fixtures/mobile-login.png",
+          "assets/fixtures/mountain-dusk.jpg",
+          "assets/fixtures/receipt-scan.jpg",
+          "assets/fixtures/settings-panel.png"
+        ],
+        "states": [
+          "recent",
+          "recent-detail",
+          "recent-markdown",
+          "recent-uploading",
+          "recent-upload-menu",
+          "recent-dest",
+          "recent-row-menu",
+          "recent-drop",
+          "recent-empty",
+          "recent-loading",
+          "recent-error",
+          "library",
+          "library-folder",
+          "library-grid",
+          "library-grid-folder",
+          "library-detail",
+          "library-uploading",
+          "library-select",
+          "library-select-grid",
+          "library-filter",
+          "library-filtered",
+          "library-filtered-empty",
+          "library-display",
+          "library-row-menu",
+          "library-tree",
+          "library-drop",
+          "library-folder-empty",
+          "library-empty",
+          "library-loading",
+          "library-error",
+          "trash",
+          "trash-grid",
+          "trash-detail",
+          "trash-select",
+          "trash-purge",
+          "trash-empty",
+          "status",
+          "status-running",
+          "status-warn",
+          "status-kind",
+          "status-loading",
+          "status-error",
+          "tokens",
+          "tokens-revoke",
+          "token-create",
+          "token-invalid",
+          "token-reveal",
+          "tokens-empty",
+          "tokens-error",
+          "settings",
+          "settings-unsaved",
+          "settings-invalid",
+          "settings-leave",
+          "palette",
+          "palette-results",
+          "palette-empty",
+          "account",
+          "sidebar-desktop-recent-first",
+          "icon-rail-tablet",
+          "tab-bar-phone-four",
+          "detail-docked-1440",
+          "detail-drawer-721-1439",
+          "detail-sheet-phone",
+          "light-dark",
+          "reduced-motion"
+        ],
+        "stableIds": [
+          "recent",
+          "library",
+          "image-detail",
+          "upload",
+          "trash",
+          "system",
+          "tokens",
+          "settings",
+          "status"
+        ]
+      },
+      "production": {
+        "routeOrWindow": "/recent (new, signed-in landing), /library, /library/<folder path>, /trash, /status, /tokens, /settings",
+        "files": [
+          "web/src/App.svelte",
+          "web/src/components/Shell.svelte",
+          "web/src/components/UploadDock.svelte",
+          "web/src/components/Palette.svelte",
+          "web/src/screens/Library.svelte",
+          "web/src/components/library/ImageList.svelte",
+          "web/src/components/library/ImageGrid.svelte",
+          "web/src/components/library/DetailPanel.svelte",
+          "web/src/screens/Status.svelte",
+          "web/src/screens/Tokens.svelte",
+          "web/src/screens/Settings.svelte",
+          "web/src/lib/router.svelte.ts",
+          "web/src/lib/upload.svelte.ts"
+        ],
+        "interfaces": [
+          "GET /api/v1/images",
+          "POST /api/v1/images",
+          "POST /api/v1/images/batch",
+          "GET /api/v1/images/facets",
+          "GET /api/v1/folders",
+          "GET /api/v1/status",
+          "GET /api/v1/tokens",
+          "GET /api/v1/settings"
+        ],
+        "tests": []
+      },
+      "status": "approved"
     }
   ]
 }

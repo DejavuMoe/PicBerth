@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark light" />
+<title>PicBerth</title>
+<link rel="stylesheet" href="base.css" />
+<link rel="stylesheet" href="shared.css" />
+<style>
+.app { background: var(--bg); }
+
+/* ---------------------------------------------------------------- sidebar */
+.side { width: var(--side); flex: none; display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; overflow: auto; }
+.brand { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; font-weight: var(--w-strong); flex: none; }
+.brand .mark { width: 16px; height: 16px; border-radius: var(--r-xs); background: var(--accent); flex: none; }
+.search-trigger { display: flex; align-items: center; gap: 8px; height: 32px; margin: 8px 0 12px; padding: 0 8px 0 12px; border-radius: var(--r-s); color: var(--faint); box-shadow: inset 0 0 0 var(--bw) var(--line); flex: none; }
+.search-trigger:hover { box-shadow: inset 0 0 0 var(--bw) var(--line-hover); color: var(--muted); }
+.search-trigger kbd { margin-left: auto; }
+.nav { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: var(--r-s); color: var(--muted); width: 100%; text-align: left; position: relative; flex: none; }
+.nav:hover { background: var(--hover); color: var(--text); }
+.nav[aria-current='page'] { background: var(--sel); color: var(--text); }
+.nav .n { margin-left: auto; font-size: var(--fs-s); color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav .tw { width: 16px; display: grid; place-items: center; margin-left: -4px; color: var(--faint); }
+.nav.sub1 { padding-left: 24px; } .nav.sub2 { padding-left: 40px; } .nav.sub3 { padding-left: 56px; }
+.side .gap { flex: 1; }
+.side hr { border: 0; border-top: var(--bw) solid var(--hairline); margin: 8px 12px; }
+.avatar { width: 20px; height: 20px; border-radius: 999px; background: var(--fill); display: grid; place-items: center; font-size: var(--fs-s); font-weight: var(--w-strong); color: var(--text); margin-left: -2px; flex: none; }
+
+/* ---------------------------------------------------------------- panel */
+.panel { flex: 1; min-width: 0; margin: 8px 8px 8px 0; border-radius: var(--r-l); background: var(--panel); box-shadow: 0 0 0 var(--bw) var(--hairline); display: flex; overflow: hidden; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.head { height: 48px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 var(--gutter); border-bottom: var(--bw) solid var(--hairline); }
+.title { display: flex; align-items: center; gap: 4px; font-size: var(--fs-l); font-weight: var(--w-strong); min-width: 0; letter-spacing: -0.012em; white-space: nowrap; }
+.title .up { color: var(--muted); font-weight: var(--w-medium); }
+.title .up:hover { color: var(--text); }
+.title .sepi { color: var(--faint); }
+.title .count { font-size: var(--fs-m); color: var(--muted); font-weight: var(--w-regular); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.head .search { width: 220px; }
+.head .lbl { color: var(--muted); }
+.subbar { display: none; }
+.content { flex: 1; overflow: auto; padding: 16px var(--gutter) 32px; position: relative; }
+.content.flush { padding-top: 0; }
+
+.split { display: inline-flex; }
+.split > .btn:first-child { border-radius: var(--r-s) 0 0 var(--r-s); }
+.split > .btn + .btn { border-radius: 0 var(--r-s) var(--r-s) 0; width: 28px; padding: 0; justify-content: center; box-shadow: inset var(--bw) 0 0 var(--blackA-3); }
+.dest { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.fchip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: var(--r-s); box-shadow: inset 0 0 0 var(--bw) var(--line); }
+.fchip:hover { background: var(--hover); box-shadow: inset 0 0 0 var(--bw) var(--line-hover); }
+.fchip .icon { color: var(--muted); }
+.fchip .n { color: var(--muted); font-size: var(--fs-s); }
+.active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+
+/* ---------------------------------------------------------------- 最近 */
+.group h2 { position: sticky; top: 0; z-index: 2; background: var(--panel); height: 40px; display: flex; align-items: center; gap: 8px; font-weight: var(--w-medium); color: var(--muted); }
+.group h2 .n { font-size: var(--fs-s); color: var(--faint); font-variant-numeric: tabular-nums; }
+.group h2 .btn { margin-left: auto; opacity: 0; }
+.group:hover h2 .btn, .group h2 .btn:focus-visible, .group.batch h2 .btn { opacity: 1; }
+.group + .group { margin-top: 8px; }
+.item { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; height: 60px; padding: 0 4px 0 8px; margin: 0 -8px; border-radius: var(--r-m); }
+.item:hover { background: var(--hover); }
+.item[aria-selected='true'] { background: var(--sel); }
+.item > img, .item .thumb44 { width: 44px; height: 44px; border-radius: var(--r-s); object-fit: cover; background: var(--fill); }
+.item .nm { display: grid; min-width: 0; text-align: left; }
+.item .nm b { font-weight: var(--w-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .nm span { color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); display: flex; gap: 12px; overflow: hidden; white-space: nowrap; }
+.item .nm span.m-only { display: none; }
+.item > img, .item .thumb44 img, .lrow img, .tray .item > img { outline: var(--bw) solid var(--hairline); outline-offset: calc(-1 * var(--bw)); }
+.item .meta { color: var(--muted); font-size: var(--fs-s); display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
+.item .meta span:nth-child(1) { width: 92px; text-align: right; }
+.item .meta span:nth-child(2) { width: 56px; text-align: right; }
+.item .meta span:nth-child(3) { width: 64px; text-align: right; }
+.item .act { display: flex; gap: 2px; align-items: center; }
+.item .st { color: var(--muted); font-size: var(--fs-s); display: flex; align-items: center; gap: 12px; }
+.item .st .progress { width: 120px; }
+.batch .item.fail .nm b { color: var(--muted); }
+
+/* ---------------------------------------------------------------- library list */
+.lrow { display: grid; grid-template-columns: 32px minmax(0, 1fr) var(--c-folder, 0) 104px 64px 80px 64px; align-items: center; gap: 12px; height: 40px; padding: 0 4px 0 8px; margin: 0 -8px; border-radius: var(--r-s); }
+.lrow.with-folder { --c-folder: 160px; }
+.lrow.trash { grid-template-columns: 32px minmax(0, 1fr) 160px 64px 96px 64px; }
+.lrow .pick { position: relative; width: 32px; height: 32px; }
+.lrow .pick > button:first-child { display: block; width: 100%; height: 100%; }
+.lrow .pick .cb { position: absolute; inset: 0; width: auto; height: auto; border-radius: var(--r-xs); background: var(--blackA-6); }
+.lrow .pick .cb .box { box-shadow: inset 0 0 0 1px var(--whiteA-9); }
+.lrow .pick .cb[aria-checked='true'] .box { background: var(--whiteA-12); color: var(--gray-l12); }
+.lrow:hover { background: var(--hover); }
+.lrow[aria-selected='true'] { background: var(--sel); }
+.lrow img { width: 100%; height: 100%; border-radius: var(--r-xs); object-fit: cover; background: var(--fill); display: block; }
+.lrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-weight: var(--w-medium); }
+.lrow .c { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow .c.l { text-align: left; }
+.lrow .act { display: flex; justify-content: flex-end; gap: 2px; }
+.lrow .act .btn { color: var(--muted); }
+.lrow:hover .act .btn, .lrow:focus-within .act .btn { color: var(--text); }
+.cb { width: 24px; height: 24px; display: grid; place-items: center; opacity: 0; }
+.lrow .pick:hover .cb, .lrow .cb:focus-visible { opacity: 1; }
+.selecting .cb, .cb[aria-checked='true'] { opacity: 1; }
+.cb .box { width: 14px; height: 14px; border-radius: var(--r-xs); box-shadow: inset 0 0 0 1px var(--line-hover); display: grid; place-items: center; }
+.cb[aria-checked='true'] .box { background: var(--text); color: var(--panel); box-shadow: none; }
+.cb .box .icon { width: 12px; height: 12px; }
+
+/* ---------------------------------------------------------------- grid */
+.jrow { display: flex; gap: 12px; margin-bottom: 16px; }
+.tile { flex: none; display: grid; gap: 6px; text-align: left; position: relative; align-content: start; }
+.tile .tile-img { outline-offset: 2px; display: block; }
+.tile[aria-selected='true'] .tile-img, .tile.cur .tile-img { outline: 2px solid var(--text); }
+.tile .name { line-height: var(--lh-m); white-space: nowrap; overflow: hidden; }
+.tile .days { color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); margin-top: -4px; font-variant-numeric: tabular-nums; }
+.tile .over { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 6px; opacity: 0; pointer-events: none; }
+.tile .over > * { pointer-events: auto; }
+.tile:hover .over, .tile:focus-within .over, .tile[aria-selected='true'] .over, .selecting .tile .over { opacity: 1; }
+.over .chk, .over .cp { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--r-s); background: var(--blackA-6); color: var(--whiteA-12); }
+.over .chk:hover, .over .cp:hover { background: var(--blackA-9); }
+.over .chk .box { width: 14px; height: 14px; border-radius: var(--r-xs); box-shadow: inset 0 0 0 1px var(--whiteA-9); display: grid; place-items: center; }
+.tile[aria-selected='true'] .over .chk .box { background: var(--whiteA-12); color: var(--gray-l12); box-shadow: none; }
+.over .chk .box .icon { width: 12px; height: 12px; }
+.selecting .tile .over .cp { visibility: hidden; }
+.badge-gif { position: absolute; left: 6px; height: 18px; padding: 0 6px; border-radius: var(--r-xs); background: var(--blackA-6); color: var(--whiteA-12); font-size: var(--fs-s); line-height: 18px; font-weight: var(--w-medium); }
+
+/* ---------------------------------------------------------------- upload tray (图片) */
+.tray { margin-bottom: 16px; border-radius: var(--r-m); box-shadow: inset 0 0 0 var(--bw) var(--hairline); }
+.tray-head { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px 0 12px; border-bottom: var(--bw) solid var(--hairline); }
+.tray .item { margin: 0; border-radius: 0; height: 48px; grid-template-columns: 32px minmax(0, 1fr) auto auto; padding: 0 4px 0 12px; }
+.tray .item + .item { border-top: var(--bw) solid var(--hairline); }
+.tray .item > img { width: 32px; height: 32px; border-radius: var(--r-xs); }
+
+/* ---------------------------------------------------------------- detail */
+.detail { width: var(--detail); flex: none; border-left: var(--bw) solid var(--hairline); display: flex; flex-direction: column; background: var(--panel); animation: slidein var(--dur) var(--ease); }
+@keyframes slidein { from { transform: translateX(16px); opacity: 0; } }
+.d-top { height: 48px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 12px; border-bottom: var(--bw) solid var(--hairline); }
+.d-body { flex: 1; overflow: auto; padding: 16px var(--gutter); display: grid; gap: 16px; align-content: start; }
+.d-prev { aspect-ratio: 4 / 3; border-radius: var(--r-m); overflow: hidden; background: var(--fill); }
+.d-prev img { width: 100%; height: 100%; object-fit: contain; }
+.d-title { font-size: var(--fs-l); line-height: var(--lh-l); font-weight: var(--w-strong); word-break: break-all; }
+.d-meta { display: flex; gap: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.d-foot { flex: none; display: flex; justify-content: space-between; gap: 8px; padding: 12px; border-top: var(--bw) solid var(--hairline); }
+.links-row.cur { background: var(--hover); }
+
+/* ---------------------------------------------------------------- 系统 */
+.page { max-width: 760px; margin: 0 auto; display: grid; gap: 32px; padding-top: 8px; }
+.sec h2 { font-size: var(--fs-m); line-height: var(--lh-m); font-weight: var(--w-medium); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.sec h2 .s { font-weight: var(--w-regular); }
+.figs { display: grid; grid-template-columns: repeat(5, 1fr); border-radius: var(--r-m); box-shadow: inset 0 0 0 var(--bw) var(--hairline); }
+.fig { padding: 12px 16px; display: grid; gap: 2px; align-content: start; }
+.fig + .fig { border-left: var(--bw) solid var(--hairline); }
+.fig b { font-size: var(--fs-l); line-height: var(--lh-l); font-weight: var(--w-strong); font-variant-numeric: tabular-nums; }
+.fig span { color: var(--muted); font-size: var(--fs-s); }
+.fig .meter { height: 4px; border-radius: 999px; background: var(--fill); overflow: hidden; margin-top: 6px; }
+.fig .meter i { display: block; height: 100%; background: var(--muted); }
+.warn { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 8px 0 16px; border-radius: var(--r-m); box-shadow: inset 0 0 0 var(--bw) var(--hairline); }
+.rows > div { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: var(--bw) solid var(--hairline); }
+.rows > div:last-child { border-bottom: var(--bw) solid var(--hairline); }
+.rows .k { width: 128px; flex: none; font-weight: var(--w-medium); }
+.rows .v { flex: 1; min-width: 0; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.rows .v.wrap { flex-wrap: wrap; padding: 8px 0; }
+.rows .thead { min-height: 32px; color: var(--muted); font-size: var(--fs-s); }
+.unit { width: 120px; }
+.audit > div { display: grid; grid-template-columns: 128px 120px 96px minmax(0, 1fr); gap: 12px; }
+.audit .c { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tok > div { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px 96px 88px; gap: 12px; }
+.tok .c { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tok .nm { display: grid; min-width: 0; }
+.tok .act { justify-self: end; }
+.dl { display: grid; grid-template-columns: 128px 1fr; row-gap: 10px; column-gap: 12px; }
+.dl dt { color: var(--muted); }
+.dl dd { margin: 0; display: flex; gap: 12px; min-width: 0; }
+.copy-inline { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); border-radius: var(--r-xs); padding: 2px 4px; margin-left: -4px; }
+.copy-inline:hover { background: var(--hover); }
+.copy-inline .icon { color: var(--muted); flex: none; }
+.selectbtn { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; padding: 0 8px 0 10px; border-radius: var(--r-s); box-shadow: inset 0 0 0 var(--bw) var(--line); }
+.selectbtn:hover { box-shadow: inset 0 0 0 var(--bw) var(--line-hover); }
+
+.savebar { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px 0 16px; border-radius: var(--r-l); background: var(--elev); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); animation: rise var(--dur) var(--ease); white-space: nowrap; }
+.savebar .t { margin-right: 16px; }
+
+.notice { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--r-s); background: var(--fill); }
+.notice .icon { color: var(--warning-text); }
+.secret { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: var(--r-s); box-shadow: inset 0 0 0 var(--bw) var(--line); }
+.secret .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
+.snippet { margin: 8px 0 0; padding: 12px; border-radius: var(--r-s); background: var(--fill); font: var(--fs-s) / var(--lh-s) var(--mono); white-space: pre-wrap; word-break: break-all; }
+.scope-opts { display: flex; gap: 8px; }
+.scope-opt { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 8px; border-radius: var(--r-s); box-shadow: inset 0 0 0 var(--bw) var(--line); }
+
+/* ---------------------------------------------------------------- overlays */
+.cmdk-scrim { position: fixed; inset: 0; z-index: 90; background: var(--scrim); display: grid; justify-items: center; align-items: start; padding: 14vh 16px 16px; animation: fade var(--dur) var(--ease); }
+.cmdk { width: 100%; max-width: 560px; border-radius: var(--r-l); background: var(--elev); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); overflow: hidden; animation: rise var(--dur) var(--ease); }
+.cmdk-input { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px; border-bottom: var(--bw) solid var(--hairline); }
+.cmdk-input .icon { color: var(--muted); }
+.cmdk-input input { flex: 1; min-width: 0; border: 0; background: none; font-size: var(--fs-l); height: 100%; }
+.cmdk-input input:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--r-xs); }
+.cmdk-list { padding: 4px 4px 8px; max-height: 420px; overflow: auto; }
+.cmdk-list .menu-item[aria-selected='true'] { background: var(--hover); }
+.cmdk-list .menu-item img { width: 20px; height: 20px; border-radius: var(--r-xs); object-fit: cover; }
+.drop { position: fixed; inset: 0; z-index: 80; background: var(--scrim); display: grid; place-items: center; padding: 24px; animation: fade var(--dur) var(--ease); }
+.drop-card { display: grid; justify-items: center; gap: 8px; padding: 32px 48px; border-radius: var(--r-l); background: var(--elev); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); }
+.drop-card .icon { width: 24px; height: 24px; }
+.drop-card .t { font-size: var(--fs-l); font-weight: var(--w-strong); }
+.tpop { padding: 4px; width: 280px; }
+.tn { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 8px; border-radius: var(--r-xs); color: var(--text); text-align: left; }
+.tn:hover { background: var(--hover); }
+.tn[aria-current='page'] { background: var(--sel); }
+.tn > .icon { color: var(--muted); }
+.tn .tw { width: 16px; display: grid; place-items: center; color: var(--faint); flex: none; }
+.tn .n { color: var(--muted); font-size: var(--fs-s); }
+.popover .pop-sec { padding: 12px; display: grid; gap: 8px; }
+.popover .pop-sec + .pop-sec { border-top: var(--bw) solid var(--hairline); }
+.popover .pop-sec h3 { font-size: var(--fs-s); color: var(--muted); font-weight: var(--w-medium); }
+.popover .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip .n { color: var(--muted); font-size: var(--fs-s); margin-left: 2px; }
+
+.tabbar, .m-only, .bulkbar { display: none; }
+.sheet-scrim { position: fixed; inset: 0; z-index: 55; background: var(--scrim); animation: fade var(--dur) var(--ease); }
+
+/* ---------------------------------------------------------------- drawer below 1440 */
+@media (max-width: 1439px) {
+  .detail { position: fixed; right: 8px; top: 8px; bottom: 8px; border-radius: var(--r-l); background: var(--elev); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); z-index: 40; border-left: 0; overflow: hidden; }
+}
+/* ---------------------------------------------------------------- tablet: icon rail */
+@media (max-width: 1099px) {
+  .side { width: var(--rail); align-items: center; }
+  .side .label, .side .n, .search-trigger kbd, .search-trigger span, .nav.sub1, .nav.sub2, .nav.sub3, .side hr, .nav .tw { display: none; }
+  .search-trigger { width: 40px; padding: 0; justify-content: center; margin: 8px 0; }
+  .nav { width: 40px; justify-content: center; padding: 0; }
+  .nav .dot { position: absolute; top: 6px; right: 6px; }
+  .brand { padding: 0; justify-content: center; }
+  .head .search { width: 32px; }
+  .head .search .input, .head .search kbd { display: none; }
+  .col-dims { display: none; }
+  .lrow { grid-template-columns: 32px minmax(0, 1fr) var(--c-folder, 0) 64px 80px 64px; }
+  .lrow.with-folder { --c-folder: 120px; }
+  .lrow.trash { grid-template-columns: 32px minmax(0, 1fr) 120px 64px 96px 64px; }
+  .item .meta span:nth-child(1) { display: none; }
+  .tree-btn { display: inline-flex !important; }
+}
+/* ---------------------------------------------------------------- phone */
+@media (max-width: 720px) {
+  :root { --gutter: 16px; }
+  .side { display: none; }
+  .panel { margin: 0; border-radius: 0; box-shadow: none; }
+  .head { position: sticky; top: 0; padding: 0 8px 0 var(--gutter); }
+  .head .search, .d-only { display: none !important; }
+  .m-only { display: inline-flex; }
+  .subbar { display: flex; gap: 8px; padding: 8px var(--gutter); border-bottom: var(--bw) solid var(--hairline); flex: none; }
+  .subbar .seg { flex: 1; }
+  .subbar .seg > button { flex: 1; justify-content: center; padding: 0 4px; }
+  .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .content.has-bar { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+  .jrow { gap: 8px; margin-bottom: 12px; }
+  .item { grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 8px; }
+  .item .meta { display: none; }
+  .item .act .more, .item .act .lbl { display: none; }
+  .item .st .progress { width: 56px; }
+  .lrow, .lrow.with-folder, .lrow.trash { grid-template-columns: 40px minmax(0, 1fr) auto; height: 56px; }
+  .lrow .pick { width: 40px; height: 40px; }
+  .lrow .cb { display: none; }
+  .selecting .lrow .cb { display: grid; }
+  .selecting .lrow .act { display: none; }
+  .item .nm span.m-only { display: inline; }
+  .split > .btn + .btn { display: none; }
+  .split > .btn:first-child { border-radius: var(--r-s); }
+  .lrow .c { display: none; }
+  .lrow .nm { display: grid; font-weight: var(--w-medium); }
+  .lrow .nm small { display: flex !important; gap: 12px; color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); font-weight: var(--w-regular); }
+  .lrow .act .more { display: none; }
+  .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: var(--bw) solid var(--hairline); z-index: 30; }
+  .tabbar button { flex: 1; display: grid; place-items: center; align-content: center; gap: 2px; font-size: var(--fs-s); color: var(--muted); position: relative; }
+  .tabbar button[aria-current='page'] { color: var(--text); }
+  .tabbar .dot { position: absolute; top: 8px; left: calc(50% + 8px); }
+  .detail { inset: 48px 0 0 0; width: auto; border-radius: var(--r-l) var(--r-l) 0 0; animation: rise var(--dur) var(--ease); }
+  .figs { grid-template-columns: repeat(2, 1fr); }
+  .fig:nth-child(odd) { border-left: 0; }
+  .fig:nth-child(n + 3) { border-top: var(--bw) solid var(--hairline); }
+  .fig:last-child { grid-column: span 2; }
+  .rows .k { width: 96px; }
+  .audit > div { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'act at' 'tgt actor'; row-gap: 0; padding: 8px 0; }
+  .audit .c-act { grid-area: act; } .audit .c-at { grid-area: at; font-size: var(--fs-s); text-align: right; } .audit .c-target { grid-area: tgt; } .audit .c-actor { grid-area: actor; text-align: right; }
+  .audit .thead { display: none !important; }
+  .audit .c-actor, .audit .c-target { font-size: var(--fs-s); }
+  .tok > div { grid-template-columns: minmax(0, 1fr) auto; }
+  .tok .c, .tok .thead { display: none !important; }
+  .dl { grid-template-columns: 96px 1fr; }
+  .savebar { left: 8px; right: 8px; transform: none; bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .savebar .t { margin-right: auto; }
+  .bulkbar { display: flex; position: fixed; left: 8px; right: 8px; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 35; height: 52px; padding: 0 4px; border-radius: var(--r-l); background: var(--elev); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); animation: rise var(--dur) var(--ease); }
+  .bulkbar button { flex: 1; display: grid; place-items: center; align-content: center; gap: 2px; font-size: var(--fs-s); border-radius: var(--r-m); }
+  .bulkbar button.danger { color: var(--danger-text); }
+  .cmdk-scrim { padding: 8px; }
+  .popover.sheet { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: var(--r-l) var(--r-l) 0 0; padding-bottom: env(safe-area-inset-bottom); }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="data.js"></script>
+<script>
+const { IMAGES, TRASH, TOKENS, FOLDERS, SOURCES, FORMAT, STATUS, AUDIT, AUDIT_KINDS, BATCH, NOW, DAY, icon, esc, size, ago, stamp, dayGroup, midName, folderLabel, folderPath, children, directCount, inFolder, justify, toast, params } = PB;
+const FMTS = [['url', 'URL'], ['markdown', 'Markdown'], ['html', 'HTML'], ['bbcode', 'BBCode']];
+const S = {
+  view: params.get('view') || 'recent',
+  sec: params.get('sec') || 'status',
+  state: params.get('state') || 'ready',
+  folder: params.get('folder') || null,
+  layout: params.get('layout') || 'list',
+  fmt: params.get('fmt') || 'url',
+  sel: params.get('detail') != null ? Number(params.get('detail')) : null,
+  open: new Set(['travel', 'y2026']),
+  picked: new Set(),
+  dest: params.get('dest') || null,
+  overlay: null,
+};
+const st = (k) => S.state === k;
+const phone = () => innerWidth <= 720;
+const wide = () => innerWidth >= 1100;
+const fmtLabel = () => FMTS.find((f) => f[0] === S.fmt)[1];
+const searching = () => st('filtered') || st('filtered-empty');
+const OVERLAYS = ['palette', 'palette-results', 'palette-empty', 'display', 'filter', 'row-menu', 'upload-menu', 'account', 'tree', 'drop', 'purge', 'token-create', 'token-invalid', 'token-reveal', 'leave', 'kind'];
+if (OVERLAYS.includes(S.state)) S.overlay = S.state;
+if (st('select')) {
+  const base = S.view === 'trash' ? TRASH : inFolder(S.folder);
+  base.slice(0, 3).forEach((im) => S.picked.add(im.id));
+}
+
+// ---------------------------------------------------------------- shell
+function tree(pid, depth) {
+  return children(pid).map((f) => {
+    const kids = children(f.id).length, open = S.open.has(f.id);
+    return `<button class="nav sub${depth}" data-folder="${f.id}" ${S.view === 'library' && S.folder === f.id ? 'aria-current="page"' : ''}>
+      <span class="tw" data-toggle="${kids ? f.id : ''}" ${kids ? `aria-label="${open ? '收起' : '展开'} ${esc(f.name)}"` : ''}>${kids ? icon(open ? 'down' : 'right', 'icon-s') : ''}</span>
+      ${icon('folder')}<span class="label ellipsis">${esc(f.name)}</span><span class="n">${directCount(f.id) || ''}</span></button>
+      ${kids && open ? tree(f.id, depth + 1) : ''}`;
+  }).join('');
+}
+const warnDot = () => (st('warn') ? '<span class="dot dot-danger" style="margin-left:auto"></span>' : '');
+function treePop(pid, depth) {
+  return children(pid).map((f) => {
+    const kids = children(f.id).length, open = S.open.has(f.id);
+    return `<button class="tn" style="padding-left:${depth * 16 - 4}px" data-folder="${f.id}" ${S.folder === f.id ? 'aria-current="page"' : ''}><span class="tw" data-toggle="${kids ? f.id : ''}" ${kids ? `aria-label="${open ? '收起' : '展开'} ${esc(f.name)}"` : ''}>${kids ? icon(open ? 'down' : 'right', 'icon-s') : ''}</span>${icon('folder')}<span class="grow ellipsis">${esc(f.name)}</span><span class="n">${directCount(f.id) || ''}</span></button>${kids && open ? treePop(f.id, depth + 1) : ''}`;
+  }).join('');
+}
+function side() {
+  const cur = (v) => (S.view === v ? 'aria-current="page"' : '');
+  return `<nav class="side" aria-label="主导航">
+    <div class="brand"><span class="mark"></span><span class="label">PicBerth</span></div>
+    <button class="search-trigger" data-act="palette" aria-label="命令面板">${icon('search')}<span>搜索</span><kbd>Ctrl K</kbd></button>
+    <button class="nav" data-view="recent" ${cur('recent')} title="最近">${icon('clock')}<span class="label">最近</span></button>
+    <button class="nav" data-folder="" ${S.view === 'library' && !S.folder ? 'aria-current="page"' : ''} title="图片">${icon('image')}<span class="label">图片</span><span class="n">${inFolder(null).length}</span></button>
+    ${tree(null, 1)}
+    <hr />
+    <button class="nav" data-view="trash" ${cur('trash')} title="回收站">${icon('trash')}<span class="label">回收站</span><span class="n">${TRASH.length}</span></button>
+    <div class="gap"></div>
+    <button class="nav" data-view="system" ${cur('system')} title="系统">${icon('gear')}<span class="label">系统</span>${warnDot()}</button>
+    <button class="nav" data-act="account" title="admin" aria-expanded="${S.overlay === 'account'}"><span class="avatar">A</span><span class="label">admin</span></button>
+  </nav>`;
+}
+function tabbar() {
+  const t = (v, ic, l) => `<button data-view="${v}" ${S.view === v ? 'aria-current="page"' : ''}>${icon(ic)}${l}${v === 'system' && st('warn') ? '<span class="dot dot-danger"></span>' : ''}</button>`;
+  return `<nav class="tabbar" aria-label="主导航">${t('recent', 'clock', '最近')}${t('library', 'image', '图片')}${t('trash', 'trash', '回收站')}${t('system', 'gear', '系统')}</nav>`;
+}
+function uploadBtn() {
+  if (S.view === 'recent') {
+    return `${S.dest ? `<span class="dest d-only">${icon('folder')}${esc(folderLabel(S.dest))}</span>` : ''}
+      <div class="split"><button class="btn btn-primary" data-act="upload">${icon('upload')}<span class="d-only">上传</span></button><button class="btn btn-primary" data-act="upload-menu" aria-label="位置" aria-expanded="${S.overlay === 'upload-menu'}">${icon('down', 'icon-s')}</button></div>`;
+  }
+  return `<button class="btn btn-primary" data-act="upload" aria-label="上传">${icon('upload')}<span class="d-only">上传</span></button>`;
+}
+
+// ---------------------------------------------------------------- header
+function header() {
+  if (S.picked.size) return bulkHeader();
+  if (S.view === 'recent') {
+    return `<h1 class="title">最近</h1><div class="grow"></div>
+      ${st('empty') ? '' : `<span class="lbl d-only">复制为</span>${fmtSeg('d-only')}`}
+      <button class="btn btn-ghost btn-icon m-only" data-act="palette" aria-label="搜索">${icon('search')}</button>
+      ${st('empty') || st('loading') || st('error') ? `<button class="btn btn-primary" data-act="upload" aria-label="上传">${icon('upload')}<span class="d-only">上传</span></button>` : uploadBtn()}`;
+  }
+  if (S.view === 'system') {
+    const ctl = S.sec === 'status' ? `<button class="btn btn-ghost d-only" data-toast="状态已刷新">${icon('refresh')}刷新</button>`
+      : S.sec === 'tokens' ? `<a class="btn btn-ghost d-only" href="../api-docs.html" target="_blank" rel="noopener">API 文档${icon('external', 'icon-s')}</a><button class="btn btn-primary" data-act="token-create" aria-label="新建令牌">${icon('plus')}<span class="d-only">新建令牌</span></button>` : '';
+    return `<h1 class="title">系统</h1><span style="width:12px" class="d-only"></span>${secSeg('d-only')}<div class="grow"></div>${ctl}`;
+  }
+  if (S.view === 'trash') {
+    return `<h1 class="title">回收站<span class="count">${currentList().length}</span></h1><div class="grow"></div>
+      ${currentList().length ? `${displayBtn()}<button class="btn btn-ghost d-only" data-act="purge">清空回收站</button>` : ''}`;
+  }
+  const path = S.folder ? folderPath(S.folder) : [];
+  const count = searching() ? currentList().length : S.folder ? inFolder(S.folder).length : inFolder(null).length;
+  let title;
+  if (phone()) title = `<h1 class="title"><button class="ellipsis" data-act="tree" style="display:inline-flex;align-items:center;gap:4px">${esc(path.length ? path[path.length - 1].name : '图片')}${icon('down', 'icon-s')}</button><span class="count">${count}</span></h1>`;
+  else title = `<button class="btn btn-ghost btn-icon tree-btn" data-act="tree" aria-label="文件夹" style="display:none;margin-left:-8px">${icon('folder')}</button>
+    <h1 class="title">${[`<button class="${path.length ? 'up' : ''}" data-folder="">图片</button>`].concat(path.map((f, i) => `<span class="sepi">/</span><button class="${i < path.length - 1 ? 'up' : ''}" data-folder="${f.id}">${esc(f.name)}</button>`)).join('')}<span class="count">${count}</span></h1>`;
+  const empty = st('empty');
+  return `${title}<div class="grow"></div>
+    <label class="field-wrap search">${icon('search')}<input class="input" placeholder="搜索" aria-label="搜索" ${searching() ? `value="${st('filtered') ? '' : 'zzzz'}"` : ''} /><kbd>/</kbd></label>
+    <button class="btn btn-ghost d-only" data-act="filter" aria-expanded="${S.overlay === 'filter'}">${icon('filter')}筛选</button>
+    <button class="btn btn-ghost btn-icon m-only" data-act="palette" aria-label="搜索">${icon('search')}</button>
+    ${displayBtn()}
+    ${empty ? '' : uploadBtn()}`;
+}
+function displayBtn() {
+  return `<button class="btn btn-ghost btn-icon" data-act="display" aria-label="显示" aria-expanded="${S.overlay === 'display'}">${icon(phone() ? 'more' : S.layout === 'grid' ? 'grid' : 'list')}</button>`;
+}
+function fmtSeg(cls = '') {
+  return `<div class="seg ${cls}" role="group" aria-label="复制为">${FMTS.map(([k, l]) => `<button aria-pressed="${S.fmt === k}" data-fmt="${k}">${l}</button>`).join('')}</div>`;
+}
+function secSeg(cls = '') {
+  return `<div class="seg ${cls}" role="tablist" aria-label="系统">${[['status', '状态'], ['tokens', '令牌'], ['settings', '设置']].map(([k, l]) => `<button role="tab" aria-selected="${S.sec === k}" aria-pressed="${S.sec === k}" data-sec="${k}">${l}</button>`).join('')}</div>`;
+}
+function subbar() {
+  if (S.picked.size) return '';
+  if (S.view === 'recent' && !st('empty')) return `<div class="subbar">${fmtSeg()}</div>`;
+  if (S.view === 'system') return `<div class="subbar">${secSeg()}</div>`;
+  return '';
+}
+function bulkHeader() {
+  const list = currentList();
+  const all = list.length && list.every((im) => S.picked.has(im.id));
+  const trash = S.view === 'trash';
+  const acts = trash
+    ? `<button class="btn btn-ghost d-only" data-toast="已恢复 ${S.picked.size} 张图片">${icon('restore')}恢复</button><button class="btn btn-ghost btn-danger-text d-only" data-act="purge">${icon('trash')}永久删除</button>`
+    : `<button class="btn btn-ghost d-only" data-toast="已复制 ${S.picked.size} 条 ${fmtLabel()}">${icon('copy')}复制链接</button><button class="btn btn-ghost d-only" data-toast="已将 ${S.picked.size} 张图片移到 旅行 / 2026 / 云南">${icon('move')}移动</button><button class="btn btn-ghost btn-danger-text d-only" data-toast="已将 ${S.picked.size} 张图片移到回收站">${icon('trash')}移到回收站</button>`;
+  return `<button class="btn btn-ghost btn-icon" data-act="unpick" aria-label="取消选择" style="margin-left:-8px">${icon('x')}</button>
+    <span class="medium tabular">已选 ${S.picked.size} 张</span>
+    <button class="btn btn-ghost btn-sm" data-act="pick-all">${all ? '取消全选' : '全选'}</button>
+    <div class="grow"></div>${acts}`;
+}
+function bulkbar() {
+  if (!S.picked.size) return '';
+  if (S.view === 'trash') return `<div class="bulkbar" role="toolbar" aria-label="批量操作"><button data-toast="已恢复">${icon('restore')}恢复</button><button class="danger" data-act="purge">${icon('trash')}永久删除</button></div>`;
+  return `<div class="bulkbar" role="toolbar" aria-label="批量操作"><button data-toast="已复制 ${S.picked.size} 条 ${fmtLabel()}">${icon('copy')}复制链接</button><button data-toast="已将 ${S.picked.size} 张图片移到 旅行 / 2026 / 云南">${icon('move')}移动</button><button class="danger" data-toast="已移到回收站">${icon('trash')}移到回收站</button></div>`;
+}
+
+// ---------------------------------------------------------------- 最近
+function batchStatus(b) {
+  const copy = `<div class="act"><button class="btn btn-ghost btn-sm" data-copy="1">${icon('copy')}<span class="lbl">复制</span></button></div>`;
+  switch (b.st) {
+    case 'done': return `<div class="st d-only">${size(b.img.size)}</div>${copy}`;
+    case 'dup': return `<div class="st"><span class="d-only">已存在，使用原有链接</span></div>${copy}`;
+    case 'up': return `<div class="st"><div class="progress"><i style="width:${b.p}%"></i></div><span class="tabular" style="width:32px;text-align:right">${b.p}%</span></div><div class="act"></div>`;
+    case 'wait': return `<div class="st">等待中</div><div class="act"></div>`;
+    case 'big': return `<div class="st text-danger">超过单文件上限</div><div class="act"><button class="btn btn-ghost btn-sm" aria-label="移除 ${esc(b.img.name)}">移除</button></div>`;
+    case 'fmt': return `<div class="st text-danger">不支持的格式</div><div class="act"><button class="btn btn-ghost btn-sm" aria-label="移除 ${esc(b.img.name)}">移除</button></div>`;
+  }
+}
+function batchSub(b) {
+  if (b.st === 'dup' && phone()) return '已存在，使用原有链接';
+  return S.view === 'recent' ? esc(folderLabel(S.dest)) : '';
+}
+function batchRows() {
+  return BATCH.map((b) => `<div class="item ${b.st === 'big' || b.st === 'fmt' ? 'fail' : ''}"><img src="${b.img.src}" alt="" />
+    <div class="nm"><b title="${esc(b.img.name)}">${esc(b.img.name)}</b>${batchSub(b) ? `<span>${batchSub(b)}</span>` : ''}</div>${batchStatus(b)}</div>`).join('');
+}
+function recentRow(im, idx) {
+  const folder = im.folderId ? folderPath(im.folderId).map((f) => f.name).join(' / ') : '图片';
+  return `<div class="item" aria-selected="${S.sel === idx}">
+    <button class="thumb44" data-open="${idx}" aria-label="${esc(im.name)}" style="overflow:hidden;padding:0"><img src="${im.src}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover" /></button>
+    <button class="nm" data-open="${idx}" tabindex="-1"><b title="${esc(im.name)}">${esc(im.name)}</b><span><span>${esc(folder)}</span><span class="d-only">${esc(SOURCES[im.source])}</span><span class="m-only">${ago(im.createdAt)}</span></span></button>
+    <div class="meta"><span>${im.w} × ${im.h}</span><span>${size(im.size)}</span><span>${ago(im.createdAt)}</span></div>
+    <div class="act"><button class="btn btn-ghost btn-sm" data-copy="1" aria-label="复制 ${esc(im.name)} 的链接">${icon('copy')}<span class="lbl">复制</span></button><button class="btn btn-ghost btn-icon btn-sm more" data-act="row-menu" data-idx="${idx}" aria-label="${esc(im.name)} 的更多操作">${icon('more')}</button></div>
+  </div>`;
+}
+function recent() {
+  if (st('loading')) return `<div aria-busy="true">${[220, 160, 260, 190, 240, 170].map((w) => `<div class="item" style="pointer-events:none"><span class="skeleton" style="width:44px;height:44px"></span><span class="skeleton" style="height:12px;width:${w}px"></span><span></span><span></span></div>`).join('')}</div>`;
+  if (st('error')) return `<div class="empty" role="alert" style="height:100%">${icon('alert')}<span class="t">加载失败</span><button class="btn btn-secondary">重试</button></div>`;
+  if (st('empty')) return `<div class="empty" style="height:100%">${icon('upload')}<span class="t">还没有图片</span><span>拖入、粘贴或选择文件上传</span></div>`;
+  const groups = [];
+  IMAGES.forEach((im, idx) => {
+    const g = dayGroup(im.createdAt);
+    let grp = groups.find((x) => x.k === g);
+    if (!grp) groups.push((grp = { k: g, items: [] }));
+    grp.items.push([im, idx]);
+  });
+  const batch = st('uploading') ? `<section class="group batch" aria-label="正在上传"><h2>正在上传<span class="n">3 / 7</span><button class="btn btn-ghost btn-sm" data-copy="all">${icon('copy')}<span class="d-only">复制全部链接</span></button></h2>${batchRows()}</section>` : '';
+  return `${batch}<div aria-label="最近">${groups.map((g) => `<section class="group"><h2>${g.k}<span class="n">${g.items.length}</span><button class="btn btn-ghost btn-sm d-only" data-copy="all" aria-label="复制全部链接">${icon('copy')}复制全部链接</button></h2>${g.items.map(([im, i]) => recentRow(im, i)).join('')}</section>`).join('')}
+    <div style="padding:16px 0 0"><button class="btn btn-ghost" style="margin-left:-12px">加载更多</button></div></div>`;
+}
+
+// ---------------------------------------------------------------- 图片 and 回收站
+function currentList() {
+  if (S.view === 'trash') return st('empty') ? [] : TRASH;
+  if (st('filtered')) return IMAGES.filter((im) => im.fmt === 'png' && (im.source === 'token:1' || im.source === 'token:2'));
+  if (st('filtered-empty')) return [];
+  return inFolder(S.folder);
+}
+function tray() {
+  return `<section class="tray" aria-label="正在上传"><div class="tray-head"><span class="medium">正在上传</span><span class="muted tabular">3 / 7</span>
+    ${S.folder ? `<span class="dest">${icon('folder')}${esc(folderLabel(S.folder))}</span>` : ''}<div class="grow"></div>
+    <button class="btn btn-ghost btn-sm" data-copy="all">${icon('copy')}<span class="d-only">复制全部链接</span></button><button class="btn btn-ghost btn-icon btn-sm" aria-label="关闭">${icon('x')}</button></div>
+    ${batchRows()}</section>`;
+}
+function cb(im) {
+  const on = S.picked.has(im.id);
+  return `<button class="cb" role="checkbox" aria-checked="${on}" data-pick="${im.id}" aria-label="选择 ${esc(im.name)}"><span class="box">${on ? icon('check') : ''}</span></button>`;
+}
+function listRows(list) {
+  const trash = S.view === 'trash', wf = searching() || S.overlay === 'filter';
+  return list.map((im) => {
+    const idx = trash ? -1 - TRASH.indexOf(im) : IMAGES.indexOf(im);
+    const left = trash ? `${30 - im.trashedDays} 天后清除` : '';
+    const sub = trash ? `<small style="display:none"><span>${left}</span></small>` : `<small style="display:none"><span>${size(im.size)}</span><span>${ago(im.createdAt)}</span></small>`;
+    return `<div class="lrow ${trash ? 'trash' : wf ? 'with-folder' : ''}" aria-selected="${S.picked.has(im.id) || S.sel === idx}">
+      <span class="pick"><button data-open="${idx}" aria-label="${esc(im.name)}"><img src="${im.src}" alt="" loading="lazy" /></button>${cb(im)}</span>
+      <button class="nm" data-open="${idx}" tabindex="-1" title="${esc(im.name)}"><span class="ellipsis">${esc(im.name)}</span>${sub}</button>
+      ${trash ? `<span class="c l">${esc(folderLabel(im.folderId))}</span><span class="c">${size(im.size)}</span><span class="c">${left}</span>`
+        : `${wf ? `<span class="c l">${esc(folderLabel(im.folderId))}</span>` : '<span></span>'}<span class="c col-dims">${im.w} × ${im.h}</span><span class="c">${size(im.size)}</span><span class="c">${ago(im.createdAt)}</span>`}
+      <span class="act">${trash ? `<button class="btn btn-ghost btn-icon btn-sm" data-toast="已恢复" aria-label="恢复 ${esc(im.name)}">${icon('restore')}</button>` : `<button class="btn btn-ghost btn-icon btn-sm" data-copy="1" aria-label="复制 ${esc(im.name)} 的链接">${icon('copy')}</button>`}<button class="btn btn-ghost btn-icon btn-sm more" data-act="row-menu" data-idx="${idx}" aria-label="${esc(im.name)} 的更多操作">${icon('more')}</button></span>
+    </div>`;
+  }).join('');
+}
+function gridRows(list, width) {
+  const gap = phone() ? 8 : 12;
+  const rows = justify(list, width, phone() ? 120 : 176, gap);
+  const trash = S.view === 'trash';
+  return rows.map((r) => `<div class="jrow">${r.items.map((im) => {
+    const w = Math.floor((im.w / im.h) * r.h), h = Math.round(r.h);
+    const idx = trash ? -1 - TRASH.indexOf(im) : IMAGES.indexOf(im);
+    const on = S.picked.has(im.id);
+    return `<div class="tile ${S.sel === idx ? 'cur' : ''}" style="width:${w}px" aria-selected="${on}">
+      <button class="tile-img" style="height:${h}px;width:${w}px" data-open="${idx}" aria-label="${esc(im.name)}"><img src="${im.src}" alt="" loading="lazy" /></button>
+      <div class="over"><button class="chk" role="checkbox" aria-checked="${on}" data-pick="${im.id}" aria-label="选择 ${esc(im.name)}"><span class="box">${on ? icon('check') : ''}</span></button>${trash ? '' : `<button class="cp" data-copy="1" aria-label="复制 ${esc(im.name)} 的链接">${icon('copy')}</button>`}</div>
+      ${im.frames > 1 ? `<span class="badge-gif" style="top:${h - 24}px">GIF</span>` : ''}
+      <span class="name" title="${esc(im.name)}">${esc(midName(im.name, w))}</span>
+      ${trash ? `<span class="days">${30 - im.trashedDays} 天后清除</span>` : ''}
+    </div>`;
+  }).join('')}</div>`).join('');
+}
+function library() {
+  if (st('loading')) return `<div aria-busy="true">${[240, 180, 300, 210, 260, 190, 230].map((w) => `<div class="lrow" style="pointer-events:none"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--r-xs)"></span><span class="skeleton" style="height:12px;width:${w}px"></span></div>`).join('')}</div>`;
+  if (st('error')) return `<div class="empty" role="alert" style="height:100%">${icon('alert')}<span class="t">加载失败</span><button class="btn btn-secondary">重试</button></div>`;
+  if (st('empty') && S.view === 'library') return `<div class="empty" style="height:100%">${icon('image')}<span class="t">还没有图片</span><span>拖入、粘贴或选择文件上传</span><button class="btn btn-primary" data-act="upload">${icon('upload')}选择文件</button></div>`;
+  const subs = searching() || S.view === 'trash' ? [] : children(S.folder);
+  const chips = st('filtered') || st('filtered-empty') ? `<div class="active-filters">${st('filtered') ? `<span class="chip" aria-pressed="true">PNG<button class="x" aria-label="移除 PNG">${icon('x', 'icon-s')}</button></span><span class="chip" aria-pressed="true">PicGo 笔记本<button class="x" aria-label="移除 PicGo 笔记本">${icon('x', 'icon-s')}</button></span><span class="chip" aria-pressed="true">ShareX 工作机<button class="x" aria-label="移除 ShareX 工作机">${icon('x', 'icon-s')}</button></span>` : `<span class="chip" aria-pressed="true">“zzzz”<button class="x" aria-label="移除 “zzzz”">${icon('x', 'icon-s')}</button></span>`}<button class="btn btn-ghost btn-sm">清除筛选</button></div>` : '';
+  return `${st('uploading') ? tray() : ''}${chips}
+    ${subs.length ? `<div class="chips">${subs.map((f) => `<button class="fchip" data-folder="${f.id}">${icon('folder')}<span>${esc(f.name)}</span><span class="n">${directCount(f.id) || ''}</span></button>`).join('')}</div>` : ''}
+    <div id="grid" class="${S.picked.size ? 'selecting' : ''}"></div>`;
+}
+
+// ---------------------------------------------------------------- detail
+function detail() {
+  if (S.sel == null || S.view === 'system') return '';
+  const trashed = S.sel < 0;
+  const im = trashed ? TRASH[-1 - S.sel] : IMAGES[S.sel];
+  if (!im) return '';
+  const list = S.view === 'recent' ? IMAGES : currentList();
+  const pos = list.indexOf(im) + 1;
+  const deleted = trashed ? NOW - im.trashedDays * DAY : 0;
+  return `<aside class="detail" aria-label="图片详情">
+    <div class="d-top"><button class="btn btn-ghost btn-icon" aria-label="上一张" data-step="-1">${icon('left')}</button><button class="btn btn-ghost btn-icon" aria-label="下一张" data-step="1">${icon('right')}</button>
+      <span class="muted tabular s">${pos} / ${list.length}</span><div class="grow"></div><button class="btn btn-ghost btn-icon" aria-label="查看大图" data-toast="查看大图">${icon('expand')}</button><button class="btn btn-ghost btn-icon" aria-label="关闭" data-close>${icon('x')}</button></div>
+    <div class="d-body">
+      <div class="d-prev"><img src="${im.src}" alt="" /></div>
+      <div><div class="d-title">${esc(im.name)}</div><div class="d-meta"><span>${im.w} × ${im.h}</span><span>${size(im.size)}</span><span>${FORMAT[im.fmt]}</span></div></div>
+      ${trashed ? '' : `<div class="links">${FMTS.map(([f, k]) => `<div class="links-row ${f === S.fmt ? 'cur' : ''}"><span class="k">${k}</span><span class="v">${esc(im.links[f])}</span><button class="btn btn-ghost btn-icon btn-sm" data-copy="${f}" aria-label="复制 ${k}">${icon('copy')}</button></div>`).join('')}</div>`}
+      <dl class="props">
+        <dt>文件夹</dt><dd>${trashed ? esc(folderLabel(im.folderId)) : `<button class="copy-inline" data-toast="移动到…">${esc(folderLabel(im.folderId))}${icon('down', 'icon-s')}</button>`}</dd>
+        <dt>来源</dt><dd>${esc(SOURCES[im.source])}</dd>
+        <dt>上传时间</dt><dd class="tabular">${stamp(im.createdAt)}</dd>
+        ${trashed ? `<dt>删除时间</dt><dd class="tabular">${stamp(deleted)}</dd>` : ''}
+        <dt>ID</dt><dd class="mono">${im.id}</dd>
+        <dt>SHA-256</dt><dd class="mono">${im.sha}</dd>
+      </dl>
+    </div>
+    <div class="d-foot">${trashed ? `<button class="btn btn-ghost" data-toast="已恢复">${icon('restore')}恢复</button><button class="btn btn-ghost btn-danger-text" data-act="purge">${icon('trash')}永久删除</button>`
+      : `<button class="btn btn-ghost">${icon('download')}下载</button><button class="btn btn-ghost btn-danger-text" data-toast="已移到回收站">${icon('trash')}移到回收站</button>`}</div>
+  </aside>`;
+}
+
+// ---------------------------------------------------------------- 系统
+function status() {
+  if (st('loading')) return `<div class="page" aria-busy="true"><span class="skeleton" style="height:72px"></span><span class="skeleton" style="height:132px"></span><span class="skeleton" style="height:180px"></span></div>`;
+  if (st('error')) return `<div class="empty" role="alert" style="height:100%">${icon('alert')}<span class="t">状态加载失败</span><button class="btn btn-secondary">重试</button></div>`;
+  const s = STATUS, used = s.diskTotal - s.diskFree;
+  const running = st('running');
+  const maint = [
+    ['快速检查', 'success', `正常 ${ago(s.lastQuick)}`, running ? '检查中…' : '检查'],
+    ['完整检查', 'success', `正常 ${ago(s.lastFull)}`, '检查'],
+    ['快照', 'warning', '上次快照在 9 天前', '创建'],
+  ];
+  const kind = 'kind';
+  return `<div class="page">
+    ${st('warn') ? `<section aria-label="警告"><div class="warn" role="alert"><span class="dot dot-danger"></span><span class="medium">图片已损坏</span><span class="muted grow mono s">IMG_4790.jpg</span><button class="btn btn-ghost btn-sm" data-view="library">查看</button></div></section>` : ''}
+    <div class="figs">
+      <div class="fig"><b>${IMAGES.length}</b><span>图片</span></div>
+      <div class="fig"><b>${size(s.imagesBytes)}</b><span>占用空间</span></div>
+      <div class="fig"><b>${TRASH.length}</b><span>回收站</span></div>
+      <div class="fig"><b>${size(s.dbBytes)}</b><span>数据库</span></div>
+      <div class="fig"><b>${size(s.diskFree)}</b><span>磁盘剩余</span><div class="meter" role="img" aria-label="磁盘已用 ${size(used)} / ${size(s.diskTotal)}"><i style="width:${(used / s.diskTotal) * 100}%"></i></div></div>
+    </div>
+    <section class="sec"><h2>维护</h2><div class="rows">${maint.map(([k, tone, text, btn], i) => `<div><span class="k">${k}</span><span class="v"><span class="dot dot-${tone}"></span><span class="tabular">${text}</span></span><button class="btn btn-secondary btn-sm" ${running && i ? 'disabled' : ''} ${running && !i ? 'disabled aria-busy="true"' : ''} data-toast="${i === 2 ? '快照已创建' : '快速检查完成'}">${btn}</button></div>`).join('')}</div></section>
+    <section class="sec"><h2>操作记录<span class="s muted">保留 180 天</span><div class="grow"></div><button class="selectbtn" data-act="kind" aria-label="操作类型" aria-expanded="${S.overlay === kind}" style="width:128px">全部操作${icon('down', 'icon-s')}</button></h2>
+      <div class="rows audit"><div class="thead"><span>时间</span><span>操作者</span><span>操作</span><span>对象</span></div>
+      ${AUDIT.slice(0, 10).map((a) => `<div><span class="c c-at tabular">${stamp(a.at)}</span><span class="c c-actor ellipsis">${esc(a.actor)}</span><span class="medium c-act">${esc(a.action)}</span><span class="c c-target ellipsis">${esc(a.target)}</span></div>`).join('')}</div>
+      <div style="padding-top:8px"><button class="btn btn-ghost" style="margin-left:-12px">加载更多</button></div></section>
+    <section class="sec"><h2>运行信息</h2><dl class="dl">
+      <dt>版本</dt><dd class="tabular"><span>${s.version}</span><span class="mono muted">${s.commit}</span></dd>
+      <dt>运行环境</dt><dd class="tabular"><span>${s.goVersion}</span><span>SQLite ${s.sqliteVersion}</span></dd>
+      <dt>已运行</dt><dd>${s.uptime}</dd>
+      <dt>数据目录</dt><dd class="mono">${s.dataDir}</dd></dl></section>
+  </div>`;
+}
+function tokens() {
+  if (st('loading')) return `<div class="page" aria-busy="true"><span class="skeleton" style="height:180px"></span></div>`;
+  if (st('error')) return `<div class="empty" role="alert" style="height:100%">${icon('alert')}<span class="t">令牌加载失败</span><button class="btn btn-secondary">重试</button></div>`;
+  if (st('empty')) return `<div class="empty" style="height:100%">${icon('key')}<span class="t">还没有令牌</span><span>PicGo、ShareX 等工具通过令牌上传图片</span></div>`;
+  const armed = st('revoke') ? 1 : -1;
+  return `<div class="page"><section class="sec"><div class="rows tok"><div class="thead"><span>名称</span><span>权限</span><span>最近使用</span><span>到期</span><span></span></div>
+    ${TOKENS.map((t, i) => `<div><span class="nm"><span class="medium ellipsis">${esc(t.name)}</span><span class="mono muted s">${t.prefix}…</span></span>
+      <span class="c">${t.scopes.join('、')}</span><span class="c">${t.last ? ago(t.last) : '从未使用'}</span><span class="c">${t.exp ? stamp(t.exp).slice(0, 10) : '永不过期'}</span>
+      <span class="act"><button class="btn ${i === armed ? 'btn-danger-armed' : 'btn-ghost'} btn-sm" aria-label="${i === armed ? '确认吊销' : '吊销'} ${esc(t.name)}">${i === armed ? '确认吊销' : '吊销'}</button></span></div>`).join('')}
+  </div></section></div>`;
+}
+function settings() {
+  const v = st('invalid') ? '0' : st('unsaved') || st('leave') ? '25' : '20';
+  const err = st('invalid') ? '请输入 1 到 100 之间的数字' : '';
+  const num = (id, val, unit, label, e) => `<span class="v" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 0"><label class="field-wrap has-suffix unit"><input id="${id}" class="input tabular" value="${val}" aria-label="${label}" ${e ? 'aria-invalid="true"' : ''} /><span class="suffix">${unit}</span></label>${e ? `<span class="field-error">${e}</span>` : ''}</span>`;
+  const url = (u) => `<span class="v"><button class="copy-inline" data-copy="1" aria-label="复制 ${u}"><span class="mono ellipsis">${u}</span>${icon('copy', 'icon-s')}</button></span>`;
+  return `<div class="page">
+    <section class="sec"><h2>上传</h2><div class="rows">
+      <div><label class="k" for="s-max">单文件上限</label>${num('s-max', v, 'MB', '单文件上限', err)}</div>
+      <div><span class="k">格式</span><span class="v wrap">${['JPEG', 'PNG', 'GIF', 'WebP', 'AVIF'].map((f) => `<button class="chip" aria-pressed="true">${icon('check', 'icon-s')}${f}</button>`).join('')}</span></div>
+      <div><span class="k">重复检测</span><span class="v"><button class="switch" role="switch" aria-checked="true" aria-label="重复检测"></button></span></div>
+    </div></section>
+    <section class="sec"><h2>回收站</h2><div class="rows"><div><label class="k" for="s-trash">保留时间</label>${num('s-trash', '30', '天', '保留时间')}</div></div></section>
+    <section class="sec"><h2>操作记录</h2><div class="rows"><div><label class="k" for="s-audit">保留时间</label>${num('s-audit', '180', '天', '保留时间')}</div></div></section>
+    <section class="sec"><h2>地址</h2><div class="rows"><div><span class="k">公开地址</span>${url('https://pics.example.com')}</div><div><span class="k">图片地址</span>${url('https://img.example.com')}</div></div></section>
+  </div>
+  ${st('unsaved') || st('invalid') || st('leave') ? `<div class="savebar" role="region" aria-label="未保存的更改"><span class="t">有未保存的更改</span><button class="btn btn-ghost">放弃</button><button class="btn btn-primary" ${err ? 'disabled' : ''} data-toast="设置已保存">保存</button></div>` : ''}`;
+}
+
+// ---------------------------------------------------------------- overlays
+function palette() {
+  const q = S.overlay === 'palette-results' ? 'DSC' : S.overlay === 'palette-empty' ? 'zzzz' : '';
+  let body;
+  if (q === 'zzzz') body = `<div class="empty" style="padding:32px"><span class="t">没有匹配的结果</span></div>`;
+  else if (q) {
+    const hits = IMAGES.filter((i) => i.name.includes(q));
+    body = `<div class="menu-group">图片</div>${hits.map((im, i) => `<button class="menu-item" role="option" aria-selected="${i === 0}"><img src="${im.src}" alt="" /><span class="ellipsis">${esc(im.name)}</span><span class="end">${esc(folderLabel(im.folderId))}</span></button>`).join('')}`;
+  } else {
+    const it = (ic, t, end = '', sel = false) => `<button class="menu-item" role="option" aria-selected="${sel}">${icon(ic)}<span>${t}</span>${end ? `<span class="end">${end}</span>` : ''}</button>`;
+    body = `<div class="menu-group">操作</div>${it('upload', '上传图片', '<kbd>U</kbd>', true)}${it('folder', '新建文件夹')}${it('key', '新建令牌')}
+      <div class="menu-group">前往</div>${it('clock', '最近')}${it('image', '图片')}${it('trash', '回收站')}${it('pulse', '状态')}${it('key', '令牌')}${it('sliders', '设置')}${it('external', 'API 文档')}
+      <div class="menu-group">主题</div>${it('gear', '跟随系统', '当前')}${it('gear', '浅色')}${it('gear', '深色')}`;
+  }
+  return `<div class="cmdk-scrim" data-dismiss><div class="cmdk" role="dialog" aria-modal="true" aria-label="命令面板">
+    <div class="cmdk-input">${icon('search')}<input value="${q}" placeholder="搜索图片、文件夹或操作" aria-label="搜索图片、文件夹或操作" role="combobox" aria-expanded="true" /><kbd>Esc</kbd></div>
+    <div class="cmdk-list" role="listbox">${body}</div></div></div>`;
+}
+function menuHtml() {
+  const o = S.overlay;
+  const sheet = phone() && (o === 'display' || o === 'tree') ? '<div class="sheet-scrim" data-dismiss></div>' : '';
+  return sheet + menuInner(o);
+}
+function menuInner(o) {
+  const tick = (on) => `<span class="tick">${on ? icon('check') : ''}</span>`;
+  if (o === 'display') return `<div class="menu ${phone() ? 'popover sheet' : ''}" role="menu" data-anchor="[data-act=display]">
+    <div class="menu-group">视图</div><button class="menu-item" data-layout="list">${tick(S.layout === 'list')}${icon('list')}列表</button><button class="menu-item" data-layout="grid">${tick(S.layout === 'grid')}${icon('grid')}网格</button>
+    <div class="menu-sep"></div><div class="menu-group">排序</div>${['最新上传', '最早上传', '文件最大', '文件最小', '文件名'].map((l, i) => `<button class="menu-item">${tick(!i)}${l}</button>`).join('')}
+    ${phone() ? `<div class="menu-sep"></div><button class="menu-item" data-act="pick-first"><span class="tick"></span>选择</button>${S.view === 'trash' ? `<button class="menu-item danger" data-act="purge">${icon('trash')}清空回收站</button>` : ''}` : ''}</div>`;
+  if (o === 'row-menu' && S.view === 'trash') return `<div class="menu" role="menu" data-anchor="[data-act=row-menu]"><button class="menu-item" data-toast="已恢复">${icon('restore')}恢复</button><button class="menu-item">${icon('download')}下载原图</button><div class="menu-sep"></div><button class="menu-item danger" data-act="purge">${icon('trash')}永久删除</button></div>`;
+  if (o === 'row-menu') return `<div class="menu" role="menu" data-anchor="[data-act=row-menu]">${FMTS.map(([f, l]) => `<button class="menu-item" data-copy="${f}">${tick(f === S.fmt)}复制 ${l}</button>`).join('')}
+    <div class="menu-sep"></div><button class="menu-item">${icon('move')}移动到…</button><button class="menu-item">${icon('download')}下载原图</button><div class="menu-sep"></div><button class="menu-item danger">${icon('trash')}移到回收站</button></div>`;
+  if (o === 'upload-menu') return `<div class="menu" role="menu" data-anchor="[data-act=upload-menu]" data-align="end"><div class="menu-group">位置</div>
+    <button class="menu-item" data-dest="">${tick(!S.dest)}${icon('image')}图片</button>${FOLDERS.map((f) => `<button class="menu-item" data-dest="${f.id}" style="padding-left:${8 + (folderPath(f.id).length - 1) * 16}px">${tick(S.dest === f.id)}${icon('folder')}${esc(f.name)}</button>`).join('')}</div>`;
+  if (o === 'account') return `<div class="menu" role="menu" data-anchor="[data-act=account]" data-place="above"><div class="menu-group">主题</div>
+    <button class="menu-item">${tick(true)}跟随系统</button><button class="menu-item">${tick(false)}浅色</button><button class="menu-item">${tick(false)}深色</button><div class="menu-sep"></div><button class="menu-item">退出</button></div>`;
+  if (o === 'kind') return `<div class="menu" role="listbox" data-anchor="[data-act=kind]" data-align="end">${AUDIT_KINDS.map(([k, l]) => `<button class="menu-item" role="option" aria-selected="${!k}">${tick(!k)}${l}</button>`).join('')}</div>`;
+  if (o === 'tree') return `<div class="popover tpop ${phone() ? 'sheet' : ''}" data-anchor="[data-act=tree]" role="dialog" aria-label="文件夹"><button class="tn" data-folder="" ${!S.folder ? 'aria-current="page"' : ''}>${icon('image')}<span class="grow ellipsis">图片</span><span class="n">${inFolder(null).length}</span></button>${treePop(null, 1)}
+    <div class="menu-sep" style="margin:4px 0"></div><button class="tn">${icon('plus')}<span>新建文件夹</span></button></div>`;
+  if (o === 'filter') {
+    const fmtCount = (f) => IMAGES.filter((i) => i.fmt === f).length;
+    const srcCount = (s) => IMAGES.filter((i) => i.source === s).length;
+    return `<div class="popover" data-anchor="[data-act=filter]" data-align="end" role="dialog" aria-label="筛选">
+      <div class="pop-sec"><h3>格式</h3><div class="opts">${['jpeg', 'png', 'gif', 'webp'].map((f) => `<button class="chip" aria-pressed="${f === 'png'}">${FORMAT[f]}<span class="n">${fmtCount(f)}</span></button>`).join('')}</div></div>
+      <div class="pop-sec"><h3>上传时间</h3><div class="opts">${['今天', '最近 7 天', '最近 30 天', '30 天以前'].map((l) => `<button class="chip" aria-pressed="false">${l}</button>`).join('')}</div></div>
+      <div class="pop-sec"><h3>来源</h3><div class="opts">${Object.entries(SOURCES).map(([k, l]) => `<button class="chip" aria-pressed="${k.startsWith('token')}">${l}<span class="n">${srcCount(k)}</span></button>`).join('')}</div></div>
+      <div class="pop-sec" style="flex-direction:row;display:flex;justify-content:space-between"><button class="btn btn-ghost btn-sm">清除</button><span class="muted s tabular" style="align-self:center">${currentList().length || IMAGES.filter((im) => im.fmt === 'png' && im.source.startsWith('token')).length} 张</span></div></div>`;
+  }
+  return '';
+}
+function dialogHtml() {
+  const o = S.overlay;
+  if (o === 'purge') {
+    const title = S.picked.size ? `永久删除 ${S.picked.size} 张图片？` : S.sel != null && S.sel < 0 ? `永久删除“${esc(TRASH[-1 - S.sel].name)}”？` : `永久删除 ${TRASH.length} 张图片？`;
+    return `<div class="scrim"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dialog-head" id="dlg-t">${title}</div>
+      <div class="dialog-body"><p>文件和链接会立即失效，无法恢复。</p></div><div class="dialog-foot"><button class="btn btn-secondary" data-dismiss>取消</button><button class="btn btn-danger" data-dismiss data-toast="已永久删除">永久删除</button></div></div></div>`;
+  }
+  if (o === 'leave') return `<div class="scrim"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dialog-head" id="dlg-t">离开设置？</div>
+    <div class="dialog-body"><p>未保存的更改会丢失。</p></div><div class="dialog-foot"><button class="btn btn-secondary" data-dismiss>留下</button><button class="btn btn-danger" data-dismiss>放弃更改</button></div></div></div>`;
+  if (o === 'token-create' || o === 'token-invalid') {
+    const bad = o === 'token-invalid';
+    return `<div class="scrim" data-dismiss><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dialog-head" id="dlg-t">新建令牌</div>
+      <div class="dialog-body">
+        <div class="field"><label for="tk-name">名称</label><input id="tk-name" class="input" ${bad ? 'aria-invalid="true"' : 'value="手机快捷指令"'} />${bad ? '<span class="field-error">请输入名称</span>' : ''}</div>
+        <fieldset class="field" style="border:0;margin:0;padding:0"><legend class="label medium" style="padding:0;margin-bottom:6px">权限</legend><div class="scope-opts">
+          <button class="scope-opt" role="checkbox" aria-checked="true"><span class="check" data-on="true">${icon('check')}</span>上传</button>
+          <button class="scope-opt" role="checkbox" aria-checked="false"><span class="check" data-on="false"></span>管理</button></div></fieldset>
+        <div class="field"><span class="label">有效期</span><button class="selectbtn" style="width:160px" aria-label="有效期">永不过期${icon('down', 'icon-s')}</button></div>
+      </div><div class="dialog-foot"><button class="btn btn-secondary" data-dismiss>取消</button><button class="btn btn-primary" data-act="token-reveal">创建</button></div></div></div>`;
+  }
+  if (o === 'token-reveal') {
+    const secret = 'pb_N8T4Q_kq7x2m9v4c1h6z3w8r5t0yb2d7f';
+    const ep = 'https://pics.example.com/api/v1/images';
+    return `<div class="scrim"><div class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><div class="dialog-head" id="dlg-t">令牌已创建</div>
+      <div class="dialog-body"><div class="notice">${icon('alert')}令牌只显示这一次</div>
+        <div class="secret"><span class="mono">${secret}</span><button class="btn btn-primary btn-sm" data-toast="已复制令牌">${icon('copy', 'icon-s')}复制</button></div>
+        <div class="field"><div class="row" style="justify-content:space-between"><div class="seg" role="group" aria-label="客户端"><button aria-pressed="true">PicGo</button><button>ShareX</button><button>curl</button></div><button class="btn btn-ghost btn-sm" data-toast="已复制">${icon('copy', 'icon-s')}复制</button></div>
+          <pre class="snippet">API 地址: ${ep}\nPOST 参数名: file\nJSON 路径: url\n自定义请求头: {"Authorization":"Bearer ${secret}"}</pre></div>
+      </div><div class="dialog-foot"><button class="btn btn-secondary" data-dismiss>完成</button></div></div></div>`;
+  }
+  if (o === 'drop') {
+    const dest = S.view === 'recent' ? S.dest : S.folder;
+    return `<div class="drop" data-dismiss><div class="drop-card">${icon('upload')}<span class="t">松开以上传</span><span class="dest">${icon(dest ? 'folder' : 'image')}${esc(folderLabel(dest))}</span></div></div>`;
+  }
+  return '';
+}
+function place() {
+  document.querySelectorAll('[data-anchor]').forEach((m) => {
+    if (m.classList.contains('sheet')) { m.style.position = 'fixed'; return; }
+    const a = document.querySelector(m.dataset.anchor);
+    if (!a) return;
+    const r = a.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+    let left = m.dataset.align === 'end' ? r.right - mw : r.left;
+    left = Math.max(8, Math.min(left, innerWidth - mw - 8));
+    let top = m.dataset.place === 'above' ? r.top - mh - 4 : r.bottom + 4;
+    if (top + mh > innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+  });
+}
+
+// ---------------------------------------------------------------- render
+function render() {
+  const body = S.view === 'system' ? (S.sec === 'tokens' ? tokens() : S.sec === 'settings' ? settings() : status())
+    : S.view === 'recent' ? recent() : library();
+  const overlays = (S.overlay && S.overlay.startsWith('palette') ? palette() : '') + menuHtml() + dialogHtml();
+  const flush = S.view === 'recent' && !st('empty') && !st('error') && !st('loading');
+  document.getElementById('app').innerHTML = `${side()}
+    <div class="panel"><main class="main"><header class="head">${header()}</header>${subbar()}<div class="content ${flush ? 'flush' : ''} ${S.view === 'system' && S.sec === 'settings' && !st('ready') ? 'has-bar' : ''}" id="content">${body}</div></main>${detail()}</div>
+    ${tabbar()}${bulkbar()}${overlays}`;
+  const g = document.getElementById('grid');
+  if (g) {
+    const list = currentList();
+    if (!list.length) g.innerHTML = st('filtered-empty') ? `<div class="empty">${icon('search')}<span class="t">没有匹配的图片</span></div>`
+      : S.view === 'trash' ? `<div class="empty">${icon('trash')}<span class="t">回收站是空的</span></div>` : `<div class="empty">${icon('folder')}<span class="t">这里没有图片</span></div>`;
+    else g.innerHTML = S.layout === 'grid' ? gridRows(list, g.clientWidth) : listRows(list);
+  }
+  place();
+}
+
+// ---------------------------------------------------------------- behaviour (simulated)
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, a, [data-dismiss]');
+  if (!t) { if (S.overlay && !e.target.closest('.menu, .popover')) { S.overlay = null; render(); } return; }
+  if (t.tagName === 'A') return;
+  const d = t.dataset;
+  if (d.toggle) { e.stopPropagation(); S.open.has(d.toggle) ? S.open.delete(d.toggle) : S.open.add(d.toggle); return render(); }
+  if (d.copy) { e.stopPropagation(); toast(d.copy === 'all' ? `已复制 3 条 ${fmtLabel()}` : d.copy === '1' ? `已复制 ${fmtLabel()}` : `已复制 ${FMTS.find((f) => f[0] === d.copy)[1]}`); S.overlay = null; return render(); }
+  if (d.toast) { toast(d.toast); if (t.hasAttribute('data-dismiss')) S.overlay = null; return render(); }
+  if (d.pick) { S.picked.has(d.pick) ? S.picked.delete(d.pick) : S.picked.add(d.pick); return render(); }
+  if (d.fmt) { S.fmt = d.fmt; return render(); }
+  if (d.sec) { S.sec = d.sec; S.state = 'ready'; S.overlay = null; return render(); }
+  if (d.layout) { S.layout = d.layout; S.overlay = null; return render(); }
+  if (d.dest != null) { S.dest = d.dest || null; S.overlay = null; return render(); }
+  if (d.open != null) { if (S.picked.size) return; S.sel = Number(d.open); return render(); }
+  if (t.hasAttribute('data-close')) { S.sel = null; return render(); }
+  if (d.step) {
+    const list = S.view === 'recent' ? IMAGES : currentList();
+    const cur = S.sel < 0 ? TRASH[-1 - S.sel] : IMAGES[S.sel];
+    const nx = list[(list.indexOf(cur) + Number(d.step) + list.length) % list.length];
+    S.sel = S.view === 'trash' ? -1 - TRASH.indexOf(nx) : IMAGES.indexOf(nx);
+    return render();
+  }
+  if (d.folder != null) { S.view = 'library'; S.folder = d.folder || null; S.sel = null; S.overlay = null; S.picked.clear(); S.state = 'ready'; return render(); }
+  if (d.view) { S.view = d.view; S.sel = null; S.overlay = null; S.picked.clear(); S.state = 'ready'; if (d.view === 'library') S.folder = null; return render(); }
+  if (d.act) {
+    const a = d.act;
+    if (a === 'unpick') { S.picked.clear(); return render(); }
+    if (a === 'pick-all') { const l = currentList(); const all = l.every((im) => S.picked.has(im.id)); l.forEach((im) => (all ? S.picked.delete(im.id) : S.picked.add(im.id))); return render(); }
+    if (a === 'pick-first') { S.overlay = null; const l = currentList(); if (l[0]) S.picked.add(l[0].id); return render(); }
+    if (a === 'upload') { toast('选择文件'); return; }
+    if (a === 'token-reveal') { S.overlay = 'token-reveal'; return render(); }
+    S.overlay = S.overlay === a ? null : a; return render();
+  }
+  if (t.hasAttribute('data-dismiss') && (e.target === t || t.tagName === 'BUTTON')) { S.overlay = null; return render(); }
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); S.overlay = 'palette'; return render(); }
+  if (e.key === 'Escape') {
+    if (S.overlay) S.overlay = null; else if (S.picked.size) S.picked.clear(); else if (S.sel != null) S.sel = null; else return;
+    return render();
+  }
+  if (e.target.matches('input')) return;
+  if (S.view === 'recent' && (e.key === 'j' || e.key === 'k')) { S.sel = Math.max(0, Math.min(IMAGES.length - 1, (S.sel ?? -1) + (e.key === 'j' ? 1 : -1))); render(); }
+  if (S.sel != null && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) document.querySelector(`[data-step="${e.key === 'ArrowRight' ? 1 : -1}"]`)?.click();
+});
+addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
