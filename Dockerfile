@@ -34,7 +34,7 @@ ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=${VERSION} -X picberth/internal/buildinfo.Commit=${COMMIT}" -o /out/picberth ./cmd/picberth && mkdir -p /out/root && mkdir -m 0700 /out/root/data
 
 # ---- final: minimal, non-root runtime ----
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:8ce6dd87e9823c5b48dcfb2c8604714ccb351ce59607327bcc4957448da279b5
 # The container listens on all interfaces *inside its network namespace*. Never publish
 # the port on all host interfaces: deploy/compose.yaml binds it to 127.0.0.1 only.
 COPY --from=build /out/picberth /picberth
