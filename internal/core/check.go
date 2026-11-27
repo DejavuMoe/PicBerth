@@ -176,7 +176,7 @@ func (s *Service) checkImage(ctx context.Context, id string, full bool, rep *Che
 	return nil
 }
 
-// Snapshots omit the thumbnail cache. Treat a missing cache file as pending regeneration.
+// Snapshots omit the thumbnail cache. Treat a missing or empty cache file as pending regeneration.
 func (s *Service) resetMissingThumbnail(ctx context.Context, im *meta.Image, rep *CheckReport) error {
 	if im.Thumb != "jpg" && im.Thumb != "png" {
 		return nil
@@ -190,7 +190,18 @@ func (s *Service) resetMissingThumbnail(ctx context.Context, im *meta.Image, rep
 		return nil
 	}
 	if err == nil {
-		err = f.Close()
+		st, serr := f.Stat()
+		err = errors.Join(serr, f.Close())
+		if err == nil && st.Size() == 0 { // renamed into place before its bytes reached the disk
+			if err := s.blobs.RemoveThumbs(im.ID); err != nil {
+				return err
+			}
+			if _, err := s.db.SetThumb(ctx, im.ID, ""); err != nil {
+				return err
+			}
+			im.Thumb = ""
+			return nil
+		}
 	}
 	if err != nil {
 		path := ""

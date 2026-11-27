@@ -229,3 +229,30 @@ func TestThumbnailRetry(t *testing.T) {
 		})
 	}
 }
+
+// A crash can leave a renamed thumbnail without its bytes. An empty file is as useless as a missing one.
+func TestFullCheckRepairsEmptyThumbnail(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	img := e.mustUpload(e.admin, "empty-thumb.png", makePNG(t, 3, 3, 126))
+	e.svc.ProcessThumbnails(ctx)
+	if err := e.svc.blobs.WriteThumb(img.ID, "png", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if rep := e.mustCheck(CheckFull); !rep.OK || len(rep.Issues) != 0 {
+		t.Fatalf("full check: %+v", rep)
+	}
+	if im, err := e.db.GetImage(ctx, img.ID); err != nil || im.Thumb != "" {
+		t.Fatalf("image: %+v, %v, want a pending thumbnail", im, err)
+	}
+	e.svc.ProcessThumbnails(ctx)
+	thumb, err := e.svc.OpenThumb(ctx, e.admin, img.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer thumb.File.Close()
+	if thumb.Size == 0 {
+		t.Fatal("the thumbnail is still empty")
+	}
+}

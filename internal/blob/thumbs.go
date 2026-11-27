@@ -20,8 +20,9 @@ func thumbPath(id, ext string) (string, error) {
 	return datadir.ThumbsDir + "/" + id[0:2] + "/" + id + "." + ext, nil
 }
 
-// WriteThumb writes cache/thumbs/ab/<id>.<ext> atomically (temp file in tmp/, then rename).
-// Thumbnails are derived data, so no fsync is needed.
+// WriteThumb writes cache/thumbs/ab/<id>.<ext> atomically (temp file in tmp/, then rename). The bytes are
+// synced first: the database records the thumbnail as present right after, and a rename can survive a
+// crash that its data does not.
 func (s *Store) WriteThumb(id, ext string, data []byte) error {
 	dst, err := thumbPath(id, ext)
 	if err != nil {
@@ -32,6 +33,9 @@ func (s *Store) WriteThumb(id, ext string, data []byte) error {
 		return err
 	}
 	_, werr := tmp.Write(data)
+	if werr == nil {
+		werr = tmp.Sync()
+	}
 	cerr := tmp.Close()
 	if werr != nil || cerr != nil {
 		s.RemoveTemp(tmp.Name())
