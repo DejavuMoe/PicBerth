@@ -44,7 +44,6 @@
   aria-multiselectable="true"
 >
   <colgroup>
-    <col class="col-check" />
     <col class="col-thumb" />
     <col />
     {#if showFolder}<col class="col-folder" style="width: 20%" />{/if}
@@ -55,10 +54,9 @@
   </colgroup>
   <thead>
     <tr>
-      <th class="col-check">
+      <th class="col-thumb">
         <Check on={allOn ? true : someOn ? 'mixed' : false} onchange={toggleAll} label="全选" class="cell-check" />
       </th>
-      <th class="col-thumb"><span class="sr-only">预览</span></th>
       <th>文件名</th>
       {#if showFolder}<th class="col-folder">文件夹</th>{/if}
       <th class="col-dims">尺寸</th>
@@ -90,15 +88,16 @@
           lib.suppressNextClick();
         }}
       >
-        <td class="col-check">
-          <Check on={on} onchange={(e) => lib.toggle(im.id, e.shiftKey)} label={`选择 ${im.filename}`} class="cell-check" />
-        </td>
         <td class="col-thumb">
-          {#if im.broken}
-            <span class="thumb" style="display: grid; place-items: center"><Icon name="image" /></span>
-          {:else}
-            <img class="thumb" src={thumbSrc(im)} alt="" loading="lazy" draggable="false" />
-          {/if}
+          <!-- The checkbox sits over the thumbnail, so thumbnails line up with the title (D8). -->
+          <span class="pick">
+            {#if im.broken}
+              <span class="thumb" style="display: grid; place-items: center"><Icon name="image" /></span>
+            {:else}
+              <img class="thumb" src={thumbSrc(im)} alt="" loading="lazy" draggable="false" />
+            {/if}
+            <Check on={on} onchange={(e) => lib.toggle(im.id, e.shiftKey)} label={`选择 ${im.filename}`} class="cell-check" />
+          </span>
         </td>
         <td>
           <div class="name-cell">

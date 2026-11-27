@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "path": "index.html",
+      "status": "approved",
+      "approvalEvidence": "Owner approved revision 7 on 2026-11-10 (docs/ui/r7-revision.md); design commit f6dd1fc, file unchanged since."
+    },
+    {
+      "path": "auth.html",
+      "status": "approved",
+      "approvalEvidence": "Owner approved revision 7 on 2026-11-10; design commit f6dd1fc, file unchanged since."
+    },
+    {
+      "path": "api-docs.html",
+      "status": "approved",
+      "approvalEvidence": "Owner approved revision 7 on 2026-11-10; design commit f6dd1fc, file unchanged since."
+    },
+    {
+      "path": "retention.html",
+      "status": "approved",
+      "approvalEvidence": "Owner approved zero-day trash retention on 2026-11-18 (docs/ui/retention-review.md); design commit 17e1a2a, file unchanged since."
+    },
+    {
+      "path": "explore/a.html",
+      "status": "changes-requested",
+      "approvalEvidence": null
+    },
+    {
+      "path": "explore/b.html",
+      "status": "changes-requested",
+      "approvalEvidence": null
+    },
+    {
+      "path": "explore/c.html",
+      "status": "changes-requested",
+      "approvalEvidence": null
+    },
+    {
+      "path": "r8/console.html",
+      "status": "approved",
+      "approvalEvidence": "Owner approved r8/console.html on 2026-11-27 (\"批准 console.html\"), keeping the new words 最近 and 系统 and accepting the new /recent route; reviewed version as recorded in docs/ui/r8-candidate.md."
+    }
+  ]
+}

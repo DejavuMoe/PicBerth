@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SystemHead from '../components/SystemHead.svelte';
+  import { phone } from '../lib/media.svelte';
   import { onDestroy, onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import TokenCreate from '../components/admin/TokenCreate.svelte';
@@ -111,21 +113,20 @@
 {/snippet}
 
 <div class="panel-main">
-  <div class="head">
-    <div class="head-title">
-      <h1>令牌</h1>
-    </div>
-    <a class="btn btn-ghost" href="/docs/api" target="_blank" rel="noopener">
-      API 文档
-      <Icon name="external" size="s" />
-    </a>
-    <button type="button" class="btn btn-primary" onclick={() => (creating = true)}>
+  <SystemHead>
+    {#if !phone.matches}
+      <a class="btn btn-ghost" href="/docs/api" target="_blank" rel="noopener">
+        API 文档
+        <Icon name="external" size="s" />
+      </a>
+    {/if}
+    <button type="button" class="btn btn-primary" class:btn-icon={phone.matches} aria-label="新建令牌" title="新建令牌" onclick={() => (creating = true)}>
       <Icon name="plus" />
-      新建令牌
+      {#if !phone.matches}新建令牌{/if}
     </button>
-  </div>
+  </SystemHead>
   <div class="scroll">
-    <div class="page" style="max-width: 960px;">
+    <div class="page">
       {#if phase === 'loading'}
         <div class="list" aria-busy="true">
           {#each [0, 1, 2] as i (i)}

@@ -196,7 +196,9 @@ test('drags an image onto a folder node', async ({ page }, testInfo) => {
 
   // A single drag carries the image id to the tree node through the product's own drag payload.
   await page.evaluate(({ filename, folder }) => {
-    const row = [...document.querySelectorAll("table.table tbody tr, .jgrid .jt")].find((tr) => tr.textContent?.includes(filename));
+    const row = [...document.querySelectorAll("table.table tbody tr, .jgrid .jt")].find(
+      (tr) => tr.getAttribute("aria-label") === filename || tr.textContent?.includes(filename),
+    );
     const node = [...document.querySelectorAll(".side .tn-main")].find((b) => b.textContent?.includes(folder));
     if (!row || !node) throw new Error("drag source or target missing");
     const dt = new DataTransfer();

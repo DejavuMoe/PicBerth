@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark light" />
+<title>PicBerth</title>
+<link rel="stylesheet" href="base.css" />
+<link rel="stylesheet" href="shared.css" />
+<style>
+/* Direction B: recent uploads are home; top navigation; reader pane. */
+.app { flex-direction: column; background: var(--panel); }
+.top { height: 52px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 12px 0 var(--gutter); border-bottom: var(--bw) solid var(--hairline); background: var(--bg); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: var(--w-strong); margin-right: 20px; }
+.brand .mark { width: 16px; height: 16px; border-radius: var(--r-xs); background: var(--accent); }
+.tab { height: 32px; padding: 0 12px; border-radius: var(--r-s); color: var(--muted); font-weight: var(--w-medium); display: inline-flex; align-items: center; gap: 6px; }
+.tab:hover { color: var(--text); background: var(--hover); }
+.tab[aria-current='page'] { color: var(--text); background: var(--sel); }
+.tab .n { font-size: var(--fs-s); color: var(--muted); font-weight: var(--w-regular); }
+.top .search { width: 260px; margin-right: 4px; }
+.iconbtn { position: relative; }
+.iconbtn .dot { position: absolute; top: 7px; right: 7px; }
+.avatar { width: 24px; height: 24px; border-radius: 999px; background: var(--fill); display: grid; place-items: center; font-size: var(--fs-s); font-weight: var(--w-strong); }
+
+.body { flex: 1; min-height: 0; display: flex; }
+.stream { flex: 1; min-width: 0; overflow: auto; }
+.stream-in { max-width: 820px; margin: 0 auto; padding: 20px var(--gutter) 48px; }
+.drop { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: var(--r-m); box-shadow: inset 0 0 0 var(--bw) var(--line); background: var(--bg); }
+.drop .to { display: inline-flex; align-items: center; gap: 6px; }
+.drop .hint { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.bar { display: flex; align-items: center; gap: 8px; margin: 24px 0 8px; }
+.group { margin-top: 20px; }
+.group h2 { font-weight: var(--w-medium); color: var(--muted); height: 28px; display: flex; align-items: center; gap: 8px; }
+.group h2 .n { font-size: var(--fs-s); color: var(--faint); }
+.item { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; height: 60px; padding: 0 4px 0 8px; margin: 0 -8px; border-radius: var(--r-m); cursor: default; }
+.item:hover { background: var(--hover); }
+.item[aria-selected='true'] { background: var(--sel); }
+.item img { width: 44px; height: 44px; border-radius: var(--r-s); object-fit: cover; background: var(--fill); }
+.item .nm { display: grid; min-width: 0; }
+.item .nm b { font-weight: var(--w-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .nm span { color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); display: flex; gap: 12px; overflow: hidden; white-space: nowrap; }
+.item .meta { color: var(--muted); font-size: var(--fs-s); display: flex; gap: 12px; }
+.item .progress { width: 120px; }
+.item .act { display: flex; gap: 2px; }
+
+.reader { width: 400px; flex: none; border-left: var(--bw) solid var(--hairline); display: flex; flex-direction: column; background: var(--panel); }
+.r-body { flex: 1; overflow: auto; padding: 20px var(--gutter); display: grid; gap: 16px; align-content: start; }
+.r-prev { border-radius: var(--r-m); overflow: hidden; background: var(--fill); aspect-ratio: 4 / 3; }
+.r-prev img { width: 100%; height: 100%; object-fit: contain; }
+.r-title { font-size: var(--fs-l); line-height: var(--lh-l); font-weight: var(--w-strong); word-break: break-all; }
+.r-meta { display: flex; gap: 12px; color: var(--muted); }
+.copybox { display: flex; gap: 8px; }
+.copybox .input { font-family: var(--mono); font-size: var(--fs-s); color: var(--muted); }
+.r-foot { display: flex; justify-content: space-between; padding: 12px; border-top: var(--bw) solid var(--hairline); }
+
+.lib { flex: 1; overflow: auto; padding: 16px var(--gutter) 48px; }
+.lib-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.scope { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: var(--r-s); box-shadow: inset 0 0 0 var(--bw) var(--line); font-weight: var(--w-medium); }
+.scope .icon { color: var(--muted); }
+.jrow { display: flex; gap: 8px; margin-bottom: 8px; }
+.jrow .tile-img { flex: none; }
+
+.bottom, .m-only { display: none; }
+
+@media (max-width: 1099px) {
+  .reader { position: fixed; top: 60px; right: 8px; bottom: 8px; border-radius: var(--r-l); box-shadow: 0 0 0 var(--bw) var(--hairline), var(--shadow); z-index: 40; animation: rise var(--dur) var(--ease); }
+  .top .search { width: 200px; }
+  .item .meta { display: none; }
+}
+@media (max-width: 720px) {
+  :root { --gutter: 16px; }
+  .top { padding: 0 8px 0 var(--gutter); background: var(--panel); }
+  .top .tab, .top .search, .top .d-only { display: none; }
+  .m-only { display: inline-flex; }
+  .brand { margin-right: auto; font-size: var(--fs-l); }
+  .brand .mark { display: none; }
+  .drop { display: none; }
+  .stream-in { padding-top: 4px; padding-bottom: 96px; }
+  .bar { margin-top: 12px; }
+  .bar .seg { flex: 1; }
+  .bar .seg > button { flex: 1; justify-content: center; padding: 0 4px; }
+  .bar .lbl { display: none; }
+  .item { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .item .meta { display: none; }
+  .item .more { display: none; }
+  .reader { inset: 52px 0 0 0; width: auto; border-radius: var(--r-l) var(--r-l) 0 0; top: 52px; right: 0; }
+  .bottom { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: calc(64px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: var(--bw) solid var(--hairline); align-items: center; z-index: 30; }
+  .bottom > button { flex: 1; display: grid; place-items: center; align-content: center; gap: 2px; font-size: var(--fs-s); color: var(--muted); }
+  .bottom > button[aria-current='page'] { color: var(--text); }
+  .bottom .up { width: 48px; height: 40px; border-radius: var(--r-l); background: var(--accent); color: var(--accent-ink); flex: none; display: grid; place-items: center; }
+  .bottom .up .icon { width: 20px; height: 20px; }
+  .lib { padding-bottom: 96px; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="data.js"></script>
+<script>
+const { IMAGES, TRASH, SOURCES, FORMAT, icon, esc, size, ago, stamp, dayGroup, folderLabel, folderPath, justify, toast, params, midName } = PB;
+const S = {
+  tab: params.get('tab') || 'recent',
+  state: params.get('state') || 'ready',
+  sel: params.get('detail') != null ? Number(params.get('detail')) : (innerWidth > 1099 ? 0 : null),
+  fmt: 'markdown',
+};
+const FMTS = [['url', 'URL'], ['markdown', 'Markdown'], ['html', 'HTML'], ['bbcode', 'BBCode']];
+
+function topbar() {
+  return `<header class="top">
+    <div class="brand"><span class="mark"></span>PicBerth</div>
+    <nav class="row" aria-label="导航" style="gap:2px">
+      <button class="tab" data-tab="recent" ${S.tab === 'recent' ? 'aria-current="page"' : ''}>最近</button>
+      <button class="tab" data-tab="library" ${S.tab === 'library' ? 'aria-current="page"' : ''}>图片</button>
+      <button class="tab" data-tab="trash" ${S.tab === 'trash' ? 'aria-current="page"' : ''}>回收站<span class="n">${TRASH.length}</span></button>
+    </nav>
+    <div class="grow"></div>
+    <label class="field-wrap search">${icon('search')}<input class="input" placeholder="搜索" aria-label="搜索" /><kbd>Ctrl K</kbd></label>
+    <button class="btn btn-ghost btn-icon m-only" aria-label="搜索">${icon('search')}</button>
+    <button class="btn btn-ghost btn-icon iconbtn d-only" aria-label="系统">${icon('gear')}<span class="dot dot-warning"></span></button>
+    <button class="btn btn-ghost btn-icon" aria-label="admin"><span class="avatar">A</span></button>
+  </header>`;
+}
+
+function item(im, idx, extra) {
+  const folder = im.folderId ? folderPath(im.folderId).map((f) => f.name).join(' / ') : '图片';
+  return `<div class="item" role="option" aria-selected="${S.sel === idx}" data-sel="${idx}">
+    <img src="${im.src}" alt="" loading="lazy" />
+    <div class="nm"><b title="${esc(im.name)}">${esc(im.name)}</b><span><span>${esc(folder)}</span><span>${esc(SOURCES[im.source])}</span></span></div>
+    ${extra || `<div class="meta tabular"><span>${im.w} × ${im.h}</span><span>${size(im.size)}</span><span>${ago(im.createdAt)}</span></div>
+    <div class="act"><button class="btn btn-ghost btn-sm" data-copy="1">${icon('copy')}复制</button><button class="btn btn-ghost btn-icon btn-sm more" aria-label="更多">${icon('more')}</button></div>`}
+  </div>`;
+}
+
+function recent() {
+  if (S.state === 'empty') {
+    return `<div class="stream"><div class="stream-in">${drop()}<div class="empty">${icon('inbox')}<span class="t">还没有图片</span></div></div></div>`;
+  }
+  const groups = [];
+  IMAGES.forEach((im, idx) => {
+    const g = dayGroup(im.createdAt);
+    let grp = groups.find((x) => x.k === g);
+    if (!grp) groups.push((grp = { k: g, items: [] }));
+    grp.items.push([im, idx]);
+  });
+  const uploading = S.state === 'uploading' ? `<div class="group"><h2>上传中<span class="n tabular">2</span></h2>
+    ${item({ ...IMAGES[9], name: 'IMG_5102.jpg' }, -1, `<div class="progress"><i style="width:62%"></i></div><span class="muted s tabular" style="width:56px;text-align:right">62%</span>`)}
+    ${item({ ...IMAGES[2], name: 'scan-large.png' }, -2, `<span class="text-danger s">文件超过 20 MB</span><button class="btn btn-ghost btn-sm">移除</button>`)}
+  </div>` : '';
+  return `<div class="stream"><div class="stream-in">
+    ${drop()}
+    <div class="bar"><span class="muted lbl">复制为</span><div class="seg" role="group" aria-label="复制为">${FMTS.map(([k, l]) => `<button aria-pressed="${S.fmt === k}" data-fmt="${k}">${l}</button>`).join('')}</div>
+      <div class="grow"></div><button class="btn btn-ghost btn-sm d-only">${icon('filter')}筛选</button></div>
+    ${uploading}
+    <div role="listbox" aria-label="最近">${groups.map((g) => `<section class="group"><h2>${g.k}<span class="n tabular">${g.items.length}</span></h2>${g.items.map(([im, i]) => item(im, i)).join('')}</section>`).join('')}</div>
+  </div></div>`;
+}
+
+function drop() {
+  return `<div class="drop">
+    <button class="btn btn-primary">${icon('upload')}上传</button>
+    <button class="to btn btn-ghost">${icon('folder')}图片${icon('down', 'icon-s')}</button>
+    <span class="hint">拖放或粘贴<kbd>Ctrl V</kbd></span>
+  </div>`;
+}
+
+function reader() {
+  if (S.sel == null || S.sel < 0 || S.tab !== 'recent') return '';
+  const im = IMAGES[S.sel];
+  const cur = FMTS.find((f) => f[0] === S.fmt);
+  return `<aside class="reader" aria-label="图片详情">
+    <div class="row" style="height:48px;padding:0 12px;border-bottom:var(--bw) solid var(--hairline);flex:none">
+      <button class="btn btn-ghost btn-icon" data-step="-1" aria-label="上一张">${icon('left')}</button><button class="btn btn-ghost btn-icon" data-step="1" aria-label="下一张">${icon('right')}</button>
+      <div class="grow"></div><button class="btn btn-ghost btn-icon" aria-label="查看大图">${icon('expand')}</button><button class="btn btn-ghost btn-icon" data-close aria-label="关闭">${icon('x')}</button></div>
+    <div class="r-body">
+      <div class="r-prev"><img src="${im.src}" alt="" /></div>
+      <div><div class="r-title">${esc(im.name)}</div><div class="r-meta tabular"><span>${im.w} × ${im.h}</span><span>${size(im.size)}</span><span>${FORMAT[im.fmt]}</span></div></div>
+      <div class="copybox"><input class="input" readonly value="${esc(im.links[S.fmt])}" aria-label="${cur[1]}" /><button class="btn btn-secondary" data-copy="1">${icon('copy')}复制</button></div>
+      <dl class="props">
+        <dt>文件夹</dt><dd>${esc(folderLabel(im.folderId))}</dd>
+        <dt>来源</dt><dd>${esc(SOURCES[im.source])}</dd>
+        <dt>上传时间</dt><dd class="tabular">${stamp(im.createdAt)}</dd>
+        <dt>ID</dt><dd class="mono">${im.id}</dd>
+        <dt>SHA-256</dt><dd class="mono">${im.sha}</dd>
+      </dl>
+    </div>
+    <div class="r-foot"><button class="btn btn-ghost">${icon('move')}移动</button><div class="row"><button class="btn btn-ghost">${icon('download')}下载</button><button class="btn btn-ghost btn-danger-text">${icon('trash')}移到回收站</button></div></div>
+  </aside>`;
+}
+
+function library(trash) {
+  return `<div class="lib"><div class="lib-head">
+    ${trash ? '<h1 class="strong" style="font-size:var(--fs-l)">回收站</h1>' : `<button class="scope">${icon('folder')}全部文件夹${icon('down', 'icon-s')}</button>`}
+    <div class="grow"></div>${trash ? '<button class="btn btn-secondary">清空回收站</button>' : `<button class="btn btn-ghost">${icon('filter')}筛选</button><button class="btn btn-ghost btn-icon" aria-label="排序">${icon('sort')}</button>`}</div>
+    <div id="grid"></div></div>`;
+}
+
+function bottom() {
+  return `<nav class="bottom" aria-label="导航">
+    <button data-tab="recent" ${S.tab === 'recent' ? 'aria-current="page"' : ''}>${icon('clock')}最近</button>
+    <button class="up" aria-label="上传">${icon('upload')}</button>
+    <button data-tab="library" ${S.tab === 'library' ? 'aria-current="page"' : ''}>${icon('image')}图片</button>
+  </nav>`;
+}
+
+function render() {
+  const main = S.tab === 'recent' ? recent() : library(S.tab === 'trash');
+  document.getElementById('app').innerHTML = `${topbar()}<div class="body">${main}${reader()}</div>${bottom()}`;
+  const g = document.getElementById('grid');
+  if (g) {
+    const list = S.tab === 'trash' ? TRASH : IMAGES;
+    const rows = justify(list, g.clientWidth, innerWidth <= 720 ? 110 : 200, 8);
+    g.innerHTML = rows.map((r) => `<div class="jrow">${r.items.map((im) => `<button class="tile-img" style="width:${Math.floor((im.w / im.h) * r.h)}px;height:${Math.round(r.h)}px" aria-label="${esc(im.name)}"><img src="${im.src}" alt="" loading="lazy" /></button>`).join('')}</div>`).join('');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button, [data-sel]');
+  if (!t) return;
+  if (t.dataset.copy) { e.stopPropagation(); const f = FMTS.find((x) => x[0] === S.fmt)[1]; return toast(`已复制 ${f}`); }
+  if (t.dataset.fmt) { S.fmt = t.dataset.fmt; return render(); }
+  if (t.dataset.tab) { S.tab = t.dataset.tab; return render(); }
+  if (t.hasAttribute('data-close')) { S.sel = null; return render(); }
+  if (t.dataset.step) { S.sel = (S.sel + Number(t.dataset.step) + IMAGES.length) % IMAGES.length; return render(); }
+  if (t.dataset.sel != null && Number(t.dataset.sel) >= 0) { S.sel = Number(t.dataset.sel); return render(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (S.tab !== 'recent') return;
+  if (e.key === 'ArrowDown' || e.key === 'j') { S.sel = Math.min(IMAGES.length - 1, (S.sel ?? -1) + 1); render(); }
+  if (e.key === 'ArrowUp' || e.key === 'k') { S.sel = Math.max(0, (S.sel ?? 1) - 1); render(); }
+  if (e.key === 'Escape') { S.sel = null; render(); }
+});
+addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>

@@ -32,12 +32,15 @@ test('has no tag or visibility controls anywhere in the library', async ({ page 
   await checkPageHealth(page);
 });
 
-test('offers only the upload and manage token scopes and links the API reference', async ({ page }) => {
+test('offers only the upload and manage token scopes and links the API reference', async ({ page }, testInfo) => {
   await login(page);
   await page.goto('/tokens');
-  const docs = page.getByRole('link', { name: /API 文档/ });
-  await expect(docs).toHaveAttribute('href', '/docs/api');
-  await expect(docs).toHaveAttribute('target', '_blank');
+  // Phones keep the header to 新建令牌; the API reference stays in the command palette.
+  if (testInfo.project.name !== 'mobile') {
+    const docs = page.getByRole('link', { name: /API 文档/ });
+    await expect(docs).toHaveAttribute('href', '/docs/api');
+    await expect(docs).toHaveAttribute('target', '_blank');
+  }
 
   await page.getByRole('button', { name: '新建令牌' }).click();
   await expect(page.getByRole('checkbox', { name: '上传', exact: true })).toBeVisible();

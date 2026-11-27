@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SystemHead from '../components/SystemHead.svelte';
   import { onMount } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import Select from '../components/Select.svelte';
@@ -117,8 +118,15 @@
   function remembered(key: Key): Result | null {
     if (!status) return null;
     if (key === 'snapshot') {
+      // A missing or old snapshot is shown here rather than as a warning at the top or a dot in the navigation.
       const s = status.lastSnapshot;
-      return s ? { tone: 'idle', text: '', at: s.at, path: s.path } : null;
+      const stale = status.warnings.some((w) => w.code === 'snapshot-stale');
+      if (!s) return { tone: 'warning', text: '近期没有快照', at: null };
+      if (stale) {
+        const days = Math.max(1, Math.floor((Date.now() - new Date(s.at).getTime()) / 86_400_000));
+        return { tone: 'warning', text: `上次快照在 ${days} 天前`, at: null, path: s.path };
+      }
+      return { tone: 'idle', text: '', at: s.at, path: s.path };
     }
     const c = status.lastCheck;
     if (!c || c.mode !== key) return null;
@@ -238,23 +246,13 @@
 
   // ---- display ---------------------------------------------------------------------------------
   const used = $derived(status ? Math.max(0, status.disk.totalBytes - status.disk.freeBytes) : 0);
-  /** 图片 / 数据库 / 其他 / 可用: 其他 is what is used beyond the first two, never below 0. */
-  const parts = $derived.by(() => {
-    if (!status) return [];
-    const other = Math.max(0, used - status.images.bytes - status.database.bytes);
-    return [
-      { k: 'images', label: '图片', v: status.images.bytes },
-      { k: 'db', label: '数据库', v: status.database.bytes },
-      { k: 'other', label: '其他', v: other },
-      { k: 'free', label: '可用', v: status.disk.freeBytes },
-    ];
-  });
+  const usedShare = $derived(status && status.disk.totalBytes > 0 ? Math.min(1, used / status.disk.totalBytes) : 0);
   const uptime = $derived.by(() => {
     if (!status) return '';
     const days = Math.floor(status.uptimeSeconds / 86400);
     return days > 0 ? `${days} 天` : `${Math.max(1, Math.floor(status.uptimeSeconds / 3600))} 小时`;
   });
-  const warnings = $derived(status ? status.warnings : []);
+  const warnings = $derived(status ? status.warnings.filter((w) => w.code !== 'snapshot-stale') : []);
   const MAINT: { k: Key; name: string; btn: string; busy: string }[] = [
     { k: 'quick', name: '快速检查', btn: '检查', busy: '检查中…' },
     { k: 'full', name: '完整检查', btn: '检查', busy: '检查中…' },
@@ -263,18 +261,15 @@
 </script>
 
 <div class="panel-main">
-  <div class="head">
-    <div class="head-title">
-      <h1>状态</h1>
-    </div>
+  <SystemHead>
     <button type="button" class="btn btn-ghost" disabled={refreshing || phase === 'loading'} onclick={() => void refresh()}>
       <Icon name="refresh" />
       刷新
     </button>
-  </div>
+  </SystemHead>
   <div class="scroll">
     {#if phase === 'loading' || phase === 'error' || !status}
-      <div class="page page-wide">
+      <div class="page">
         {#if phase === 'error'}
           <div class="state" role="alert">
             <span class="t">状态加载失败</span>
@@ -286,9 +281,16 @@
         {/if}
       </div>
     {:else}
-      <div class="page page-wide">
-        {#if warnings.length > 0}
+      <div class="page">
+        {#if warnings.length > 0 || status.images.broken > 0}
           <section aria-label="警告">
+            {#if status.images.broken > 0}
+              <div class="warn-row" role="alert">
+                <span class="dot dot-danger"></span>
+                <span class="t">图片已损坏</span>
+                <span class="d num">{formatInt(status.images.broken)} 张</span>
+              </div>
+            {/if}
             {#each warnings as w (w.code)}
               <div class="warn-row" role="alert">
                 <span class="dot dot-warning"></span>
@@ -313,34 +315,21 @@
             <span class="k">回收站</span>
           </div>
           <div class="figure">
-            <span class="v">{formatInt(status.images.broken)}</span>
-            <span class="k">损坏</span>
-          </div>
-          <div class="figure">
             <span class="v">{formatBytes(status.database.bytes)}</span>
             <span class="k">数据库</span>
           </div>
+          <div class="figure">
+            <span class="v">{formatBytes(status.disk.freeBytes)}</span>
+            <span class="k">磁盘剩余</span>
+            <span
+              class="meter"
+              role="img"
+              aria-label={`磁盘已用 ${formatBytes(used)} / ${formatBytes(status.disk.totalBytes)}`}
+              title={`已用 ${formatBytes(used)} / ${formatBytes(status.disk.totalBytes)}`}
+            ><i style:width={`${usedShare * 100}%`}></i></span>
+          </div>
         </div>
 
-        <section class="section">
-          <div class="disk-head">
-            <h2>磁盘</h2>
-            <span class="muted num">已用 {formatBytes(used)} / {formatBytes(status.disk.totalBytes)}</span>
-          </div>
-          <div class="stack-bar" role="img" aria-label={parts.map((p) => `${p.label} ${formatBytes(p.v)}`).join('，')}>
-            {#each parts as p (p.k)}
-              <i class="sw-{p.k}" style:width={p.k === 'free' || status.disk.totalBytes <= 0 ? undefined : `${(p.v / status.disk.totalBytes) * 100}%`}></i>
-            {/each}
-          </div>
-          <dl class="legend">
-            {#each parts as p (p.k)}
-              <div>
-                <dt><i class="sw-{p.k}"></i>{p.label}</dt>
-                <dd>{formatBytes(p.v)}</dd>
-              </div>
-            {/each}
-          </dl>
-        </section>
 
         <section class="section">
           <h2>维护</h2>

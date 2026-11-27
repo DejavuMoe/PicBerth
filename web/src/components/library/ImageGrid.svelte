@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatBytes } from '../../lib/format';
+  import { middleEllipsis } from '../../lib/format';
   import { daysLeft, thumbSrc } from '../../lib/image';
   import { copyLink, type Library } from '../../lib/library.svelte';
   import { longpress } from '../../lib/longpress';
@@ -89,10 +89,13 @@
             {/if}
           </div>
           <div class="jt-cap">
-            <span class="name ellipsis">{im.filename}</span>
-            <span class="meta num">
-              {trash ? (daysLeft(im, lib.retention) ?? formatBytes(im.size)) : showFolder ? lib.label(im.folderId) : formatBytes(im.size)}
-            </span>
+            <!-- The name has its own line and keeps its extension; trash and filtered results add a second line. -->
+            <span class="name" title={im.filename}>{middleEllipsis(im.filename, r * row.h)}</span>
+            {#if trash}
+              <span class="meta num">{daysLeft(im, lib.retention) ?? ''}</span>
+            {:else if showFolder}
+              <span class="meta ellipsis">{lib.label(im.folderId)}</span>
+            {/if}
           </div>
         </div>
       {/each}

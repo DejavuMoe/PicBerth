@@ -2,6 +2,7 @@
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import Drawer from '../components/Drawer.svelte';
   import Sheet from '../components/Sheet.svelte';
+  import UploadQueue from '../components/UploadQueue.svelte';
   import ActiveFilters from '../components/library/ActiveFilters.svelte';
   import BulkActions from '../components/library/BulkActions.svelte';
   import DetailPanel from '../components/library/DetailPanel.svelte';
@@ -14,10 +15,10 @@
   import { Library } from '../lib/library.svelte';
   import { phone, wide } from '../lib/media.svelte';
   import { isTypingTarget } from '../lib/modal';
-  import { openRequest } from '../lib/open.svelte';
+  import { openImage, openRequest } from '../lib/open.svelte';
   import { bottomBar } from '../lib/toast.svelte';
   import { tree } from '../lib/tree.svelte';
-  import { onUploaded, setUploadTarget } from '../lib/upload.svelte';
+  import { onUploaded, setUploadTarget, type UploadItem } from '../lib/upload.svelte';
 
   let { mode }: { mode: 'library' | 'trash' } = $props();
 
@@ -90,6 +91,14 @@
   // Wide screens dock the detail beside the list; narrower ones use a drawer, phones a sheet.
   const variant = $derived(wide.matches && !phone.matches ? 'docked' : phone.matches ? 'sheet' : 'drawer');
   const openImg = $derived(lib.active);
+
+  // 查看 on an upload in the queue: open it here when it is in this folder, else go to its folder.
+  function openUpload(u: UploadItem) {
+    const img = u.image;
+    if (!img) return;
+    if (lib.items.some((i) => i.id === img.id)) lib.open(img.id);
+    else void openImage(img.id, img.folderId ?? null);
+  }
 
   async function focusSearch() {
     if (phone.matches) {
@@ -167,6 +176,9 @@
       </div>
     {/if}
     <div class="scroll" bind:this={scroller} onscroll={maybeLoadMore}>
+      {#if !trash}
+        <div class="lib-queue"><UploadQueue open={openUpload} folder={lib.folderId ? lib.label(lib.folderId) : ''} /></div>
+      {/if}
       {#if lib.view === 'grid' && lib.phase === 'ready'}
         <FolderChips {lib} />
       {/if}

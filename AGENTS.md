@@ -25,7 +25,7 @@
 Every commit message must end with this exact line as its sole `Co-Authored-By` trailer.
 
 ```text
-Co-Authored-By: DeepSeek v4.1 Flash Codex (1M context) <noreply@openai.com>
+Co-Authored-By: Codex with DeepSeek v4.1 Flash (1M context) <noreply@openai.com>
 ```
 
 ## Prototype-first gate
