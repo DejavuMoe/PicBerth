@@ -168,7 +168,7 @@ jobs:
         env:
           TAG: ghcr.io/dejavumoe/picberth:${{ github.ref_name }}
         run: |
-          python3 .github/scripts/publish_oci_image.py "build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$TAG"
+          python3 .github/scripts/publish_oci_image.py "build-$GITHUB_RUN_ID" "$TAG"
 
   release:
     if: github.event_name == 'push'

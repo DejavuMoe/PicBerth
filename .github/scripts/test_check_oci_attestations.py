@@ -60,34 +60,41 @@ class AttestationTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(self.fixture(directory), 'arm64')
 
+    def registry(self, directory, arm_options):
+        tags, contents, writes = {}, {}, []
+        for arch, options in [('amd64', {}), ('arm64', arm_options)]:
+            with tarfile.open(self.fixture(directory, arch=arch, **options)) as archive:
+                index = archive.extractfile('index.json').read()
+                contents[sha256(index)] = index
+                tags[f'registry.example/picberth:staged-{arch}'] = sha256(index)
+                for member in archive.getmembers():
+                    if member.name.startswith('blobs/sha256/'):
+                        contents[member.name.split('/', 1)[1].replace('/', ':', 1)] = archive.extractfile(member).read()
+
+        def run(group, command, reference, *options, data=None):
+            match group, command:
+                case 'image', 'digest':
+                    return tags[reference].encode()
+                case 'tag', 'ls':
+                    names = [tag.split(':', 1)[1] for tag in tags if tag.startswith(reference + ':')]
+                    return '\n'.join(names).encode()
+                case 'manifest', 'get':
+                    return contents[reference.split('@', 1)[1]]
+                case 'blob', 'get':
+                    return contents[options[0]]
+                case 'manifest', 'put':
+                    writes.append(json.loads(data))
+                    tags[reference] = sha256(data)
+                    return b''
+                case _:
+                    raise AssertionError((group, command, reference))
+
+        return tags, writes, run
+
     def test_publish_validates_both_architectures_before_writing(self):
         for arm_options in ({}, dict(provenance=False), dict(wrong=True), dict(reference=False)):
             with self.subTest(arm_options=arm_options), tempfile.TemporaryDirectory() as directory:
-                tags, contents, writes = {}, {}, []
-                for arch, options in [('amd64', {}), ('arm64', arm_options)]:
-                    with tarfile.open(self.fixture(directory, arch=arch, **options)) as archive:
-                        index = archive.extractfile('index.json').read()
-                        contents[sha256(index)] = index
-                        tags[f'registry.example/picberth:staged-{arch}'] = sha256(index)
-                        for member in archive.getmembers():
-                            if member.name.startswith('blobs/sha256/'):
-                                contents[member.name.split('/', 1)[1].replace('/', ':', 1)] = archive.extractfile(member).read()
-
-                def run(group, command, reference, *options, data=None):
-                    match group, command:
-                        case 'image', 'digest':
-                            return tags[reference].encode()
-                        case 'manifest', 'get':
-                            return contents[reference.split('@', 1)[1]]
-                        case 'blob', 'get':
-                            return contents[options[0]]
-                        case 'manifest', 'put':
-                            writes.append(json.loads(data))
-                            tags[reference] = sha256(data)
-                            return b''
-                        case _:
-                            raise AssertionError((group, command, reference))
-
+                tags, writes, run = self.registry(directory, arm_options)
                 if arm_options:
                     with self.assertRaises(ValueError):
                         publish('staged', 'registry.example/picberth:release', run=run)
@@ -97,3 +104,23 @@ class AttestationTest(unittest.TestCase):
                     self.assertEqual(len(writes), 1)
                     self.assertEqual([d['platform']['architecture'] for d in writes[0]['manifests']
                                       if 'platform' in d], ['amd64', 'arm64'])
+
+    def test_publish_never_replaces_an_existing_release_tag(self):
+        target = 'registry.example/picberth:release'
+        with tempfile.TemporaryDirectory() as directory:
+            tags, writes, run = self.registry(directory, {})
+            tags[target] = 'sha256:' + '1' * 64
+            with self.assertRaises(ValueError):
+                publish('staged', target, run=run)
+            self.assertEqual(writes, [])
+            self.assertEqual(tags[target], 'sha256:' + '1' * 64)
+
+    def test_publish_accepts_a_release_tag_it_already_wrote(self):
+        target = 'registry.example/picberth:release'
+        with tempfile.TemporaryDirectory() as directory:
+            tags, writes, run = self.registry(directory, {})
+            publish('staged', target, run=run)
+            published = tags[target]
+            publish('staged', target, run=run)
+            self.assertEqual(len(writes), 1)
+            self.assertEqual(tags[target], published)

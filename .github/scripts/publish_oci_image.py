@@ -51,6 +51,12 @@ def publish(source, target, run=regctl):
     combined = indexes[0]
     combined['manifests'].extend(indexes[1]['manifests'])
     body = json.dumps(combined, separators=(',', ':')).encode()
+    # A release tag is written once. Listing tags tells "absent" apart from a registry failure, which raises.
+    if target.rsplit(':', 1)[1] in run('tag', 'ls', repository).decode().split():
+        if run('image', 'digest', target).decode().strip() != sha256(body):
+            raise ValueError(f'{target} already exists with different content; refusing to replace it')
+        print(f'{target} is already published with this content', flush=True)
+        return
     run('manifest', 'put', target, data=body)
     if run('image', 'digest', target).decode().strip() != sha256(body):
         raise ValueError('Published image index digest mismatch')

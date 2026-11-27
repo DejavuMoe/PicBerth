@@ -36,9 +36,9 @@ jobs:
           git check-ref-format "refs/tags/$TAG"
           sha=$(git rev-parse "refs/tags/$TAG^{commit}")
           git merge-base --is-ancestor "$sha" origin/master
-          gh run view "$RUN" --json headSha,event,workflowName,attempt,jobs > run.json
+          gh run view "$RUN" --json headSha,event,workflowName,jobs > run.json
           jq -e --arg sha "$sha" '
-            .headSha == $sha and .event == "push" and .workflowName == "Release" and .attempt == 1 and
+            .headSha == $sha and .event == "push" and .workflowName == "Release" and
             ([.jobs[] | select(.name == "verify / ci-ok")] | length == 1 and all(.conclusion == "success")) and
             ([.jobs[] | select((.name | startswith("binaries (")) or (.name | startswith("image (")))] |
               length == 6 and all(.conclusion == "success"))
@@ -64,7 +64,7 @@ jobs:
           TAG: ghcr.io/dejavumoe/picberth:${{ inputs.tag }}
           RUN_ID: ${{ inputs.run_id }}
         run: |
-          python3 .github/scripts/publish_oci_image.py "build-$RUN_ID-1" "$TAG"
+          python3 .github/scripts/publish_oci_image.py "build-$RUN_ID" "$TAG"
 
   release:
     needs: manifest

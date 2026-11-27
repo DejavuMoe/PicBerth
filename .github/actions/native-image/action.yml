@@ -40,7 +40,9 @@ runs:
             args+=(--import-cache type=local,src=/cache)
           fi
         fi
-        image="ghcr.io/dejavumoe/picberth:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$ARCH"
+        # One staging tag per run and architecture: a re-run of only the failed jobs still finds the images
+        # an earlier attempt pushed.
+        image="ghcr.io/dejavumoe/picberth:build-$GITHUB_RUN_ID-$ARCH"
         if [[ "$PUSH" == true ]]; then
           output="type=image,name=$image,push=true"
         else
