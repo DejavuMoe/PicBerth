@@ -216,8 +216,12 @@ func (db *DB) backupBeforeMigration(ctx context.Context, from int) (string, erro
 	base := filepath.Join(dir, fmt.Sprintf("picberth-schema%d-%s", from, time.Now().UTC().Format("20060102T150405Z")))
 	name := base + ".db"
 	for i := 2; ; i++ { // VACUUM INTO refuses existing files; a retry within the same second must not fail
-		if _, err := os.Lstat(name); errors.Is(err, os.ErrNotExist) {
+		_, err := os.Lstat(name)
+		if errors.Is(err, os.ErrNotExist) {
 			break
+		}
+		if err != nil { // the name can neither be shown free nor taken: there is nothing to try next
+			return "", err
 		}
 		name = fmt.Sprintf("%s-%d.db", base, i)
 	}

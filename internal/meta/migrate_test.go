@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -317,4 +318,55 @@ func TestThumbnailIndexMigrationPreservesPendingImages(t *testing.T) {
 	if err != nil || len(ids) != 1 || ids[0] != broken {
 		t.Fatalf("repaired image not reselected after cursor: %v, %v", ids, err)
 	}
+}
+
+// When the backup directory cannot be searched, the upgrade must stop with an error rather than keep
+// looking for a free backup name.
+func TestPreMigrationBackupFailsWhenDirectoryIsUnreadable(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a directory the test user cannot search")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "picberth.db")
+	ms, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := openWith(ctx, path, ms)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	backups := filepath.Join(dir, "backups")
+	if err := os.Mkdir(backups, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(backups, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(backups, 0o700) })
+
+	next := append(append([]migration(nil), ms...), migration{version: len(ms) + 1, name: "extra.sql", sql: "CREATE TABLE extra(x INTEGER) STRICT;"})
+	done := make(chan error, 1)
+	go func() {
+		db, err := openWith(ctx, path, next)
+		if err == nil {
+			db.Close()
+		}
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("migrating without a backup must fail")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the upgrade hangs instead of reporting that the backup failed")
+	}
+	db, err = openWith(ctx, path, ms)
+	if err != nil {
+		t.Fatalf("the database must stay usable at the old schema: %v", err)
+	}
+	db.Close()
 }
