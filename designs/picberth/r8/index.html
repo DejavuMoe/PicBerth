@@ -70,7 +70,9 @@ const GROUPS = [
 ];
 const ALL = GROUPS.flatMap(([, xs]) => xs);
 const q = new URLSearchParams(location.search);
-let cur = q.get('s') || 'recent', t = q.get('theme') || 'dark';
+// Only known values from the address reach the page.
+let cur = ALL.find((x) => x[0] === q.get('s'))?.[0] ?? 'recent';
+let t = ['dark', 'light'].find((x) => x === q.get('theme')) ?? 'dark';
 function frame(src, w, h, scale, cap) {
   return `<div class="frame"><div class="cap"><span>${cap}</span><a href="${src}" target="_blank" rel="noopener">${w} × ${h}</a></div>
     <div class="box" style="width:${w * scale}px;height:${h * scale}px"><iframe title="${cap}" src="${src}" width="${w}" height="${h}" style="transform:scale(${scale})"></iframe></div></div>`;

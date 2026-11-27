@@ -41,7 +41,11 @@ const STATES = {
   c: [['ready', '默认'], ['one', '单选'], ['multi', '多选'], ['folder', '文件夹'], ['phone-folders', '手机：文件夹'], ['phone-detail', '手机：详情']],
 };
 const q = new URLSearchParams(location.search);
-let d = q.get('d') || 'a', t = q.get('theme') || 'dark', st = q.get('s') || 'ready';
+// Only known values from the address reach the page.
+const pick = (v, allowed, fallback) => allowed.find((x) => x === v) ?? fallback;
+let d = pick(q.get('d'), ['a', 'b', 'c'], 'a');
+let t = pick(q.get('theme'), ['dark', 'light'], 'dark');
+let st = pick(q.get('s'), STATES[d].map(([k]) => k), 'ready');
 
 function qs(dir, s) {
   const m = {
