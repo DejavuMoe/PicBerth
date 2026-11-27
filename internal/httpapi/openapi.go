@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"net/http"
 )
 
@@ -11,10 +13,16 @@ import (
 //go:embed openapi.json
 var openAPIDoc []byte
 
+// openAPIETag identifies the exact document served, so a client holding an older contract revalidates.
+var openAPIETag = func() string {
+	sum := sha256.Sum256(openAPIDoc)
+	return `"` + hex.EncodeToString(sum[:]) + `"`
+}()
+
 // handleOpenAPI serves the embedded contract. The document changes only with a release, so it is
 // cacheable for a day but always revalidated by ETag.
 func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request) {
-	etag := `"openapi-` + openAPIVersion + `"`
+	etag := openAPIETag
 	h := w.Header()
 	h.Set("Content-Type", "application/json")
 	h.Set("ETag", etag)
@@ -25,6 +33,3 @@ func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _ = w.Write(openAPIDoc)
 }
-
-// openAPIVersion is bumped whenever openapi.json changes, so clients revalidate.
-const openAPIVersion = "1"

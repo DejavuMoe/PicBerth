@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"picberth/internal/buildinfo"
 	"picberth/internal/config"
 )
 
@@ -31,7 +33,7 @@ func runCLI(t *testing.T, stdin string, args ...string) result {
 
 func TestVersionAndUsage(t *testing.T) {
 	r := runCLI(t, "", "version")
-	if r.code != 0 || !strings.Contains(r.stdout, "picberth v0.0.2-dev") {
+	if r.code != 0 || !strings.Contains(r.stdout, "picberth "+buildinfo.Version) {
 		t.Fatalf("version: %+v", r)
 	}
 	if r := runCLI(t, "", "frobnicate"); r.code != 2 {
@@ -218,4 +220,50 @@ func (s *syncBuf) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+// A release is cut from one version number. The places that repeat it must agree, so a bump that misses
+// one fails here instead of at release time.
+func TestVersionStringsAgree(t *testing.T) {
+	read := func(rel string) []byte {
+		t.Helper()
+		b, err := os.ReadFile(filepath.Join("..", "..", filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	var pkg struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(read("web/package.json"), &pkg); err != nil || pkg.Version == "" {
+		t.Fatalf("web/package.json version: %q %v", pkg.Version, err)
+	}
+	var api struct {
+		Info struct {
+			Version string `json:"version"`
+		} `json:"info"`
+	}
+	if err := json.Unmarshal(read("internal/httpapi/openapi.json"), &api); err != nil {
+		t.Fatal(err)
+	}
+	if api.Info.Version != pkg.Version {
+		t.Errorf("openapi.json info.version is %q, web/package.json has %q", api.Info.Version, pkg.Version)
+	}
+	dev := "v" + pkg.Version + "-dev"
+	if buildinfo.Version != dev {
+		t.Errorf("buildinfo.Version is %q, want %q", buildinfo.Version, dev)
+	}
+	for rel, want := range map[string]string{
+		"Dockerfile": "ARG VERSION=" + dev,
+		".github/actions/native-image/action.yml": "default: " + dev,
+	} {
+		found := false
+		for line := range strings.Lines(string(read(rel))) {
+			found = found || strings.TrimSpace(line) == want
+		}
+		if !found {
+			t.Errorf("%s has no line %q", rel, want)
+		}
+	}
 }

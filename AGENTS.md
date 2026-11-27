@@ -39,7 +39,7 @@ Go build embeds `internal/webui/dist`.
   builds with `CGO_ENABLED=0`.
 - The console uses Svelte 5 and Vite only. Do not add Next.js, Tailwind or any other CSS or UI framework.
 - All file access goes through the `os.Root` opened on the data directory. Never build a path from user input.
-- When the API changes, update `internal/httpapi/openapi.json` and bump `openAPIVersion` in the same change.
+- When the API changes, update `internal/httpapi/openapi.json` in the same change.
 - Comments state what the code does or why. Do not cite design rounds, review IDs or deleted documents.
 
 ## Product constraints

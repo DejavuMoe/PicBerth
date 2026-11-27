@@ -969,7 +969,7 @@
           "detail": { "type": "string" },
           "code": {
             "type": "string",
-            "enum": ["validation", "unauthorized", "forbidden", "not-found", "conflict", "folder-exists", "folder-not-empty", "folder-depth", "invalid-scope", "too-large", "unsupported-format", "invalid-image", "too-many-pixels", "setup-required", "setup-done", "rate-limited", "insufficient-storage", "internal"]
+            "enum": ["validation", "unauthorized", "forbidden", "not-found", "conflict", "folder-exists", "folder-not-empty", "folder-depth", "invalid-scope", "too-large", "unsupported-format", "invalid-image", "too-many-pixels", "setup-required", "setup-done", "rate-limited", "insufficient-storage", "trash-retention-changed", "internal"]
           }
         }
       }
