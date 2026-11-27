@@ -23,6 +23,7 @@ UMask=0077
 # Hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
+# Add PICBERTH_SNAPSHOT_DIR here when it lies outside the data directory.
 ReadWritePaths=/var/lib/picberth
 ProtectHome=yes
 PrivateTmp=yes

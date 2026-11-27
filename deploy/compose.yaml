@@ -29,6 +29,9 @@ services:
         max-file: "3"
     stop_grace_period: 30s
     read_only: true
+    # SQLite writes temporary files for large sorts and index builds; the root filesystem is read-only.
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
     cap_drop:
