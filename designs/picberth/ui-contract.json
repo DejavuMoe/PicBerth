@@ -369,6 +369,7 @@
           "recent-uploading",
           "recent-upload-menu",
           "recent-dest",
+          "recent-upload-signed-in",
           "recent-row-menu",
           "recent-drop",
           "recent-empty",
@@ -380,6 +381,7 @@
           "library-grid-folder",
           "library-detail",
           "library-uploading",
+          "library-upload-signed-in",
           "library-select",
           "library-select-grid",
           "library-filter",
@@ -456,7 +458,8 @@
           "web/src/screens/Tokens.svelte",
           "web/src/screens/Settings.svelte",
           "web/src/lib/router.svelte.ts",
-          "web/src/lib/upload.svelte.ts"
+          "web/src/lib/upload.svelte.ts",
+          "web/src/components/UploadList.svelte"
         ],
         "interfaces": [
           "GET /api/v1/images",
@@ -468,9 +471,11 @@
           "GET /api/v1/tokens",
           "GET /api/v1/settings"
         ],
-        "tests": []
+        "tests": [
+          "web/e2e/session.spec.ts"
+        ]
       },
-      "status": "implemented"
+      "status": "needs-review"
     }
   ]
 }

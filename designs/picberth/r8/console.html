@@ -297,7 +297,7 @@
 <div class="app" id="app"></div>
 <script src="data.js"></script>
 <script>
-const { IMAGES, TRASH, TOKENS, FOLDERS, SOURCES, FORMAT, STATUS, AUDIT, AUDIT_KINDS, BATCH, NOW, DAY, icon, esc, size, ago, stamp, dayGroup, midName, folderLabel, folderPath, children, directCount, inFolder, justify, toast, params } = PB;
+const { IMAGES, TRASH, TOKENS, FOLDERS, SOURCES, FORMAT, STATUS, AUDIT, AUDIT_KINDS, BATCH, BATCH_RESUMED, NOW, DAY, icon, esc, size, ago, stamp, dayGroup, midName, folderLabel, folderPath, children, directCount, inFolder, justify, toast, params } = PB;
 const FMTS = [['url', 'URL'], ['markdown', 'Markdown'], ['html', 'HTML'], ['bbcode', 'BBCode']];
 const S = {
   view: params.get('view') || 'recent',
@@ -313,6 +313,9 @@ const S = {
   overlay: null,
 };
 const st = (k) => S.state === k;
+// The upload queue is on screen while a batch runs and after signing in again part-way through one.
+const queue = () => (st('uploading') ? BATCH : st('upload-signed-in') ? BATCH_RESUMED : null);
+const queueCount = () => `${queue().filter((b) => b.st === 'done' || b.st === 'dup').length} / ${queue().length}`;
 const phone = () => innerWidth <= 720;
 const wide = () => innerWidth >= 1100;
 const fmtLabel = () => FMTS.find((f) => f[0] === S.fmt)[1];
@@ -442,6 +445,7 @@ function batchStatus(b) {
     case 'up': return `<div class="st"><div class="progress"><i style="width:${b.p}%"></i></div><span class="tabular" style="width:32px;text-align:right">${b.p}%</span></div><div class="act"></div>`;
     case 'wait': return `<div class="st">等待中</div><div class="act"></div>`;
     case 'big': return `<div class="st text-danger">超过单文件上限</div><div class="act"><button class="btn btn-ghost btn-sm" aria-label="移除 ${esc(b.img.name)}">移除</button></div>`;
+    case 'auth': return `<div class="st text-danger">登录已失效</div><div class="act"><button class="btn btn-ghost btn-sm" aria-label="重试 ${esc(b.img.name)}">重试</button><button class="btn btn-ghost btn-sm" aria-label="移除 ${esc(b.img.name)}">移除</button></div>`;
     case 'fmt': return `<div class="st text-danger">不支持的格式</div><div class="act"><button class="btn btn-ghost btn-sm" aria-label="移除 ${esc(b.img.name)}">移除</button></div>`;
   }
 }
@@ -450,7 +454,7 @@ function batchSub(b) {
   return S.view === 'recent' ? esc(folderLabel(S.dest)) : '';
 }
 function batchRows() {
-  return BATCH.map((b) => `<div class="item ${b.st === 'big' || b.st === 'fmt' ? 'fail' : ''}"><img src="${b.img.src}" alt="" />
+  return queue().map((b) => `<div class="item ${b.st === 'big' || b.st === 'fmt' || b.st === 'auth' ? 'fail' : ''}"><img src="${b.img.src}" alt="" />
     <div class="nm"><b title="${esc(b.img.name)}">${esc(b.img.name)}</b>${batchSub(b) ? `<span>${batchSub(b)}</span>` : ''}</div>${batchStatus(b)}</div>`).join('');
 }
 function recentRow(im, idx) {
@@ -473,7 +477,7 @@ function recent() {
     if (!grp) groups.push((grp = { k: g, items: [] }));
     grp.items.push([im, idx]);
   });
-  const batch = st('uploading') ? `<section class="group batch" aria-label="正在上传"><h2>正在上传<span class="n">3 / 7</span><button class="btn btn-ghost btn-sm" data-copy="all">${icon('copy')}<span class="d-only">复制全部链接</span></button></h2>${batchRows()}</section>` : '';
+  const batch = queue() ? `<section class="group batch" aria-label="正在上传"><h2>正在上传<span class="n">${queueCount()}</span><button class="btn btn-ghost btn-sm" data-copy="all">${icon('copy')}<span class="d-only">复制全部链接</span></button></h2>${batchRows()}</section>` : '';
   return `${batch}<div aria-label="最近">${groups.map((g) => `<section class="group"><h2>${g.k}<span class="n">${g.items.length}</span><button class="btn btn-ghost btn-sm d-only" data-copy="all" aria-label="复制全部链接">${icon('copy')}复制全部链接</button></h2>${g.items.map(([im, i]) => recentRow(im, i)).join('')}</section>`).join('')}
     <div style="padding:16px 0 0"><button class="btn btn-ghost" style="margin-left:-12px">加载更多</button></div></div>`;
 }
@@ -486,7 +490,7 @@ function currentList() {
   return inFolder(S.folder);
 }
 function tray() {
-  return `<section class="tray" aria-label="正在上传"><div class="tray-head"><span class="medium">正在上传</span><span class="muted tabular">3 / 7</span>
+  return `<section class="tray" aria-label="正在上传"><div class="tray-head"><span class="medium">正在上传</span><span class="muted tabular">${queueCount()}</span>
     ${S.folder ? `<span class="dest">${icon('folder')}${esc(folderLabel(S.folder))}</span>` : ''}<div class="grow"></div>
     <button class="btn btn-ghost btn-sm" data-copy="all">${icon('copy')}<span class="d-only">复制全部链接</span></button><button class="btn btn-ghost btn-icon btn-sm" aria-label="关闭">${icon('x')}</button></div>
     ${batchRows()}</section>`;
@@ -533,7 +537,7 @@ function library() {
   if (st('empty') && S.view === 'library') return `<div class="empty" style="height:100%">${icon('image')}<span class="t">还没有图片</span><span>拖入、粘贴或选择文件上传</span><button class="btn btn-primary" data-act="upload">${icon('upload')}选择文件</button></div>`;
   const subs = searching() || S.view === 'trash' ? [] : children(S.folder);
   const chips = st('filtered') || st('filtered-empty') ? `<div class="active-filters">${st('filtered') ? `<span class="chip" aria-pressed="true">PNG<button class="x" aria-label="移除 PNG">${icon('x', 'icon-s')}</button></span><span class="chip" aria-pressed="true">PicGo 笔记本<button class="x" aria-label="移除 PicGo 笔记本">${icon('x', 'icon-s')}</button></span><span class="chip" aria-pressed="true">ShareX 工作机<button class="x" aria-label="移除 ShareX 工作机">${icon('x', 'icon-s')}</button></span>` : `<span class="chip" aria-pressed="true">“zzzz”<button class="x" aria-label="移除 “zzzz”">${icon('x', 'icon-s')}</button></span>`}<button class="btn btn-ghost btn-sm">清除筛选</button></div>` : '';
-  return `${st('uploading') ? tray() : ''}${chips}
+  return `${queue() ? tray() : ''}${chips}
     ${subs.length ? `<div class="chips">${subs.map((f) => `<button class="fchip" data-folder="${f.id}">${icon('folder')}<span>${esc(f.name)}</span><span class="n">${directCount(f.id) || ''}</span></button>`).join('')}</div>` : ''}
     <div id="grid" class="${S.picked.size ? 'selecting' : ''}"></div>`;
 }

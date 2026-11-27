@@ -23,8 +23,7 @@
     },
     {
       "path": "r8/console.html",
-      "status": "approved",
-      "approvalEvidence": "Owner approved r8/console.html on 2026-11-27 (\"批准 console.html\"), keeping the new words 最近 and 系统 and accepting the new /recent route."
+      "status": "needs-review"
     }
   ]
 }

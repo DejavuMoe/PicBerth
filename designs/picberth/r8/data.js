@@ -131,6 +131,17 @@
     { img: { ...IMAGES[11], name: 'scan-large.png', size: 31457280 }, st: 'big' },
     { img: { ...IMAGES[7], name: 'scan-raw.tiff' }, st: 'fmt' },
   ];
+  // The same batch after the session ended part-way and the administrator signed in again: the three
+  // uploads the server refused can be retried, and the files that were still waiting go on by themselves.
+  const BATCH_RESUMED = [
+    { img: IMAGES[0], st: 'done' },
+    { img: IMAGES[1], st: 'done' },
+    { img: { ...IMAGES[9], name: 'IMG_5102.jpg' }, st: 'auth' },
+    { img: { ...IMAGES[14], name: 'IMG_5103.jpg' }, st: 'auth' },
+    { img: { ...IMAGES[11], name: 'IMG_5104.jpg' }, st: 'auth' },
+    { img: { ...IMAGES[7], name: 'IMG_5105.jpg' }, st: 'up', p: 18 },
+    { img: { ...IMAGES[5], name: 'IMG_5106.jpg' }, st: 'wait' },
+  ];
 
   // ---------------------------------------------------------------- helpers
   const folderById = Object.fromEntries(FOLDERS.map((f) => [f.id, f]));
@@ -253,5 +264,5 @@
     return rows;
   }
 
-  window.PB = { STATUS, AUDIT, AUDIT_KINDS, BATCH, NOW, MIN, HOUR, DAY, FOLDERS, IMAGES, TRASH, TOKENS, SOURCES, FORMAT, folderPath, folderLabel, children, directCount, inFolder, size, ago, stamp, dayGroup, midName, esc, icon, params, theme, toast, justify };
+  window.PB = { STATUS, AUDIT, AUDIT_KINDS, BATCH, BATCH_RESUMED, NOW, MIN, HOUR, DAY, FOLDERS, IMAGES, TRASH, TOKENS, SOURCES, FORMAT, folderPath, folderLabel, children, directCount, inFolder, size, ago, stamp, dayGroup, midName, esc, icon, params, theme, toast, justify };
 })();

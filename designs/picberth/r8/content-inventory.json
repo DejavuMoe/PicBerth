@@ -21268,6 +21268,289 @@
       "evidence": null,
       "flags": [],
       "notes": "existing console action or shortcut"
+    },
+    {
+      "id": "content-e70b96ebb1153536",
+      "text": "18%",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item:nth-of-type(6) > div.st:nth-of-type(2) > span.tabular",
+        "div#content > section.tray > div.item:nth-of-type(7) > div.st:nth-of-type(2) > span.tabular"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "state",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "existing state wording with synthetic value"
+    },
+    {
+      "id": "content-a949551bac232293",
+      "text": "2 / 7",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#content > section.group.batch > h2 > span.n",
+        "div#content > section.tray > div.tray-head:nth-of-type(1) > span.muted.tabular:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "domain-value",
+      "origin": "production-domain",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "synthetic fixture value (file name, size, dimension, date, id, link, count)"
+    },
+    {
+      "id": "content-094a016862198018",
+      "text": "IMG_5104.jpg",
+      "channels": [
+        "text",
+        "title"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(5) > div.nm:nth-of-type(1) > b",
+        "div#content > section.tray > div.item.fail:nth-of-type(6) > div.nm:nth-of-type(1) > b"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "domain-value",
+      "origin": "production-domain",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "synthetic fixture value (file name, size, dimension, date, id, link, count)"
+    },
+    {
+      "id": "content-a032977f33e48ce0",
+      "text": "IMG_5105.jpg",
+      "channels": [
+        "text",
+        "title"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item:nth-of-type(6) > div.nm:nth-of-type(1) > b",
+        "div#content > section.tray > div.item:nth-of-type(7) > div.nm:nth-of-type(1) > b"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "domain-value",
+      "origin": "production-domain",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "synthetic fixture value (file name, size, dimension, date, id, link, count)"
+    },
+    {
+      "id": "content-0be7fc7021eaad5c",
+      "text": "IMG_5106.jpg",
+      "channels": [
+        "text",
+        "title"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item:nth-of-type(7) > div.nm:nth-of-type(1) > b",
+        "div#content > section.tray > div.item:nth-of-type(8) > div.nm:nth-of-type(1) > b"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "domain-value",
+      "origin": "production-domain",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "synthetic fixture value (file name, size, dimension, date, id, link, count)"
+    },
+    {
+      "id": "content-0759032719bfdf71",
+      "text": "登录已失效",
+      "channels": [
+        "text"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(3) > div.st.text-danger:nth-of-type(2)",
+        "div#content > section.group.batch > div.item.fail:nth-of-type(4) > div.st.text-danger:nth-of-type(2)",
+        "div#content > section.group.batch > div.item.fail:nth-of-type(5) > div.st.text-danger:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(4) > div.st.text-danger:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(5) > div.st.text-danger:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(6) > div.st.text-danger:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "error",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": "web/src/lib/api.ts (SUMMARY.unauthorized)",
+      "flags": [],
+      "notes": "existing console error wording for an ended session"
+    },
+    {
+      "id": "content-bd83a729c8b782fd",
+      "text": "移除 IMG_5102.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(3) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(4) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "existing-approved-ui-copy",
+      "decision": "allow",
+      "evidence": "designs/picberth/content-inventory.json (revision 7, approved 2026-11-10)",
+      "flags": [],
+      "notes": "same wording approved in revision 7, with a synthetic file name"
+    },
+    {
+      "id": "content-64aa26ac1832ce29",
+      "text": "移除 IMG_5103.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(4) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(5) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "existing-approved-ui-copy",
+      "decision": "allow",
+      "evidence": "designs/picberth/content-inventory.json (revision 7, approved 2026-11-10)",
+      "flags": [],
+      "notes": "same wording approved in revision 7, with a synthetic file name"
+    },
+    {
+      "id": "content-7f96ec4a397e844e",
+      "text": "移除 IMG_5104.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(5) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)",
+        "div#content > section.tray > div.item.fail:nth-of-type(6) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(2)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "existing-approved-ui-copy",
+      "decision": "allow",
+      "evidence": "designs/picberth/content-inventory.json (revision 7, approved 2026-11-10)",
+      "flags": [],
+      "notes": "same wording approved in revision 7, with a synthetic file name"
+    },
+    {
+      "id": "content-9c1a61ad7c9e9f7f",
+      "text": "重试 IMG_5102.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(3) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)",
+        "div#content > section.tray > div.item.fail:nth-of-type(4) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "existing console action, named with a synthetic file name"
+    },
+    {
+      "id": "content-3b7cdde69de32aaa",
+      "text": "重试 IMG_5103.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(4) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)",
+        "div#content > section.tray > div.item.fail:nth-of-type(5) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "existing console action, named with a synthetic file name"
+    },
+    {
+      "id": "content-e27574dd4c100cea",
+      "text": "重试 IMG_5104.jpg",
+      "channels": [
+        "aria-label"
+      ],
+      "locations": [
+        "div#content > section.group.batch > div.item.fail:nth-of-type(5) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)",
+        "div#content > section.tray > div.item.fail:nth-of-type(6) > div.act:nth-of-type(3) > button.btn.btn-ghost:nth-of-type(1)"
+      ],
+      "visibility": [
+        "visible"
+      ],
+      "captures": [
+        "r8/console.html?state=upload-signed-in (1440 and 390 wide)"
+      ],
+      "purpose": "user-action",
+      "origin": "production-behavior",
+      "decision": "allow",
+      "evidence": null,
+      "flags": [],
+      "notes": "existing console action, named with a synthetic file name"
     }
   ]
 }
