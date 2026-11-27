@@ -85,14 +85,22 @@ jobs:
           test "$version" = "$(node -p 'require("./web/package.json").version')"
           binary=picberth
           if [[ "$GOOS" == windows ]]; then binary=picberth.exe; fi
-          mkdir -p package release
-          cp LICENSE package/
-          go build -a -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=$TAG -X picberth/internal/buildinfo.Commit=$GITHUB_SHA" -o "package/$binary" ./cmd/picberth
+          # Nothing may be added to the checkout before go build: an untracked file makes Go stamp the
+          # binary with vcs.modified=true although it was built from the tagged commit.
+          package="$RUNNER_TEMP/package"
+          mkdir -p "$package"
+          go build -a -trimpath -ldflags "-s -w -X picberth/internal/buildinfo.Version=$TAG -X picberth/internal/buildinfo.Commit=$GITHUB_SHA" -o "$package/$binary" ./cmd/picberth
+          if go version -m "$package/$binary" | grep -q 'vcs.modified=true'; then
+            echo 'The checkout was modified before the build' >&2
+            exit 1
+          fi
+          cp LICENSE "$package/"
+          mkdir -p release
           archive="picberth_${TAG}_${GOOS}_${GOARCH}"
           if [[ "$GOOS" == windows ]]; then
-            (cd package && zip "../release/$archive.zip" "$binary" LICENSE)
+            (cd "$package" && zip "$GITHUB_WORKSPACE/release/$archive.zip" "$binary" LICENSE)
           else
-            tar -czf "release/$archive.tar.gz" -C package "$binary" LICENSE
+            tar -czf "release/$archive.tar.gz" -C "$package" "$binary" LICENSE
           fi
           (cd release && sha256sum "$archive".* > "$archive.sha256" && sha256sum --check "$archive.sha256")
       - name: Attest release archives
