@@ -48,6 +48,8 @@ runs:
         else
           output="type=oci,name=$image,dest=/output/image.tar"
         fi
+        # BuildKit, the Dockerfile frontend (Dockerfile line 1) and the SBOM scanner are pinned by digest;
+        # update each tag together with its digest.
         docker run --rm --privileged \
           -v "$GITHUB_WORKSPACE:/src:ro" \
           -v "$HOME/.docker:/root/.docker:ro" \
@@ -57,7 +59,8 @@ runs:
           --frontend dockerfile.v0 --local context=/src --local dockerfile=/src \
           --opt "platform=linux/$ARCH" \
           --opt "build-arg:VERSION=$VERSION" --opt "build-arg:COMMIT=$GITHUB_SHA" \
-          --opt attest:provenance=mode=max --opt attest:sbom= \
+          --opt attest:provenance=mode=max \
+          --opt attest:sbom=generator=docker/buildkit-syft-scanner:1.12.1@sha256:873a7458c3c8ac8e32c7b796c10e1600b07b963d2aa000a72a2d97aaaa2d6315 \
           "${args[@]}" \
           --output "$output"
         if [[ "$PUSH" != true ]]; then
