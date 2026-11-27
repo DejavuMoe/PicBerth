@@ -40,7 +40,7 @@ echo 'your-secure-password' | picberth admin create --username admin --password-
 
 ## Docker 部署
 
-发布镜像为 `ghcr.io/dejavumoe/picberth:v0.0.2`。镜像基于 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。Compose 示例启用只读根文件系统，并从当前检出构建镜像：
+发布镜像为 `ghcr.io/dejavumoe/picberth:v0.0.2`。镜像基于 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。Compose 示例启用只读根文件系统，在 `/tmp` 挂载 tmpfs 供 SQLite 存放临时文件，并从当前检出构建镜像：
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -51,6 +51,7 @@ docker compose -f deploy/compose.yaml up -d --build
 - **切勿直接暴露端口**：示例中仅将端口绑定到宿主机的 `127.0.0.1:12433:12433`。**不要**配置为 `12433:12433`——Docker 发布端口会自动配置宿主机 iptables 规则并绕过 ufw / firewalld 防火墙，导致服务未经反代直接暴露于公网。
 - **存储卷建议**：Docker Desktop（macOS / Windows）用户请务必使用 Docker 命名卷（如 `picberth-data:/data`），避免宿主机文件夹绑定挂载导致的性能损耗与文件所有权权限问题。
 - **Docker 版本要求**：建议使用 Docker Engine ≥ 28.3.3（修复了 firewalld 重载后已发布端口暴露至局域网的安全漏洞 CVE-2025-54388，以及旧版回环端口绑定的隔离边界问题）。
+- **只读根文件系统**：容器以 `read_only: true` 运行时必须保留可写的 `/tmp`（示例使用 `tmpfs`）。否则大结果集排序以及升级时创建索引会因磁盘 I/O 错误而失败。
 - **内置 Caddy 示例**：若宿主机未安装独立反向代理，可使用 [`deploy/compose.caddy.yaml`](deploy/compose.caddy.yaml)，由同网络内的 Caddy 容器自动申请 TLS 证书并提供 HTTPS 接入。
 
 ---
@@ -81,7 +82,7 @@ PicBerth 设计为工作在反向代理之后，由代理层负责 TLS 终结与
 | `PICBERTH_IMAGE_URL` | `--image-url` | 同 `PUBLIC_URL` | 图片公开链接的基础地址，可配置为独立的图片域名或 CDN 地址 |
 | `PICBERTH_TRUSTED_PROXIES` | `--trusted-proxies` | 空 | 受信任反向代理 IP 或 CIDR（逗号分隔）；本机代理填写 `127.0.0.1` |
 | `PICBERTH_HARD_MAX_UPLOAD` | `--hard-max-upload` | `104857600` (100 MiB) | 单文件上传大小的硬上限（字节） |
-| `PICBERTH_SNAPSHOT_DIR` | `--snapshot-dir` | `<数据目录>/snapshots` | 快照默认输出目录 |
+| `PICBERTH_SNAPSHOT_DIR` | `--snapshot-dir` | `<数据目录>/snapshots` | 快照默认输出目录；使用 systemd 单元时，数据目录之外的路径须加入 `ReadWritePaths` |
 | `PICBERTH_LOG_LEVEL` | `--log-level` | `info` | 日志级别（`debug`、`info`、`warn`、`error`） |
 | `PICBERTH_LOG_FORMAT` | `--log-format` | `text` | 日志输出格式（`text` 或 `json`） |
 
@@ -149,7 +150,7 @@ picberth check --full --data-dir /var/lib/picberth-new
 - **自动迁移与回滚**：程序启动时会自动执行 SQLite 迁移。在执行架构迁移前，系统会自动将元数据库副本备份至 `<数据目录>/backups/picberth-schema<N>-<UTC>.db`（最多保留最新的 5 份）。若数据库架构版本高于程序支持版本，程序将拒绝启动；此时切回旧版二进制并将该备份替换回 `picberth.db` 即可安全回滚。
 - **完整性检查机制**：
   - **快速检查**（`quick`）：校验活跃与回收站记录的文件路径与大小，自动补全中断的移动操作，清理过期上传临时碎片。
-  - **完整检查**（`full`）：在快速检查基础上重新计算并比对所有文件的 SHA-256 哈希，将无引用的孤立文件移入 `<数据目录>/quarantine/`（绝不会静默删除）。只有通过完整检查才能清除图片的损坏标记（`broken_at`）。
+  - **完整检查**（`full`）：在快速检查基础上重新计算并比对所有文件的 SHA-256 哈希，将无引用的孤立文件移入 `<数据目录>/quarantine/`（绝不会静默删除）。只有通过完整检查才能清除图片的损坏标记（`broken_at`）。同时将缺失或为空的缩略图排入重新生成队列。
 
 ---
 
@@ -225,14 +226,14 @@ linux-task.ps1 -Mode build -Project <项目路径> -Command 'export PATH="$HOME/
 gh workflow run release.yml --ref master -f version=v0.0.2
 ```
 
-正式发布时，更新 `web/package.json`、`internal/buildinfo/buildinfo.go`、`Dockerfile` 与 `internal/httpapi/openapi.json` 中的版本，确认目标提交已在 `master` 上且 CI、CodeQL、Scorecard 与演练全部成功，然后推送附注标签：
+正式发布时，更新 `web/package.json`、`internal/buildinfo/buildinfo.go`、`Dockerfile`、`.github/actions/native-image/action.yml` 与 `internal/httpapi/openapi.json` 中的版本（不一致时 `go test ./cmd/picberth` 会失败），确认目标提交已在 `master` 上且 CI、CodeQL、Scorecard 与演练全部成功，然后推送附注标签：
 
 ```sh
 git tag -a v0.0.2 <verified-commit-sha> -m "PicBerth v0.0.2"
 git push origin v0.0.2
 ```
 
-标签触发发布：创建带自动生成说明的 GitHub Release，并推送镜像 `ghcr.io/dejavumoe/picberth:<tag>`。不发布 `latest` 或缩写版本别名，也不覆写已有标签。
+标签触发发布：创建带自动生成说明的 GitHub Release，并推送镜像 `ghcr.io/dejavumoe/picberth:<tag>`。不发布 `latest` 或缩写版本别名，也不覆写已有标签：镜像标签已存在且内容不同时，发布会停止。发布运行中途失败时，使用“Re-run failed jobs”继续，该次运行已构建的镜像会被复用。
 
 压缩包包含程序与 MIT 许可证，`SHA256SUMS` 是单独的 Release 附件；压缩包同时有 GitHub 构建证明。发布的容器镜像包含 SBOM 与构建来源证明。
 

@@ -40,7 +40,7 @@ Then configure your reverse proxy (Caddy or Nginx) to forward public traffic to 
 
 ## Docker Deployment
 
-The release image is `ghcr.io/dejavumoe/picberth:v0.0.2`. It uses `gcr.io/distroless/static-debian13:nonroot`, runs as UID/GID `65532:65532`, and contains no shell. The Compose example enables a read-only root filesystem and builds from the current checkout:
+The release image is `ghcr.io/dejavumoe/picberth:v0.0.2`. It uses `gcr.io/distroless/static-debian13:nonroot`, runs as UID/GID `65532:65532`, and contains no shell. The Compose example enables a read-only root filesystem, mounts a tmpfs at `/tmp` for SQLite temporary files, and builds from the current checkout:
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -51,6 +51,7 @@ docker compose -f deploy/compose.yaml up -d --build
 - **Do not publish ports directly to public interfaces**: The example configuration binds ports exclusively to host `127.0.0.1:12433:12433`. **Never** configure `12433:12433`—Docker writes its own iptables rules and bypasses host ufw / firewalld firewalls, exposing the service directly to the public Internet without reverse proxy protection.
 - **Volume recommendations**: On Docker Desktop (macOS / Windows), always use Docker named volumes (e.g. `picberth-data:/data`) to avoid filesystem performance bottlenecks and ownership quirks associated with host directory bind mounts.
 - **Docker version requirement**: Docker Engine ≥ 28.3.3 is recommended (resolves CVE-2025-54388, where published ports became reachable from the LAN after a firewalld reload, and fixes loopback publishing isolation boundaries).
+- **Read-only root filesystem**: Keep a writable `/tmp` (the examples use `tmpfs`) whenever the container runs with `read_only: true`. Without it, large sorts and index builds during an upgrade fail with a disk I/O error.
 - **Embedded Caddy example**: If the host lacks an existing reverse proxy, use [`deploy/compose.caddy.yaml`](deploy/compose.caddy.yaml), where an in-network Caddy container automatically provisions TLS certificates and provides HTTPS access.
 
 ---
@@ -81,7 +82,7 @@ Settings are evaluated in order of precedence: **CLI flags > Environment variabl
 | `PICBERTH_IMAGE_URL` | `--image-url` | Same as `PUBLIC_URL` | Base URL for public image links; can be pointed to a dedicated CDN or image domain |
 | `PICBERTH_TRUSTED_PROXIES` | `--trusted-proxies` | Empty | Comma-separated list of trusted proxy IPs or CIDRs; use `127.0.0.1` for local proxies |
 | `PICBERTH_HARD_MAX_UPLOAD` | `--hard-max-upload` | `104857600` (100 MiB) | Hard maximum upload size per file (in bytes) |
-| `PICBERTH_SNAPSHOT_DIR` | `--snapshot-dir` | `<data-dir>/snapshots` | Default output directory for snapshots |
+| `PICBERTH_SNAPSHOT_DIR` | `--snapshot-dir` | `<data-dir>/snapshots` | Default output directory for snapshots; under the systemd unit, add a directory outside the data directory to `ReadWritePaths` |
 | `PICBERTH_LOG_LEVEL` | `--log-level` | `info` | Logging level (`debug`, `info`, `warn`, `error`) |
 | `PICBERTH_LOG_FORMAT` | `--log-format` | `text` | Logging output format (`text` or `json`) |
 
@@ -149,7 +150,7 @@ If a restore is interrupted, leave the partial directory in place. Run the resto
 - **Automated migrations and rollback**: Database migrations run automatically on startup. Before migrating, the system creates an automated schema backup at `<data-dir>/backups/picberth-schema<N>-<UTC>.db` (retaining the 5 newest copies). If the database schema is newer than the binary, startup is refused; roll back safely by restoring `picberth.db` from this pre-migration copy with the previous binary version.
 - **Integrity checking mechanisms**:
   - **Quick check** (`quick`): Verifies file presence and sizes for active and trashed records, completes interrupted moves, and cleans expired temporary upload chunks.
-  - **Full check** (`full`): In addition to quick checks, recalculates and compares SHA-256 hashes for all files and quarantines untracked orphan files into `<data-dir>/quarantine/` (orphans are never automatically deleted). Only a successful full check clears image corruption flags (`broken_at`).
+  - **Full check** (`full`): In addition to quick checks, recalculates and compares SHA-256 hashes for all files and quarantines untracked orphan files into `<data-dir>/quarantine/` (orphans are never automatically deleted). Only a successful full check clears image corruption flags (`broken_at`). It also queues missing or empty thumbnails for regeneration.
 
 ---
 
@@ -225,14 +226,14 @@ Run a rehearsal before every release. It runs the full CI and builds the four pl
 gh workflow run release.yml --ref master -f version=v0.0.2
 ```
 
-To release, update the version in `web/package.json`, `internal/buildinfo/buildinfo.go`, `Dockerfile` and `internal/httpapi/openapi.json`, confirm that CI, CodeQL, Scorecard and the rehearsal succeeded for the target commit on `master`, then push an annotated tag:
+To release, update the version in `web/package.json`, `internal/buildinfo/buildinfo.go`, `Dockerfile`, `.github/actions/native-image/action.yml` and `internal/httpapi/openapi.json` (`go test ./cmd/picberth` fails when they disagree), confirm that CI, CodeQL, Scorecard and the rehearsal succeeded for the target commit on `master`, then push an annotated tag:
 
 ```sh
 git tag -a v0.0.2 <verified-commit-sha> -m "PicBerth v0.0.2"
 git push origin v0.0.2
 ```
 
-The tag publishes the GitHub Release with generated notes and the image `ghcr.io/dejavumoe/picberth:<tag>`. No `latest` or shortened version alias is published, and an existing tag is never overwritten.
+The tag publishes the GitHub Release with generated notes and the image `ghcr.io/dejavumoe/picberth:<tag>`. No `latest` or shortened version alias is published, and an existing tag is never overwritten: publishing stops when the image tag already exists with different content. If a release run fails part-way, use "Re-run failed jobs"; the images already built for that run are reused.
 
 Each release archive contains the binary and MIT license. `SHA256SUMS` is a separate release asset; archives also have GitHub build attestations. Released container images include an SBOM and build provenance.
 
