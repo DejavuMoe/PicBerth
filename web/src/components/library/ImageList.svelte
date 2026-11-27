@@ -28,7 +28,7 @@
         class="row"
         style="height: 48px; padding: 0 var(--gutter); gap: 16px; border-bottom: var(--bw) solid var(--hairline)"
       >
-        <div class="skeleton" style="width: 32px; height: 32px; margin-left: 36px"></div>
+        <div class="skeleton" style="width: 32px; height: 32px"></div>
         <div class="skeleton" style="width: {30 + ((i * 17) % 30)}%; height: 10px"></div>
         <span class="grow"></span>
         <div class="skeleton" style="width: 56px; height: 10px"></div>

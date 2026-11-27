@@ -5,7 +5,7 @@
   import Menu from '../components/Menu.svelte';
   import Seg from '../components/Seg.svelte';
   import Sheet from '../components/Sheet.svelte';
-  import UploadList from '../components/UploadList.svelte';
+  import UploadQueue from '../components/UploadQueue.svelte';
   import DetailPanel from '../components/library/DetailPanel.svelte';
   import FolderTargets from '../components/library/FolderTargets.svelte';
   import PurgeConfirm from '../components/library/PurgeConfirm.svelte';
@@ -22,7 +22,6 @@
   import { tree } from '../lib/tree.svelte';
   import type { Image, LinkFormat } from '../lib/types';
   import {
-    clearFinished,
     LINK_FORMATS,
     onUploaded,
     setLinkFormat,
@@ -85,9 +84,6 @@
   });
 
   const queue = $derived(uploads.items);
-  const doneItems = $derived(queue.filter((u) => u.status === 'done' && u.image));
-  const busy = $derived(queue.some((u) => u.status === 'queued' || u.status === 'uploading' || u.status === 'processing'));
-  const queueTitle = $derived(busy ? '正在上传' : doneItems.length > 0 ? '上传完成' : '上传失败');
 
   /** Where an image is: the folder path without the root, or 图片 for the root itself. */
   function place(id: string | null): string {
@@ -188,27 +184,7 @@
   {/if}
 
   <div class="scroll rc-scroll" bind:this={scroller} onscroll={maybeLoadMore}>
-    {#if queue.length > 0}
-      <section class="rc-group rc-queue" aria-label={queueTitle}>
-        <h2>
-          {queueTitle}
-          <span class="n num">{doneItems.length} / {queue.length}</span>
-          <span class="grow"></span>
-          {#if doneItems.length > 1}
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void copyLinks(doneItems.map((u) => u.image!))}>
-              <Icon name="copy" size="s" />
-              复制全部链接
-            </button>
-          {/if}
-          {#if !busy}
-            <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="关闭" title="关闭" onclick={() => clearFinished()}>
-              <Icon name="x" />
-            </button>
-          {/if}
-        </h2>
-        <div class="rc-queue-list"><UploadList open={openUpload} /></div>
-      </section>
-    {/if}
+    <div class="rc-queue"><UploadQueue open={openUpload} /></div>
 
     {#if lib.phase === 'loading'}
       <div aria-busy="true" aria-label="加载中">

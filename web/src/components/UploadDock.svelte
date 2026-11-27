@@ -1,7 +1,7 @@
 <script lang="ts">
   import { copyLinks } from '../lib/library.svelte';
   import { openImage } from '../lib/open.svelte';
-  import { router } from '../lib/router.svelte';
+  import { isLibraryPath, router } from '../lib/router.svelte';
   import { clearFinished, uploads, type UploadItem } from '../lib/upload.svelte';
   import Icon from './Icon.svelte';
   import UploadList from './UploadList.svelte';
@@ -30,8 +30,8 @@
 
 </script>
 
-<!-- 最近 lists the queue in place, so the dock stays away there. -->
-{#if items.length > 0 && router.path !== '/recent'}
+<!-- 最近 and the library list the queue in place, so the dock stays away there. -->
+{#if items.length > 0 && router.path !== '/recent' && !isLibraryPath(router.path)}
   <section class="dock" aria-label="上传">
     <div class="dock-head">
       <span class="t">{title}</span>

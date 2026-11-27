@@ -84,3 +84,41 @@ export const FORMAT_NAMES: Record<string, string> = {
 export function formatNames(formats: readonly string[]): string[] {
   return formats.map((f) => FORMAT_NAMES[f] ?? f.toUpperCase());
 }
+
+// Approximate advance widths at 13 px: CJK and full-width ≈ 13, Latin ≈ 7.
+const charWidth = (c: string) => (/[⺀-￿]/.test(c) ? 13 : 7);
+const textWidth = (s: string) => [...s].reduce((a, c) => a + charWidth(c), 0);
+
+/**
+ * Shorten a file name in the middle so it fits about `px` wide, keeping the start and the extension
+ * (screenshot-2026…52210.png), so similar names stay distinguishable.
+ */
+export function middleEllipsis(name: string, px: number): string {
+  if (textWidth(name) <= px) return name;
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 && name.length - dot <= 6 ? name.slice(dot) : '';
+  const chars = [...(ext ? name.slice(0, dot) : name)];
+  let budget = px - textWidth(ext) - 13;
+  let head = '';
+  let tail = '';
+  let i = 0;
+  let j = chars.length - 1;
+  while (i <= j && budget > 0) {
+    if (textWidth(head) <= textWidth(tail) * 1.6) {
+      const c = chars[i]!;
+      budget -= charWidth(c);
+      if (budget >= 0) {
+        head += c;
+        i++;
+      }
+    } else {
+      const c = chars[j]!;
+      budget -= charWidth(c);
+      if (budget >= 0) {
+        tail = c + tail;
+        j--;
+      }
+    }
+  }
+  return `${head}…${tail}${ext}`;
+}

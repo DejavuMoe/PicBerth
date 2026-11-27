@@ -75,17 +75,21 @@ drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced
 - Moving images: bulk 移动, 移动到… in the row menu, the 文件夹 row in the image detail, and drag and drop onto a
   tree node or a breadcrumb ancestor (dragging a selected image drags the whole selection; a collapsed node
   expands after 0.7 s of hovering). Every move toasts with 撤销.
-- List (default on every width): 40 px rows with a checkbox column that fades in, thumbnail, name, then
-  dimensions, size and relative time; the trash and filtered results add 文件夹. Columns hide as the width
-  narrows. Row actions: copy in the current link format, and a ⋯ menu (复制为 URL / Markdown / HTML / BBCode,
-  移动到…, 下载原图, 移到回收站). They show on hover or focus and always on touch. No footer count; paging loads
+- List: rows with the thumbnail on the gutter (in line with the title); its checkbox appears over the thumbnail on
+  hover or focus, and stays while selecting. Then name, dimensions, size and relative time; the trash and filtered
+  results add 文件夹. Columns hide as the width narrows. Row actions are always visible, muted until the row is
+  hovered: copy in the current link format, and a ⋯ menu (复制为 URL / Markdown / HTML / BBCode, 移动到…, 下载原图,
+  移到回收站). On touch there are no checkboxes until a selection starts (选择 in the 显示 menu, or a long press). No footer count; paging loads
   automatically (加载中…, with a retry button on failure).
-- Grid: tiles with radius 12, 4:3 cover image, name inside.
+- Grid: justified rows of true-proportion images. The name has a line of its own under the image and is shortened in
+  the middle so its extension stays visible; the trash adds 「N 天后清除」 and filtered results the folder on a
+  second line.
 - Image detail: ≥ 1440 px a docked column inside the panel; 721–1439 px a right drawer; phones a bottom sheet.
   Top bar ‹ › ×. Order: preview (checkerboard for transparent images, 打开原图), the filename as an editable
   title, meta line, link tabs URL / Markdown / HTML / BBCode with a copy field, then the property list: 文件夹,
   来源, 上传时间, 删除时间 (trash), ID, SHA-256. Footer 下载 / 移到回收站 (trash: 恢复 / 永久删除).
-- Uploads go to the current folder. The inline upload tray shows the folder for uploads outside the root; the
+- Uploads go to the current folder. The upload queue is listed in place above the images (the floating panel is
+  used only on other screens) and names the folder for uploads outside the root; the
   window-wide drop overlay names the destination folder. Purge confirm is the only confirmation dialog besides
   leaving unsaved settings; trash, move and folder delete offer 撤销 instead.
 - Filters and sort live in the URL: `q`, `format` (repeatable), `date` (`today | 7d | 30d | older`), `source`
@@ -104,11 +108,15 @@ drawer, sheet) animate in and out; all motion is disabled under `prefers-reduced
 - Settings: centred column with sections 上传 (单文件上限, 格式, 重复检测) / 回收站 (保留时间) / 操作记录
   (保留时间, 7–3650 days) / 地址 (read-only). Number fields have a fixed width with the unit inside the field.
   Unsaved changes show a floating bar at the bottom of the screen (放弃 / 保存), above the tab bar on phones.
-- Status: warning alerts (a stale snapshot is shown on the 快照 row instead); five figures in one card (图片, 占用空间, 回收站, 数据库,
-  磁盘剩余 with a usage bar); maintenance rows; run information (including 已运行); 操作记录 with 保留 N 天, a
-  filter (全部操作, 图片, 文件夹, 令牌, 设置, 系统, 登录; server-side `kind`) and pages of 10 with 加载更多.
+- 系统 pages are one centred column (760 px).
+- Status: warning alerts (a broken image is listed as 图片已损坏; a missing or old snapshot is shown on the 快照 row
+  as 近期没有快照 / 上次快照在 N 天前 instead); five figures in one card (图片, 占用空间, 回收站, 数据库, 磁盘剩余
+  with a thin usage bar; no whole-disk breakdown); maintenance rows; run information (including 已运行); 操作记录
+  with 保留 N 天, a filter (全部操作, 图片, 文件夹, 令牌, 设置, 系统, 登录; server-side `kind`) and pages of 10 with
+  加载更多.
 - Tokens: a list with a small header row; scopes 上传 and 管理; 吊销 turns into 确认吊销 for 4 s and revokes on
-  the second press; the expiry is picked with the product-drawn select. The header links API 文档 (new tab).
+  the second press; the expiry is picked with the product-drawn select. The header links API 文档 (new tab; on phones only
+  新建令牌, as an icon button, and API 文档 stays in the command palette).
 - API reference (`/docs/api`): a page of its own with a contents column (a contents row on phones), copy buttons
   on code blocks and a link to `/api/v1/openapi.json`.
 ## Code layout

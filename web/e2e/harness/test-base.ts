@@ -56,12 +56,16 @@ export async function checkPageHealth(page: Page) {
 
 /** A tile of the grid or a row of the list (not the upload panel). */
 export function libraryItem(page: Page, filename: string) {
-  return page.locator('table.table tbody tr, .jgrid .jt').filter({ hasText: filename });
+  // Grid captions shorten long names in the middle; the full name is the tile's accessible name.
+  return page
+    .locator('table.table tbody tr')
+    .filter({ hasText: filename })
+    .or(page.locator('.jgrid .jt').filter({ has: page.getByTitle(filename, { exact: true }) }));
 }
 
-/** A row of the upload panel. */
+/** A row of the upload queue: in place on 最近 and in the library, the floating dock elsewhere. */
 export function uploadRow(page: Page, filename: string) {
-  return page.locator('.dock .up-row').filter({ hasText: filename });
+  return page.locator('.upq .up-row, .dock .up-row').filter({ hasText: filename });
 }
 
 /** Waits until every named upload has finished (its row offers 查看), then closes the panel. */
@@ -69,8 +73,8 @@ export async function finishUploads(page: Page, filenames: string[]) {
   for (const name of filenames) {
     await expect(uploadRow(page, name).getByRole('button', { name: '查看', exact: true })).toBeVisible();
   }
-  await page.locator('.dock').getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(page.locator('.dock')).toHaveCount(0);
+  await page.locator('.upq, .dock').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.locator('.upq, .dock')).toHaveCount(0);
 }
 
 export async function storedImages(page: Page, filename: string, state: ImageState = 'active') {
