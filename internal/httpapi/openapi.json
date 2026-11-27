@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PicBerth API",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "JSON API of the PicBerth single-user image host. All endpoints live under /api/v1. Errors are RFC 9457 problem documents with a stable `code`. Session-authenticated unsafe requests must send `X-PicBerth-Client: web`; token-authenticated requests need no extra header.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },

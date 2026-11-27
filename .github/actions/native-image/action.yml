@@ -5,7 +5,7 @@ inputs:
     required: true
     description: Native Linux CPU architecture
   version:
-    default: v0.0.2-dev
+    default: v0.0.3-dev
     description: Release version
   push:
     default: 'false'
