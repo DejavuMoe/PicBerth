@@ -6,6 +6,8 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"image/png"
+	"runtime"
 	"testing"
 )
 
@@ -302,5 +304,36 @@ func TestThumbnailGIFFrameBeyondLimit(t *testing.T) {
 	_, _, err := Thumbnail(bytes.NewReader(b), int64(len(b)), info, 10, 1<<20)
 	if !errors.Is(err, ErrTooManyPixels) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// A source with one very long and one very short side must not be handed whole to the kernel scaler,
+// whose working memory grows with the source length of each axis.
+func TestThumbnailExtremeAspectIsBounded(t *testing.T) {
+	for _, dim := range [][2]int{{4_000_000, 1}, {1, 4_000_000}, {1_000_000, 3}} {
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, dim[0], dim[1]))); err != nil {
+			t.Fatal(err)
+		}
+		data := buf.Bytes()
+		info, err := Inspect(bytes.NewReader(data), int64(len(data)), Limits{MaxPixels: 50_000_000})
+		if err != nil {
+			t.Fatalf("%dx%d: Inspect: %v", dim[0], dim[1], err)
+		}
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		out, ext, err := Thumbnail(bytes.NewReader(data), int64(len(data)), info, 480, 25_000_000)
+		runtime.ReadMemStats(&after)
+		if err != nil {
+			t.Fatalf("%dx%d: Thumbnail: %v", dim[0], dim[1], err)
+		}
+		b := decodeOut(t, out, ext).Bounds()
+		if b.Dx() > 480 || b.Dy() > 480 || b.Dx() < 1 || b.Dy() < 1 || (b.Dx() != 480 && b.Dy() != 480) {
+			t.Errorf("%dx%d: thumbnail is %dx%d", dim[0], dim[1], b.Dx(), b.Dy())
+		}
+		// Decoding the source itself costs a few MiB; the old code path needed hundreds.
+		if got := (after.TotalAlloc - before.TotalAlloc) >> 20; got > 64 {
+			t.Errorf("%dx%d: thumbnail allocated %d MiB", dim[0], dim[1], got)
+		}
 	}
 }

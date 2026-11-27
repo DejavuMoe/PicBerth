@@ -18,8 +18,8 @@ const (
 	// defaultThumbPixels is used when maxPixels <= 0 (25 megapixels).
 	defaultThumbPixels int64 = 25_000_000
 	jpegQuality              = 82
-	// preReduceRatio: sources at least this many times larger than the target (per axis) are first
-	// shrunk with the cheap ApproxBiLinear scaler to twice the target size, then finished with CatmullRom.
+	// preReduceRatio: an axis at least this many times longer than its target is first shrunk with the
+	// cheap ApproxBiLinear scaler to twice the target size; CatmullRom then finishes both axes.
 	preReduceRatio = 4
 )
 
@@ -66,8 +66,17 @@ func thumbnail(r io.ReaderAt, size int64, info Info, maxDim int, maxPixels int64
 		img = image.NewRGBA(image.Rect(0, 0, tw, th))
 		draw.Draw(img, img.Bounds(), src, sb.Min, draw.Src)
 	default:
-		if sb.Dx() >= preReduceRatio*tw && sb.Dy() >= preReduceRatio*th {
-			mid := image.NewRGBA(image.Rect(0, 0, 2*tw, 2*th))
+		// Each axis is reduced on its own: a very long, very thin source has one axis that cannot shrink,
+		// and the kernel scaler's working memory grows with the source length of every axis it is given.
+		mw, mh := sb.Dx(), sb.Dy()
+		if mw >= preReduceRatio*tw {
+			mw = 2 * tw
+		}
+		if mh >= preReduceRatio*th {
+			mh = 2 * th
+		}
+		if mw != sb.Dx() || mh != sb.Dy() {
+			mid := image.NewRGBA(image.Rect(0, 0, mw, mh))
 			draw.ApproxBiLinear.Scale(mid, mid.Bounds(), src, sb, draw.Src, nil)
 			src, sb = mid, mid.Bounds()
 		}
