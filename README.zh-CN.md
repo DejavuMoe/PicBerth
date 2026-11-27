@@ -13,7 +13,7 @@
 - **默认安全基线**：默认仅监听本地回环地址 `127.0.0.1:12433`；图片格式由内容判定，不信任扩展名，拒绝 SVG。网页初始化要求服务器日志中的一次性代码，也可通过离线 CLI 创建管理员；内置 CSP、速率限制与 Argon2id 密码哈希。
 - **备份与校验**：内置一致性快照与数据校验，检查发现缺失或损坏文件时会标记相关图片；数据可通过快照在支持的平台之间迁移。
 
-本页对应 `v0.0.2`。各版本的变更见 [GitHub Releases](https://github.com/dejavumoe/picberth/releases)。
+本页对应 `v0.0.3`。各版本的变更见 [GitHub Releases](https://github.com/dejavumoe/picberth/releases)。
 
 ---
 
@@ -40,7 +40,63 @@ echo 'your-secure-password' | picberth admin create --username admin --password-
 
 ## Docker 部署
 
-发布镜像为 `ghcr.io/dejavumoe/picberth:v0.0.2`。镜像基于 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。Compose 示例启用只读根文件系统，在 `/tmp` 挂载 tmpfs 供 SQLite 存放临时文件，并从当前检出构建镜像：
+发布镜像为 `ghcr.io/dejavumoe/picberth:v0.0.3`。镜像基于 `gcr.io/distroless/static-debian13:nonroot`，以 UID/GID `65532:65532` 运行，不含 shell。下面两个 Compose 示例都以只读根文件系统运行，并在 `/tmp` 挂载 tmpfs 供 SQLite 存放临时文件。
+
+### 使用宿主机目录的 Compose 示例
+
+数据保存在 `compose.yaml` 旁边的目录中。首次启动前先创建该目录，属主设为镜像用户，并禁止其他用户访问：
+
+```sh
+mkdir picberth && cd picberth
+mkdir -m 0700 data
+sudo chown 65532:65532 data
+```
+
+将以下内容保存为 `compose.yaml`：
+
+```yaml
+services:
+  picberth:
+    image: ghcr.io/dejavumoe/picberth:v0.0.3
+    ports:
+      - "127.0.0.1:12433:12433"
+    environment:
+      PICBERTH_PUBLIC_URL: https://pics.example.com
+      PICBERTH_TRUSTED_PROXIES: 172.30.112.1
+    volumes:
+      - ./data:/data
+    networks:
+      - picberth
+    restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  picberth:
+    ipam:
+      config:
+        - subnet: 172.30.112.0/24
+          gateway: 172.30.112.1
+```
+
+```sh
+docker compose up -d
+docker compose logs picberth   # 首次启动时，一次性设置码会出现在这里
+```
+
+- `./data` 保存数据库、图片以及默认的 `snapshots/` 目录。请在控制台状态页创建快照，并备份 `data/snapshots/`；容器运行时不要复制 `data/picberth.db`。该目录属于 UID 65532，在宿主机上读取需要 `sudo`。
+- `PICBERTH_TRUSTED_PROXIES` 是固定网络 `picberth` 的网关地址，即宿主机上的反向代理连接容器时使用的地址。如果宿主机上该子网已被占用，请同时修改子网、网关和这个值。
+- 升级时修改镜像标签，然后运行 `docker compose pull && docker compose up -d`。
+
+### 从当前检出构建
+
+[`deploy/compose.yaml`](deploy/compose.yaml) 从当前检出构建镜像，数据保存在命名卷中：
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -49,7 +105,7 @@ docker compose -f deploy/compose.yaml up -d --build
 ### 部署注意事项
 
 - **切勿直接暴露端口**：示例中仅将端口绑定到宿主机的 `127.0.0.1:12433:12433`。**不要**配置为 `12433:12433`——Docker 发布端口会自动配置宿主机 iptables 规则并绕过 ufw / firewalld 防火墙，导致服务未经反代直接暴露于公网。
-- **存储卷建议**：Docker Desktop（macOS / Windows）用户请务必使用 Docker 命名卷（如 `picberth-data:/data`），避免宿主机文件夹绑定挂载导致的性能损耗与文件所有权权限问题。
+- **存储卷建议**：宿主机目录适用于 Linux 主机。Docker Desktop（macOS / Windows）用户请改用命名卷（如 `picberth-data:/data`），因为在这些平台上绑定挂载宿主机目录性能较差，且存在文件所有权问题。
 - **Docker 版本要求**：建议使用 Docker Engine ≥ 28.3.3（修复了 firewalld 重载后已发布端口暴露至局域网的安全漏洞 CVE-2025-54388，以及旧版回环端口绑定的隔离边界问题）。
 - **只读根文件系统**：容器以 `read_only: true` 运行时必须保留可写的 `/tmp`（示例使用 `tmpfs`）。否则大结果集排序以及升级时创建索引会因磁盘 I/O 错误而失败。
 - **内置 Caddy 示例**：若宿主机未安装独立反向代理，可使用 [`deploy/compose.caddy.yaml`](deploy/compose.caddy.yaml)，由同网络内的 Caddy 容器自动申请 TLS 证书并提供 HTTPS 接入。
@@ -223,14 +279,14 @@ linux-task.ps1 -Mode build -Project <项目路径> -Command 'export PATH="$HOME/
 每次发布前先做演练。演练执行完整 CI，构建四个平台的压缩包和双架构容器，不创建标签、不发布 Release、不推送镜像：
 
 ```sh
-gh workflow run release.yml --ref master -f version=v0.0.2
+gh workflow run release.yml --ref master -f version=v0.0.3
 ```
 
 正式发布时，更新 `web/package.json`、`internal/buildinfo/buildinfo.go`、`Dockerfile`、`.github/actions/native-image/action.yml` 与 `internal/httpapi/openapi.json` 中的版本（不一致时 `go test ./cmd/picberth` 会失败），确认目标提交已在 `master` 上且 CI、CodeQL、Scorecard 与演练全部成功，然后推送附注标签：
 
 ```sh
-git tag -a v0.0.2 <verified-commit-sha> -m "PicBerth v0.0.2"
-git push origin v0.0.2
+git tag -a v0.0.3 <verified-commit-sha> -m "PicBerth v0.0.3"
+git push origin v0.0.3
 ```
 
 标签触发发布：创建带自动生成说明的 GitHub Release，并推送镜像 `ghcr.io/dejavumoe/picberth:<tag>`。不发布 `latest` 或缩写版本别名，也不覆写已有标签：镜像标签已存在且内容不同时，发布会停止。发布运行中途失败时，使用“Re-run failed jobs”继续，该次运行已构建的镜像会被复用。

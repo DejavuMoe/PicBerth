@@ -13,7 +13,7 @@ A personal self-hosted image hosting service designed for a single administrator
 - **Security defaults**: Listens on loopback `127.0.0.1:12433` by default; identifies image formats from content, ignores filename extensions, and rejects SVG. Web setup requires the one-time code in the server logs; an offline CLI can also create the administrator. CSP, rate limits, and Argon2id password hashing are built in.
 - **Backups and integrity checks**: Consistent snapshots and integrity checks flag images with missing or damaged files. Snapshots can move data between supported platforms.
 
-This page covers `v0.0.2`. Changes for each version are listed in [GitHub Releases](https://github.com/dejavumoe/picberth/releases).
+This page covers `v0.0.3`. Changes for each version are listed in [GitHub Releases](https://github.com/dejavumoe/picberth/releases).
 
 ---
 
@@ -40,7 +40,63 @@ Then configure your reverse proxy (Caddy or Nginx) to forward public traffic to 
 
 ## Docker Deployment
 
-The release image is `ghcr.io/dejavumoe/picberth:v0.0.2`. It uses `gcr.io/distroless/static-debian13:nonroot`, runs as UID/GID `65532:65532`, and contains no shell. The Compose example enables a read-only root filesystem, mounts a tmpfs at `/tmp` for SQLite temporary files, and builds from the current checkout:
+The release image is `ghcr.io/dejavumoe/picberth:v0.0.3`. It uses `gcr.io/distroless/static-debian13:nonroot`, runs as UID/GID `65532:65532`, and contains no shell. Both Compose examples below run it with a read-only root filesystem and a tmpfs at `/tmp` for SQLite temporary files.
+
+### Compose with a host directory
+
+Keep the data in a directory next to `compose.yaml`. Create it before the first start, owned by the image user and closed to everyone else:
+
+```sh
+mkdir picberth && cd picberth
+mkdir -m 0700 data
+sudo chown 65532:65532 data
+```
+
+Save this as `compose.yaml`:
+
+```yaml
+services:
+  picberth:
+    image: ghcr.io/dejavumoe/picberth:v0.0.3
+    ports:
+      - "127.0.0.1:12433:12433"
+    environment:
+      PICBERTH_PUBLIC_URL: https://pics.example.com
+      PICBERTH_TRUSTED_PROXIES: 172.30.112.1
+    volumes:
+      - ./data:/data
+    networks:
+      - picberth
+    restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  picberth:
+    ipam:
+      config:
+        - subnet: 172.30.112.0/24
+          gateway: 172.30.112.1
+```
+
+```sh
+docker compose up -d
+docker compose logs picberth   # the one-time setup code appears here on the first start
+```
+
+- `./data` holds the database, the images and the default `snapshots/` directory. Create snapshots from the console Status page and back up `data/snapshots/`; do not copy `data/picberth.db` while the container runs. The directory belongs to UID 65532, so reading it from the host needs `sudo`.
+- `PICBERTH_TRUSTED_PROXIES` is the gateway of the fixed `picberth` network, the address a reverse proxy on the host connects from. If the subnet is taken on your host, change the subnet, the gateway and this value together.
+- To upgrade, change the image tag, then run `docker compose pull && docker compose up -d`.
+
+### Build from the checkout
+
+[`deploy/compose.yaml`](deploy/compose.yaml) builds the image from the current checkout and keeps the data in a named volume:
 
 ```sh
 docker compose -f deploy/compose.yaml up -d --build
@@ -49,7 +105,7 @@ docker compose -f deploy/compose.yaml up -d --build
 ### Deployment Considerations
 
 - **Do not publish ports directly to public interfaces**: The example configuration binds ports exclusively to host `127.0.0.1:12433:12433`. **Never** configure `12433:12433`—Docker writes its own iptables rules and bypasses host ufw / firewalld firewalls, exposing the service directly to the public Internet without reverse proxy protection.
-- **Volume recommendations**: On Docker Desktop (macOS / Windows), always use Docker named volumes (e.g. `picberth-data:/data`) to avoid filesystem performance bottlenecks and ownership quirks associated with host directory bind mounts.
+- **Volume recommendations**: A host directory suits Linux hosts. On Docker Desktop (macOS / Windows), use a named volume (e.g. `picberth-data:/data`) instead: host directory bind mounts there are slow and have ownership quirks.
 - **Docker version requirement**: Docker Engine ≥ 28.3.3 is recommended (resolves CVE-2025-54388, where published ports became reachable from the LAN after a firewalld reload, and fixes loopback publishing isolation boundaries).
 - **Read-only root filesystem**: Keep a writable `/tmp` (the examples use `tmpfs`) whenever the container runs with `read_only: true`. Without it, large sorts and index builds during an upgrade fail with a disk I/O error.
 - **Embedded Caddy example**: If the host lacks an existing reverse proxy, use [`deploy/compose.caddy.yaml`](deploy/compose.caddy.yaml), where an in-network Caddy container automatically provisions TLS certificates and provides HTTPS access.
@@ -223,14 +279,14 @@ linux-task.ps1 -Mode build -Project <project-path> -Command 'export PATH="$HOME/
 Run a rehearsal before every release. It runs the full CI and builds the four platform archives and both container architectures without creating a tag, a release or a pushed image:
 
 ```sh
-gh workflow run release.yml --ref master -f version=v0.0.2
+gh workflow run release.yml --ref master -f version=v0.0.3
 ```
 
 To release, update the version in `web/package.json`, `internal/buildinfo/buildinfo.go`, `Dockerfile`, `.github/actions/native-image/action.yml` and `internal/httpapi/openapi.json` (`go test ./cmd/picberth` fails when they disagree), confirm that CI, CodeQL, Scorecard and the rehearsal succeeded for the target commit on `master`, then push an annotated tag:
 
 ```sh
-git tag -a v0.0.2 <verified-commit-sha> -m "PicBerth v0.0.2"
-git push origin v0.0.2
+git tag -a v0.0.3 <verified-commit-sha> -m "PicBerth v0.0.3"
+git push origin v0.0.3
 ```
 
 The tag publishes the GitHub Release with generated notes and the image `ghcr.io/dejavumoe/picberth:<tag>`. No `latest` or shortened version alias is published, and an existing tag is never overwritten: publishing stops when the image tag already exists with different content. If a release run fails part-way, use "Re-run failed jobs"; the images already built for that run are reused.
