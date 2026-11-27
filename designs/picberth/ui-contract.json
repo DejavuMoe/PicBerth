@@ -475,7 +475,7 @@
           "web/e2e/session.spec.ts"
         ]
       },
-      "status": "needs-review"
+      "status": "implemented"
     }
   ]
 }

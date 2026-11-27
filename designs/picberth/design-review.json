@@ -23,7 +23,8 @@
     },
     {
       "path": "r8/console.html",
-      "status": "needs-review"
+      "status": "approved",
+      "approvalEvidence": "Owner approved r8/console.html on 2026-11-27 (\"批准 console.html\") at design commit 578cd7a, which adds the upload queue after signing in again; file unchanged since."
     }
   ]
 }
