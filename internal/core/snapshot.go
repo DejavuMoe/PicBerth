@@ -44,7 +44,7 @@ type SnapshotInfo struct {
 }
 
 // Snapshot writes a consistent, verified copy of the library below parent (the configured snapshot
-// directory when empty) following docs/architecture.md §5. On any failure nothing is left behind.
+// directory when empty) On any failure nothing is left behind.
 func (s *Service) Snapshot(ctx context.Context, p Principal, parent string) (info SnapshotInfo, err error) {
 	if !p.IsAdmin() {
 		return SnapshotInfo{}, s.denyAdmin(p)

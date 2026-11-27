@@ -4,7 +4,7 @@
     {
       "id": "production-code",
       "type": "code",
-      "location": "internal/httpapi, web/src/lib, docs/api.md",
+      "location": "internal/httpapi (openapi.json), web/src/lib",
       "roles": [
         "functional-truth"
       ],

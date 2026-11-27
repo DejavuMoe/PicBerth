@@ -61,7 +61,7 @@ type AuditQuery struct {
 	Kind   string
 }
 
-// AuditKinds groups action strings into the console's filter categories (docs/api.md §7).
+// AuditKinds groups action strings into the console's filter categories.
 var AuditKinds = map[string]meta.AuditFilter{
 	"image":    {Prefixes: []string{"image."}},
 	"folder":   {Prefixes: []string{"folder."}},

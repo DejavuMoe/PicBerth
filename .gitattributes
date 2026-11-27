@@ -10,7 +10,6 @@
 # Exclude agent tooling, prototypes, and documentation from language statistics.
 .agents/** linguist-detectable=false
 designs/** linguist-detectable=false
-docs/** linguist-detectable=false
 
 # Generated build outputs.
 dist/** linguist-generated=true

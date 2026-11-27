@@ -1,7 +1,7 @@
 // Package imaging identifies, validates and thumbnails uploaded images.
 //
 // Validation never trusts file names or client-declared content types: the format is sniffed from the
-// leading bytes, then the container structure is walked without decoding pixels (design baseline §6.3).
+// leading bytes, then the container structure is walked without decoding pixels.
 // Full decoding only happens in Thumbnail, behind a pixel limit checked from the header first.
 package imaging
 

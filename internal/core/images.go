@@ -32,7 +32,7 @@ func fmtTimePtr(ms *int64) *string {
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
-// ImageView is the API representation of an image (docs/api.md §3).
+// ImageView is the API representation of an image.
 type ImageView struct {
 	ID        string      `json:"id"`
 	URL       string      `json:"url"`

@@ -191,7 +191,7 @@ func (db *DB) init(ctx context.Context, ms []migration) error {
 			ErrSchemaTooNew, userVersion, len(ms))
 	}
 	if userVersion > 0 && userVersion < len(ms) {
-		// Baseline §12.4: snapshot the metadata before changing an existing schema. Image files are
+		// Snapshot the metadata before changing an existing schema. Image files are
 		// immutable and untouched by migrations, so the database copy is what a rollback needs.
 		backup, err := db.backupBeforeMigration(ctx, userVersion)
 		if err != nil {

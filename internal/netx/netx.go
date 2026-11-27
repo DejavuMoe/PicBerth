@@ -92,7 +92,7 @@ func PeerAddr(remoteAddr string) (netip.Addr, bool) {
 	return a.Unmap().WithZone(""), true
 }
 
-// ClientIP applies the baseline §11.4 rules: unless the peer is a trusted proxy the peer address is the
+// ClientIP resolves the real client address: unless the peer is a trusted proxy the peer address is the
 // client; otherwise X-Forwarded-For (all header lines, in order) is walked right to left skipping trusted
 // hops, and the first untrusted entry is the client. An empty or unparsable chain falls back to the peer.
 func (t *Trusted) ClientIP(remoteAddr string, xff []string) Result {

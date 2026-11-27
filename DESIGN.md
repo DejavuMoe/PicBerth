@@ -1,7 +1,7 @@
 # PicBerth design rules
 
 Binding rules for every prototype under `designs/` and for the production console in `web/`. Product scope and
-content boundaries are in `docs/product/constraints.md`; the approved prototype is the visual truth for anything
+content boundaries are in `AGENTS.md`; the approved prototype is the visual truth for anything
 these rules leave open.
 
 ## 1. Copy
@@ -11,7 +11,7 @@ these rules leave open.
 - No explanatory or descriptive text that the layout, the control or the label already makes clear. No hints
   under fields unless the user cannot finish the task without them.
 - Write for the instance administrator: plain, precise product words, not chatty and not invented. Reuse the
-  terms in `docs/ui/capabilities.md` (图片, 上传, 回收站, 令牌, 公开, 私有, 永久删除 …).
+  terms already in the console (图片, 文件夹, 上传, 回收站, 令牌, 永久删除 …).
 - Length follows the job: navigation and buttons are one or two words; states are short phrases; errors say
   what is wrong and, when it is not obvious, what to do.
 - One name per thing everywhere (nav, title, empty state, toast).

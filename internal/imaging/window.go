@@ -13,7 +13,7 @@ const (
 	maxExifBytes  = 1 << 20  // EXIF/TIFF payloads larger than this are ignored, not read
 	trailingScan  = 4 << 10  // bytes of trailing data inspected for embedded markup
 	defaultFrames = 10000
-	// defaultPixels is used when Limits.MaxPixels is not set (design baseline §13.3: 50 megapixels).
+	// defaultPixels is used when Limits.MaxPixels is not set (50 megapixels).
 	defaultPixels int64 = 50_000_000
 )
 

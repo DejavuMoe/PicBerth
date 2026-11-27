@@ -10,7 +10,7 @@ import (
 	"picberth/internal/meta"
 )
 
-// FolderView is the API representation of a folder (docs/api.md §3).
+// FolderView is the API representation of a folder.
 type FolderView struct {
 	ID         string  `json:"id"`
 	Name       string  `json:"name"`

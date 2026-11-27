@@ -6,7 +6,7 @@ import (
 )
 
 // openAPIDoc is the static OpenAPI 3.1 description of the public API. It is served without
-// authentication and kept in sync with docs/api.md.
+// authentication and is the API contract.
 //
 //go:embed openapi.json
 var openAPIDoc []byte

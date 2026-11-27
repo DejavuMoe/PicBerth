@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// StartJobs launches the in-process background jobs (docs/architecture.md §4): thumbnail worker with
+// StartJobs launches the in-process background jobs: thumbnail worker with
 // startup backfill, quick check 30 s after start and every 24 h, hourly purge of expired trash, hourly
 // cleanup of expired sessions and hourly batched pruning of the audit log. Call once; Close stops them.
 func (s *Service) StartJobs() {

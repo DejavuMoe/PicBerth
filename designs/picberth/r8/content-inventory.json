@@ -13672,7 +13672,7 @@
       "purpose": "domain-value",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "designs/picberth/data.jsx AUDIT_KINDS (revision 7); docs/ui.md",
+      "evidence": "designs/picberth/data.jsx AUDIT_KINDS (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },
@@ -14233,7 +14233,7 @@
       "purpose": "user-action",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "docs/ui.md Library and trash (revision 7)",
+      "evidence": "designs/picberth/library.jsx (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },
@@ -19280,7 +19280,7 @@
       "purpose": "user-action",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "designs/picberth/ui.jsx THEMES (revision 7); docs/ui.md",
+      "evidence": "designs/picberth/ui.jsx THEMES (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },
@@ -19304,7 +19304,7 @@
       "purpose": "user-action",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "designs/picberth/ui.jsx THEMES (revision 7); docs/ui.md",
+      "evidence": "designs/picberth/ui.jsx THEMES (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },
@@ -19626,7 +19626,7 @@
       "purpose": "domain-field",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "docs/ui.md Status (revision 7)",
+      "evidence": "designs/picberth/admin.jsx (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },
@@ -20463,7 +20463,7 @@
       "purpose": "user-action",
       "origin": "existing-approved-ui-copy",
       "decision": "allow",
-      "evidence": "designs/picberth/ui.jsx THEMES (revision 7); docs/ui.md",
+      "evidence": "designs/picberth/ui.jsx THEMES (revision 7)",
       "flags": [],
       "notes": "approved revision 7 copy that the r7 capture did not render"
     },

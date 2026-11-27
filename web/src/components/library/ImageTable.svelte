@@ -89,7 +89,7 @@
         }}
       >
         <td class="col-thumb">
-          <!-- The checkbox sits over the thumbnail, so thumbnails line up with the title (D8). -->
+          <!-- The checkbox sits over the thumbnail, so thumbnails line up with the title. -->
           <span class="pick">
             {#if im.broken}
               <span class="thumb" style="display: grid; place-items: center"><Icon name="image" /></span>

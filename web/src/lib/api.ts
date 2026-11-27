@@ -238,7 +238,7 @@ async function request<T>(method: string, path: string, o: RequestOptions = {}):
 }
 
 // ---------------------------------------------------------------------------
-// Endpoints (docs/api.md only)
+// Endpoints (the contract is internal/httpapi/openapi.json)
 
 export const rawUrl = (id: string) => `${BASE}/images/${encodeURIComponent(id)}/raw`;
 export const thumbUrl = (id: string) => `${BASE}/images/${encodeURIComponent(id)}/thumb`;

@@ -1,4 +1,4 @@
-// Types mirror docs/api.md and the approved folder contract. Unknown response fields are ignored.
+// Types mirror internal/httpapi/openapi.json. Unknown response fields are ignored.
 
 export type ImageFormat = 'jpeg' | 'png' | 'gif' | 'webp' | 'avif';
 export type ImageState = 'active' | 'trashed';

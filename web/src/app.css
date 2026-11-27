@@ -372,7 +372,7 @@ a {
 .btn-ghost[aria-pressed='true'] {
   background: var(--sel);
 }
-/* White on Radix red 11 is 5.2:1; red 9 was 3.67:1 (D7). Hover darkens with an alpha layer, not a new colour. */
+/* White on Radix red 11 is 5.2:1; red 9 was 3.67:1. Hover darkens with an alpha layer, not a new colour. */
 .btn-danger {
   background: var(--red-l11);
   color: var(--gray-l1);
@@ -1071,11 +1071,11 @@ kbd {
 .thumb { width: 32px; height: 32px; border-radius: var(--r-xs); object-fit: cover; background: var(--fill); box-shadow: 0 0 0 var(--bw) var(--hairline); }
 .name-cell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .name-cell .name { font-weight: var(--w-medium); }
-/* Row actions stay visible (D8), muted until the row is hovered or focused. */
+/* Row actions stay visible, muted until the row is hovered or focused. */
 .row-actions { display: flex; justify-content: flex-end; gap: 2px; }
 .row-actions .btn { color: var(--muted); }
 .table tr:hover .row-actions .btn, .table tr:focus-within .row-actions .btn, .table tr.is-open .row-actions .btn { color: var(--text); }
-/* Touch: no checkboxes until a selection starts (选择 or a long press) (D6). */
+/* Touch: no checkboxes until a selection starts (选择 or a long press). */
 @media (hover: none) { .table tr:hover .cell-check { opacity: 0; } .selecting .cell-check, .cell-check[aria-checked='true'] { opacity: 1; } }
 @container (max-width: 860px) { .col-dims { display: none; } }
 @container (max-width: 720px) { .col-folder { display: none; } }
@@ -1121,7 +1121,7 @@ kbd {
   position: absolute; left: 4px; bottom: 4px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center;
   border-radius: var(--r-xs); background: var(--blackA-9); color: var(--whiteA-12); font-size: var(--fs-s);
 }
-/* The name has a line of its own (D2); trash adds the days left, filtered results the folder, on a second line (D1). */
+/* The name has a line of its own; trash adds the days left, filtered results the folder, on a second line. */
 .jt-cap { position: relative; display: grid; padding-top: 6px; min-width: 0; }
 .jt-cap .name { font-weight: var(--w-medium); white-space: nowrap; overflow: hidden; }
 .jt-cap .meta { color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-s); white-space: nowrap; }
@@ -1371,7 +1371,7 @@ button.tn-tw:not(:disabled):hover { background: var(--sel); color: var(--text); 
 
 /* ---------------------------------------------------------------- admin pages */
 /* Titles, section headings and every row start on the gutter. */
-/* 系统 pages: one centred column (D5). */
+/* 系统 pages: one centred column. */
 .page {
   max-width: calc(760px + 2 * var(--gutter));
   margin: 0 auto;

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	// defaultThumbPixels is used when maxPixels <= 0 (design baseline §13.3: 25 megapixels).
+	// defaultThumbPixels is used when maxPixels <= 0 (25 megapixels).
 	defaultThumbPixels int64 = 25_000_000
 	jpegQuality              = 82
 	// preReduceRatio: sources at least this many times larger than the target (per axis) are first

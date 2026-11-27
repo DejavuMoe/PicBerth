@@ -186,7 +186,7 @@ func (u *Upload) Close() {
 	}
 }
 
-// Commit validates the received file and registers it (docs/architecture.md §4).
+// Commit validates the received file and registers it.
 func (u *Upload) Commit(ctx context.Context) (UploadResult, error) {
 	s := u.s
 	if !u.haveFile {

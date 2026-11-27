@@ -21,7 +21,7 @@ import (
 	"picberth/internal/ratelimit"
 )
 
-// assertInvariants checks I1-I5 strictly (the state a successful Check must leave behind).
+// assertInvariants checks the state a successful Check must leave behind.
 func assertInvariants(t *testing.T, e *env) {
 	t.Helper()
 	ctx := context.Background()

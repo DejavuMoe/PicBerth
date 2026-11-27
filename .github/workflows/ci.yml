@@ -23,8 +23,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
-      design: ${{ steps.filter.outputs.design }}
-      skills: ${{ steps.filter.outputs.skills }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,7 +36,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF_TYPE" == tag || -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}"; then
-            printf '%s\n' code=true design=true skills=true >> "$GITHUB_OUTPUT"
+            printf '%s\n' code=true >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
@@ -46,20 +44,16 @@ jobs:
           fi
           git diff --name-only --no-renames -z "$BASE" "$HEAD" > "$RUNNER_TEMP/changed-paths"
           code=false
-          design=false
-          skills=false
           while IFS= read -r -d '' path; do
             case "$path" in
-              .agents/skills/baoyu-design/agents/gen-pptx/*|.agents/skills/baoyu-design/agents/gen-video/*) design=true ;;
-              .agents/skills/security-audit/*.cjs|.agents/skills/security-audit/*.json) skills=true ;;
-              .github/workflows/ci.yml|.github/actions/setup/*) code=true; design=true; skills=true ;;
-              docs/*|designs/*|.agents/*) ;;
+              .github/workflows/ci.yml|.github/actions/setup/*) code=true ;;
+              designs/*|.agents/*) ;;
               */*) code=true ;;
               *.md|LICENSE|LICENSE.*) ;;
               *) code=true ;;
             esac
           done < "$RUNNER_TEMP/changed-paths"
-          printf '%s\n' "code=$code" "design=$design" "skills=$skills" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "code=$code" >> "$GITHUB_OUTPUT"
 
   test:
     needs: changes
@@ -96,46 +90,6 @@ jobs:
         if: runner.arch == 'X64'
         working-directory: web
         run: pnpm audit --audit-level moderate
-  design-tools:
-    needs: changes
-    if: needs.changes.outputs.design == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          node-only: 'true'
-      - name: Check design export tools
-        run: |
-          for tool in gen-pptx gen-video; do
-            (
-              cd ".agents/skills/baoyu-design/agents/$tool"
-              npm ci --ignore-scripts
-              npm audit --audit-level moderate
-              npm run typecheck
-              npm run build
-              npm test
-            )
-          done
-
-  skill-tests:
-    needs: changes
-    if: needs.changes.outputs.skills == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          node-only: 'true'
-      - name: Test security audit validators
-        run: node --test .agents/skills/security-audit/*.test.cjs
-
   cross-compile:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -219,7 +173,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, test, cross-compile, e2e, docker, design-tools, skill-tests]
+    needs: [changes, test, cross-compile, e2e, docker]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -234,7 +188,5 @@ jobs:
               elif $selected == "false" then $jobs | all(.result == "skipped")
               else false end;
             .changes.result == "success" and
-            check(.changes.outputs.code; [.test, .["cross-compile"], .e2e, .docker]) and
-            check(.changes.outputs.design; [.["design-tools"]]) and
-            check(.changes.outputs.skills; [.["skill-tests"]])
+            check(.changes.outputs.code; [.test, .["cross-compile"], .e2e, .docker])
           ' <<< "$RESULTS"

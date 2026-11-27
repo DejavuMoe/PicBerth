@@ -20,7 +20,7 @@ const (
 	CheckFull  = "full"
 )
 
-// Issue kinds (docs/api.md CheckReport).
+// Issue kinds reported in a CheckReport.
 const (
 	IssueMissingFile  = "missing-file"
 	IssueSizeMismatch = "size-mismatch"
@@ -61,9 +61,9 @@ func (r *CheckReport) add(kind, imageID, path string, repaired bool) {
 	r.Issues = append(r.Issues, is)
 }
 
-// Check verifies invariants I1–I5 (baseline §6.6), repairing what the protocol allows: pending moves,
-// leftovers of purged images, stale temp files and (full mode) orphan files, which go to quarantine/.
-// The database decides where a file must be.
+// Check verifies that every record has its file where its state says it must be, repairing what the
+// protocol allows: pending moves, leftovers of purged images, stale temp files and (full mode) orphan
+// files, which go to quarantine/. The database decides where a file must be.
 func (s *Service) Check(ctx context.Context, p Principal, mode string) (*CheckReport, error) {
 	if !p.IsAdmin() {
 		return nil, s.denyAdmin(p)

@@ -30,21 +30,6 @@ updates:
     groups:
       web:
         patterns: ["*"]
-  - package-ecosystem: npm
-    open-pull-requests-limit: 1
-    directories:
-      - /.agents/skills/baoyu-design/agents/gen-pptx
-      - /.agents/skills/baoyu-design/agents/gen-video
-    schedule:
-      interval: monthly
-    ignore:
-      - dependency-name: typescript
-        update-types: [version-update:semver-major]
-      - dependency-name: '@types/node'
-        update-types: [version-update:semver-major]
-    groups:
-      design-tools:
-        patterns: ["*"]
   - package-ecosystem: docker
     open-pull-requests-limit: 1
     directory: /

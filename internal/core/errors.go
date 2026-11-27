@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Stable error codes (docs/api.md §2).
+// Stable error codes carried in problem+json responses.
 const (
 	CodeValidation          = "validation"
 	CodeUnauthorized        = "unauthorized"

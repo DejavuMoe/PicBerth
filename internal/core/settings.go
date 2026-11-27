@@ -16,7 +16,7 @@ const (
 	uploadsPerMinute = 60
 )
 
-// Settings are the runtime-editable business settings (docs/api.md §3).
+// Settings are the runtime-editable business settings.
 type Settings struct {
 	MaxUploadBytes     int64    `json:"maxUploadBytes"`
 	AllowedFormats     []string `json:"allowedFormats"`
@@ -66,7 +66,7 @@ func defaultSettings(hardMax int64) Settings {
 	}
 }
 
-// validate checks every range from docs/api.md §3.
+// validate checks every documented range.
 func (st *Settings) validate(hardMax int64) error {
 	if st.MaxUploadBytes < minUploadBytes || st.MaxUploadBytes > hardMax {
 		return validation("maxUploadBytes must be between %d and %d.", minUploadBytes, hardMax)

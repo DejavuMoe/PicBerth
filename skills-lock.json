@@ -1,12 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "baoyu-design": {
-      "source": "JimLiu/baoyu-design",
-      "sourceType": "github",
-      "skillPath": "skills/baoyu-design/SKILL.md",
-      "computedHash": "c6a470ac32ec601b7ce841c6463c02e93b4f69ec92cd656b02bee80aba5b2fc8"
-    },
     "prototype-first-ui": {
       "source": "DejavuMoe/prototype-first-ui",
       "sourceType": "github",

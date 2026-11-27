@@ -18,5 +18,4 @@ internal/webui/dist
 *.log
 # Documentation and deploy helpers are not needed to build the image
 **/*.md
-docs
 deploy
