@@ -135,3 +135,20 @@ test('keeps the token cursor after a late folder response', async ({ page }) => 
   await page.getByRole('button', { name: '加载更多' }).click();
   expect(new URL((await next).url()).searchParams.get('cursor')).toBe('token');
 });
+
+test('picks a token expiry with the pointer inside the dialog', async ({ page }, testInfo) => {
+  await login(page);
+  await page.goto('/tokens');
+  const name = uniqueName('expiring', testInfo);
+  await page.getByRole('button', { name: '新建令牌' }).click();
+  await page.locator('#tk-name').fill(name);
+  await page.getByRole('button', { name: /有效期/ }).click();
+  await page.locator('.menu [role^="menuitem"]').filter({ hasText: '30 天' }).click({ timeout: 3_000 });
+  await page.getByRole('button', { name: '创建', exact: true }).click();
+
+  await expect.poll(async () => {
+    const response = await page.request.get('/api/v1/tokens');
+    const tokens = (await response.json()) as { items: { name: string; expiresAt: string | null }[] };
+    return tokens.items.find((t) => t.name === name)?.expiresAt ?? null;
+  }).not.toBeNull();
+});

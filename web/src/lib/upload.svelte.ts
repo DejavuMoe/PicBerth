@@ -1,6 +1,7 @@
 // Upload queue: concurrency 3, one XHR per file (for real progress), client pre-checks,
 // window-wide drop / paste, link format preference.
 
+import { untrack } from 'svelte';
 import { ApiError, errorDetail, errorMessage, handleUnauthorized, isRetryable, networkError, noteVersion, problemFrom } from './api';
 import { formatBytes, formatLimit, formatNames } from './format';
 import { dropBlocked, isTypingTarget } from './modal';
@@ -197,6 +198,8 @@ function pickQueued(): UploadItem | undefined {
 }
 
 function pump() {
+  // Without a session every request would be refused: queued files wait for the next sign-in.
+  if (!session.authenticated) return;
   while (running < MAX_CONCURRENT) {
     const next = pickQueued();
     if (!next) return;
@@ -278,6 +281,8 @@ function start(item: UploadItem) {
         setTimeout(pump, err.retryAfter * 1000 + 50);
       } else {
         fail(item, err);
+        // The file itself was not refused; it can go again once signed in.
+        if (xhr.status === 401) item.retryable = true;
       }
     }
     settle();
@@ -289,6 +294,13 @@ function start(item: UploadItem) {
   xhr.addEventListener('abort', settle);
   xhr.send(body);
 }
+
+// Signing in again resumes whatever was still queued.
+$effect.root(() => {
+  $effect(() => {
+    if (session.authenticated) untrack(pump);
+  });
+});
 
 export function retry(id: number) {
   const item = uploads.items.find((i) => i.id === id);

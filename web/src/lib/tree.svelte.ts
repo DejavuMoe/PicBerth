@@ -40,6 +40,7 @@ class FolderTree {
   mover: ((ids: string[], to: string | null) => void) | null = null;
 
   #inflight: Promise<void> | null = null;
+  #queued: Promise<void> | null = null;
 
   /** The folder id on screen: null at the library root, undefined on other screens or for an unknown folder. */
   current = $derived.by((): string | null | undefined => {
@@ -50,7 +51,15 @@ class FolderTree {
   });
 
   load(quiet = false): Promise<void> {
-    if (this.#inflight) return this.#inflight;
+    // A request already under way may have been answered before the change this caller just made:
+    // callers that arrive meanwhile share one fresh request that starts after it.
+    if (this.#inflight) {
+      this.#queued ??= this.#inflight.then(() => {
+        this.#queued = null;
+        return this.load(true);
+      });
+      return this.#queued;
+    }
     if (!quiet || this.phase !== 'ready') this.phase = 'loading';
     this.#inflight = (async () => {
       try {

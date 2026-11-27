@@ -253,3 +253,39 @@ test('uploads into the current folder and finds it from the root with the folder
   }
   await checkPageHealth(page);
 });
+
+test('shows a new folder when the tree was already refreshing', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  await login(page);
+  const name = uniqueName('late', testInfo);
+  const file = uniqueName('nudge', testInfo) + '.png';
+
+  // The next folder listing is answered late, with what the server held before the folder existed.
+  const listed = Promise.withResolvers<void>();
+  const held = Promise.withResolvers<void>();
+  let stale = true;
+  await page.route('**/api/v1/folders', async (route) => {
+    if (route.request().method() !== 'GET' || !stale) return route.continue();
+    stale = false;
+    const response = await route.fetch();
+    listed.resolve();
+    await held.promise;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.locator('input[type="file"]').setInputFiles({ name: file, mimeType: 'image/png', buffer: samplePng() });
+    await listed.promise;
+
+    await openTree(page, mobile);
+    await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
+    const input = page.getByLabel('文件夹名称');
+    await input.fill(name);
+    const created = page.waitForResponse((r) => r.url().endsWith('/api/v1/folders') && r.request().method() === 'POST');
+    await input.press('Enter');
+    expect((await created).status()).toBe(201);
+  } finally {
+    held.resolve();
+  }
+  await expect(tree(page).locator('.tn-main').filter({ hasText: name })).toBeVisible();
+  await page.unrouteAll({ behavior: 'wait' });
+});

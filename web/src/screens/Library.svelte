@@ -75,8 +75,7 @@
     if (!id || lib.mode !== 'library') return;
     untrack(() => {
       openRequest.id = null;
-      if (lib.phase === 'ready' && lib.items.some((i) => i.id === id)) lib.open(id);
-      else lib.pendingOpen = id;
+      void lib.reveal(id);
     });
   });
 

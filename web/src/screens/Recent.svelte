@@ -97,8 +97,7 @@
 
   function openUpload(u: UploadItem) {
     if (!u.image) return;
-    if (lib.items.some((i) => i.id === u.image!.id)) lib.open(u.image.id);
-    else lib.pendingOpen = u.image.id;
+    void lib.reveal(u.image.id);
   }
 
   function maybeLoadMore() {

@@ -40,12 +40,10 @@ export async function refreshSession(): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
-  try {
-    await api.logout();
-  } finally {
-    session.authenticated = false;
-    session.user = null;
-  }
+  // A failed request leaves the cookie valid, so the console stays signed in and the caller reports it.
+  await api.logout();
+  session.authenticated = false;
+  session.user = null;
 }
 
 // An expired session (401 anywhere) flips the flag; App's gate redirects to /login?next=.

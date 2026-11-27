@@ -84,6 +84,8 @@ function dateRange(key: DateKey, now = Date.now()): { since?: string; until?: st
 export const IMAGE_DRAG_TYPE = 'application/x-picberth-images';
 
 const VIEW_KEY = 'picberth.view';
+/** How many further pages opening one image may load before giving up. */
+const REVEAL_PAGES = 20;
 export type ViewMode = 'grid' | 'list';
 /** Grid unless the list was chosen; the old value `table` counts as unset. */
 function loadView(): ViewMode {
@@ -397,10 +399,7 @@ export class Library {
         if (!this.sel.size) this.clearSel();
       }
       this.phase = 'ready';
-      if (this.pendingOpen) {
-        if (this.items.some((i) => i.id === this.pendingOpen)) this.activeId = this.pendingOpen;
-        this.pendingOpen = null;
-      }
+      if (this.pendingOpen) void this.reveal(this.pendingOpen, true);
       if (this.activeId && !this.items.some((i) => i.id === this.activeId)) this.activeId = null;
     } catch (e) {
       if (isAbort(e) || my !== this.#seq) return;
@@ -426,6 +425,27 @@ export class Library {
       this.more = 'error';
       toast(errorMessage(e));
     }
+  }
+
+  /**
+   * Open an image's detail, loading further pages until it is in the list (at most REVEAL_PAGES of them).
+   * The request stays in `pendingOpen` while a reload is under way or may still follow a folder change;
+   * the reload ends with a `settled` call, after which an image that was not found stays closed.
+   */
+  async reveal(id: string, settled = false) {
+    this.pendingOpen = id;
+    if (this.phase !== 'ready') return;
+    const my = this.#seq;
+    for (let n = 0; n < REVEAL_PAGES && !this.items.some((i) => i.id === id); n++) {
+      const before = this.cursor;
+      if (!before) break;
+      await this.loadMore();
+      if (my !== this.#seq) return;
+      if (this.cursor === before) break;
+    }
+    const found = this.items.some((i) => i.id === id);
+    if (this.pendingOpen === id && (found || settled)) this.pendingOpen = null;
+    if (found) this.activeId = id;
   }
 
   async loadRetention(refocus = false) {
